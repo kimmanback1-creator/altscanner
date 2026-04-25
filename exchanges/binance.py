@@ -52,9 +52,12 @@ async def trades_ws(symbols_ref: list):
     """aggTrades WebSocket - 24시간마다 자동 재연결"""
     while True:
         try:
-            streams = "/".join([f"{s.lower()}@aggTrade" for s in symbols_ref])
+            chunk = list(symbols_ref)[:50]
+            streams = "/".join([f"{s.lower()}@aggTrade" for s in chunk])
             url = f"{BINANCE['ws']}{streams}"
-            logger.info(f"[Binance] WS 연결 중... ({len(symbols_ref)}개)")
+            logger.info(f"[Binance] WS URL 길이: {len(url)}")
+            logger.info(f"[Binance] WS URL 샘플: {url[:150]}")
+            logger.info(f"[Binance] WS 연결 중... ({len(chunk)}개)")
 
             async with websockets.connect(
                 url,
