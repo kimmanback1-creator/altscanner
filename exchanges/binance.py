@@ -31,7 +31,7 @@ async def fetch_top_symbols() -> list[str]:
 
 
 async def oi_poller(symbols_ref: list):
-    """OI 30초 폴링 - symbols_ref는 공유 리스트"""
+    """OI 30초 폴링"""
     async with aiohttp.ClientSession() as session:
         while True:
             for symbol in list(symbols_ref):
@@ -39,38 +39,35 @@ async def oi_poller(symbols_ref: list):
                     url = f"{BINANCE['rest_oi']}?symbol={symbol}"
                     async with session.get(url) as resp:
                         data = await resp.json()
-                        logger.info(f"[Binance] OI 응답: {data}")
                     oi = float(data["openInterest"])
                     state.update_oi(EXCHANGE, symbol, oi)
                 except Exception as e:
                     logger.warning(f"[Binance] OI 실패 {symbol}: {e}")
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)
             await asyncio.sleep(OI_POLL_SEC)
 
 
-async def trades_ws(symbols_ref: list):
-    """aggTrades WebSocket - 24시간마다 자동 재연결"""
+async def trades_ws_chunk(symbols: list, chunk_id: int):
+    """심볼 청크 단위 WS 연결"""
+    streams = "/".join([f"{s.lower()}@aggTrade" for s in symbols])
+    url = f"{BINANCE['ws']}{streams}"
+    logger.info(f"[Binance] WS청크{chunk_id} 연결 중... ({len(symbols)}개)")
+
     while True:
         try:
-            chunk = list(symbols_ref)[:50]
-            streams = "/".join([f"{s.lower()}@aggTrade" for s in chunk])
-            url = f"{BINANCE['ws']}{streams}"
-            logger.info(f"[Binance] WS URL 길이: {len(url)}")
-            logger.info(f"[Binance] WS URL 샘플: {url[:150]}")
-            logger.info(f"[Binance] WS 연결 중... ({len(chunk)}개)")
-
             async with websockets.connect(
                 url,
                 ping_interval=20,
-                close_timeout=10
+                close_timeout=10,
+                max_size=10 * 1024 * 1024,
             ) as ws:
-                logger.info("[Binance] WS 연결 완료")
+                logger.info(f"[Binance] WS청크{chunk_id} 연결 완료")
                 msg_count = 0
                 async for raw in ws:
+                    msg_count += 1
+                    if msg_count <= 3:
+                        logger.info(f"[Binance] 청크{chunk_id} RAW: {str(raw)[:150]}")
                     try:
-                        msg_count += 1
-                        if msg_count <= 3:
-                            logger.info(f"[Binance] RAW: {str(raw)[:150]}")
                         msg  = json.loads(raw)
                         data = msg.get("data", msg)
                         symbol = data["s"]
@@ -79,11 +76,25 @@ async def trades_ws(symbols_ref: list):
                         is_buy = not data["m"]
                         state.update_trade(EXCHANGE, symbol, price, qty, is_buy)
                     except Exception as e:
-                        logger.error(f"[Binance] 파싱 오류: {e} raw={str(raw)[:100]}")
+                        logger.error(f"[Binance] 청크{chunk_id} 파싱 오류: {e}")
 
         except Exception as e:
-            logger.error(f"[Binance] WS 끊김: {e} — 5초 후 재연결")
+            logger.error(f"[Binance] WS청크{chunk_id} 끊김: {e} — 5초 후 재연결")
             await asyncio.sleep(5)
+
+
+async def trades_ws(symbols_ref: list):
+    """심볼을 50개씩 나눠서 병렬 WS 연결"""
+    chunk_size = 50
+    chunks = [
+        symbols_ref[i:i+chunk_size]
+        for i in range(0, len(symbols_ref), chunk_size)
+    ]
+    logger.info(f"[Binance] 총 {len(chunks)}개 청크로 WS 연결")
+    await asyncio.gather(*[
+        trades_ws_chunk(chunk, i)
+        for i, chunk in enumerate(chunks)
+    ])
 
 
 async def symbol_refresher(symbols_ref: list):
