@@ -62,16 +62,18 @@ async def trades_ws(symbols_ref: list):
                 close_timeout=10
             ) as ws:
                 logger.info("[Binance] WS 연결 완료")
+                msg_count = 0
                 async for raw in ws:
                     try:
+                        msg_count += 1
+                        if msg_count <= 3:
+                            logger.info(f"[Binance] RAW: {str(raw)[:150]}")
                         msg  = json.loads(raw)
                         data = msg.get("data", msg)
-                        logger.info(f"[Binance] RAW: {str(raw)[:100]}")
                         symbol = data["s"]
                         price  = float(data["p"])
                         qty    = float(data["q"])
                         is_buy = not data["m"]
-                        logger.info(f"[Binance] 틱: {symbol} {price}")
                         state.update_trade(EXCHANGE, symbol, price, qty, is_buy)
                     except Exception as e:
                         logger.error(f"[Binance] 파싱 오류: {e} raw={str(raw)[:100]}")
