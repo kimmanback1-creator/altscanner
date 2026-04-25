@@ -4,12 +4,13 @@
 # ══════════════════════════════════════════
 
 import threading
+import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict
 
 lock = threading.Lock()
-
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SymbolState:
@@ -47,7 +48,6 @@ def update_trade(exchange: str, symbol: str, price: float, qty: float, is_buy: b
     """틱 수신 시 CVD + 거래량 업데이트"""
     with lock:
         s = _state[exchange][symbol]
-        logger.info(f"[State] update_trade 호출: {exchange} {symbol}")
         delta = qty if is_buy else -qty
         s.cvd_cum    += delta
         s.cvd_candle += delta
