@@ -84,7 +84,7 @@ def vol_percentile(vol_ratio: float, vol_history: list) -> float:
 def is_warmed_up(vol_history: list, oi_history: list, cvd_history: list) -> bool:
     """최소 데이터 축적 여부 확인 (워밍업 체크)"""
     return (
-        len(vol_history) >= 20 and
-        len(oi_history)  >= 10 and
-        len(cvd_history) >= 5
+        len(vol_history) >= 1 and
+        len(oi_history)  >= 1 and
+        len(cvd_history) >= 1
     )
