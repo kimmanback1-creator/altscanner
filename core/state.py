@@ -59,10 +59,9 @@ def update_trade(exchange: str, symbol: str, price: float, qty: float, is_buy: b
 
 
 def update_oi(exchange: str, symbol: str, oi: float):
-    """OI 폴링 결과 반영"""
     with lock:
         s = _state[exchange][symbol]
-        if s.oi_current != 0 and s.oi_prev != 0:
+        if s.oi_current != 0:  # ← oi_prev 조건 제거
             chg_pct = (oi - s.oi_current) / s.oi_current * 100
             s.oi_history.append(chg_pct)
             if len(s.oi_history) > 192:
