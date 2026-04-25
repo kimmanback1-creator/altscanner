@@ -39,6 +39,7 @@ async def oi_poller(symbols_ref: list):
                     url = f"{BINANCE['rest_oi']}?symbol={symbol}"
                     async with session.get(url) as resp:
                         data = await resp.json()
+                        logger.info(f"[Binance] OI 응답: {data}")
                     oi = float(data["openInterest"])
                     state.update_oi(EXCHANGE, symbol, oi)
                 except Exception as e:
