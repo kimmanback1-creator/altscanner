@@ -69,6 +69,7 @@ async def trades_ws(symbols_ref: list):
                         price  = float(data["p"])
                         qty    = float(data["q"])
                         is_buy = not data["m"]
+                        logger.info(f"[Binance] 틱: {symbol} {price}")
                         state.update_trade(EXCHANGE, symbol, price, qty, is_buy)
                     except Exception as e:
                         logger.warning(f"[Binance] 파싱 오류: {e}")
