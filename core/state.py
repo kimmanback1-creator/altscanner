@@ -75,19 +75,17 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
     with lock:
         s = _state[exchange][symbol]
 
-        # 히스토리 업데이트
+
+        # 평균 거래량
+        vol_avg = sum(s.vol_history) / len(s.vol_history) if s.vol_history else s.vol_candle
+        vol_ratio = s.vol_candle / vol_avg if vol_avg > 0 else 1.0
         s.vol_history.append(s.vol_candle)
         if len(s.vol_history) > 96:
             s.vol_history.pop(0)
-
         s.cvd_history.append(s.cvd_candle)
         if len(s.cvd_history) > 10:
             s.cvd_history.pop(0)
-
-        # 평균 거래량
-        vol_avg = sum(s.vol_history) / len(s.vol_history) if s.vol_history else 1
-        vol_ratio = s.vol_candle / vol_avg if vol_avg > 0 else 0
-
+            
         # 가격 변화율
         price_chg = 0.0
         if s.price_open > 0:
