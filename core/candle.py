@@ -56,6 +56,7 @@ async def candle_loop():
 
         for exchange in EXCHANGES:
             symbols = state.get_all_symbols(exchange)
+            logger.info(f"[캔들] {exchange} 심볼 수: {len(symbols)}")
             for symbol in symbols:
                 snap = state.snapshot_and_reset(exchange, symbol)
                 result = calc_score(snap)
