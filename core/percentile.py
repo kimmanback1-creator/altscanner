@@ -12,7 +12,7 @@ def to_percentile(current: float, history: list) -> float:
     반환값: 0.0 ~ 100.0
     데이터 부족 시 50.0 반환
     """
-    if len(history) < 5:
+    if len(history) < 1:
         return 50.0
 
     below = sum(1 for h in history if h < current)
@@ -25,7 +25,7 @@ def cvd_percentile(cvd_history: list) -> float:
     반환값: -100.0 ~ +100.0
     양수 = 매수 우세, 음수 = 매도 우세
     """
-    if len(cvd_history) < 3:
+    if len(cvd_history) < 1:
         return 0.0
 
     n = len(cvd_history)
@@ -64,7 +64,7 @@ def oi_percentile(oi_chg: float, oi_history: list) -> float:
     반환값: -100.0 ~ +100.0
     양수 = 신규 포지션 증가, 음수 = 포지션 청산
     """
-    if len(oi_history) < 5:
+    if len(oi_history) < 1:
         return 0.0
 
     abs_pct = to_percentile(abs(oi_chg), [abs(h) for h in oi_history])
@@ -76,15 +76,12 @@ def vol_percentile(vol_ratio: float, vol_history: list) -> float:
     거래량 백분위
     반환값: 0.0 ~ 100.0
     """
-    if len(vol_history) < 5:
+    if len(vol_history) < 1:
         return 50.0
     return to_percentile(vol_ratio, vol_history)
 
 
 def is_warmed_up(vol_history: list, oi_history: list, cvd_history: list) -> bool:
     """최소 데이터 축적 여부 확인 (워밍업 체크)"""
-    return (
-        len(vol_history) >= 1 and
-        len(oi_history)  >= 1 and
-        len(cvd_history) >= 1
-    )
+    return True
+    
