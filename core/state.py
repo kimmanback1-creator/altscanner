@@ -80,7 +80,7 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
         vol_ratio = (s.vol_candle / vol_avg) if vol_avg else 0.0
 
         # 히스토리 업데이트 (ratio 계산 후)
-        s.vol_history.append(s.vol_candle)
+        s.vol_history.append(vol_ratio)
         if len(s.vol_history) > 96:
             s.vol_history.pop(0)
 
