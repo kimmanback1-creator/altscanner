@@ -144,7 +144,7 @@ async def preload_history():
     try:
         # 가장 많이 필요한 192봉 기준으로 조회
         res = get_client().table("candle_data")\
-            .select("exchange, symbol, cvd_delta, oi_chg, vol_candle")\
+            .select("exchange, symbol, cvd_delta, oi_chg, vol_ratio")\
             .order("ts", desc=True)\
             .limit(192 * 10)\
             .execute()
@@ -165,7 +165,7 @@ async def preload_history():
             s = state._state[exchange][symbol]
 
             # vol_history: vol_candle 최근 96봉
-            vol_vals = [r["vol_candle"] for r in rows if r.get("vol_candle") is not None]
+            vol_vals = [r["vol_ratio"] for r in rows if r.get("vol_ratio") is not None]
             if vol_vals:
                 s.vol_history = vol_vals[-96:]
 
