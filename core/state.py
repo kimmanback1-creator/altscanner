@@ -76,11 +76,12 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
         s = _state[exchange][symbol]
 
         # vol_ratio: append 전에 계산 (자기 자신을 평균에 포함시키지 않음)
+        # vol_history는 raw 거래량(vol_candle) 저장 → 단위 일관성 유지
         vol_avg = sum(s.vol_history) / len(s.vol_history) if s.vol_history else None
         vol_ratio = (s.vol_candle / vol_avg) if vol_avg else 0.0
 
-        # 히스토리 업데이트 (ratio 계산 후)
-        s.vol_history.append(vol_ratio)
+        # 히스토리 업데이트 (raw 거래량 저장)
+        s.vol_history.append(s.vol_candle)
         if len(s.vol_history) > 96:
             s.vol_history.pop(0)
 
