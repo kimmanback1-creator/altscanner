@@ -62,7 +62,7 @@ def vol_percentile(vol_ratio: float, vol_history: list) -> float:
     """
     if len(vol_history) < 5:
         return 50.0
-
+    return to_percentile(vol_ratio, vol_history)
     # 과거 vol_ratio 분포 재구성
     ratios = []
     for i in range(1, len(vol_history)):
