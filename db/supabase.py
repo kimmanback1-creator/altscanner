@@ -44,6 +44,7 @@ async def insert_candle(result: dict, ts: int):
             "cvd_delta": result["cvd_delta"],
             "oi_chg":    result["oi_chg"],
             "vol_ratio": result["vol_ratio"],
+            "vol_candle": result["vol_candle"],
             "price":     result["price"],
             "price_chg": result["price_chg"],
             "diagnosis": result["diagnosis"],
@@ -144,7 +145,7 @@ async def preload_history():
     try:
         # 가장 많이 필요한 192봉 기준으로 조회
         res = get_client().table("candle_data")\
-            .select("exchange, symbol, cvd_delta, oi_chg, vol_ratio")\
+            .select("exchange, symbol, cvd_delta, oi_chg, vol_candle")\
             .order("ts", desc=True)\
             .limit(19200)\
             .execute()
@@ -165,7 +166,7 @@ async def preload_history():
             s = state._state[exchange][symbol]
 
             # vol_history: vol_candle 최근 96봉
-            vol_vals = [r["vol_ratio"] for r in rows if r.get("vol_ratio") is not None]
+            vol_vals = [r["vol_candle"] for r in rows if r.get("vol_candle") is not None]
             if vol_vals:
                 s.vol_history = vol_vals[-96:]
 
