@@ -55,7 +55,7 @@ def calc_score(snap: dict) -> dict | None:
 
     cvd_pct = cvd_percentile(cvd_h)
     oi_pct  = oi_percentile(snap["oi_chg"], oi_h)
-    vol_pct = vol_percentile(snap["vol_ratio"], vol_h)
+    vol_pct = vol_percentile(snap["vol_candle"], vol_h)
 
     diag = diagnose(cvd_pct, oi_pct, snap["price_chg"], vol_pct)
 
@@ -68,6 +68,7 @@ def calc_score(snap: dict) -> dict | None:
         "cvd_delta": snap["cvd_delta"],
         "oi_chg":    snap["oi_chg"],
         "vol_ratio": snap["vol_ratio"],
+        "vol_candle": snap["vol_candle"],
         "price":     snap["price"],
         "price_chg": snap["price_chg"],
         "diagnosis": diag,
