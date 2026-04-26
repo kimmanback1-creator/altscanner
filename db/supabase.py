@@ -127,6 +127,66 @@ async def get_active_diamonds() -> dict:
         return {}
 
 
+# ── Preload ───────────────────────────────
+async def preload_history():
+    """
+    서버 시작 시 Supabase candle_data에서 최근 데이터를 불러와
+    state.py의 히스토리에 주입 → 워밍업 없이 즉시 정상 작동
+
+    vol_history  : 최근 96봉 (24시간)
+    oi_history   : 최근 192봉 (48시간) — oi_chg 값
+    cvd_history  : 최근 10봉 (2.5시간) — cvd_delta 값
+    """
+    import core.state as state
+
+    logger.info("[Preload] Supabase에서 히스토리 로딩 시작...")
+
+    try:
+        # 가장 많이 필요한 192봉 기준으로 조회
+        res = get_client().table("candle_data")\
+            .select("exchange, symbol, cvd_delta, oi_chg, vol_candle")\
+            .order("ts", desc=True)\
+            .limit(192 * 10)\
+            .execute()
+
+        if not res.data:
+            logger.warning("[Preload] DB에 데이터 없음 — 워밍업 필요")
+            return
+
+        # exchange+symbol별로 그룹핑 (최신순으로 왔으므로 reverse해서 오래된 것부터)
+        from collections import defaultdict
+        grouped: dict[tuple, list] = defaultdict(list)
+        for row in reversed(res.data):
+            key = (row["exchange"], row["symbol"])
+            grouped[key].append(row)
+
+        injected = 0
+        for (exchange, symbol), rows in grouped.items():
+            s = state._state[exchange][symbol]
+
+            # vol_history: vol_candle 최근 96봉
+            vol_vals = [r["vol_candle"] for r in rows if r.get("vol_candle") is not None]
+            if vol_vals:
+                s.vol_history = vol_vals[-96:]
+
+            # oi_history: oi_chg 최근 192봉
+            oi_vals = [r["oi_chg"] for r in rows if r.get("oi_chg") is not None]
+            if oi_vals:
+                s.oi_history = oi_vals[-192:]
+
+            # cvd_history: cvd_delta 최근 10봉
+            cvd_vals = [r["cvd_delta"] for r in rows if r.get("cvd_delta") is not None]
+            if cvd_vals:
+                s.cvd_history = cvd_vals[-10:]
+
+            injected += 1
+
+        logger.info(f"[Preload] 완료 — {injected}개 심볼 히스토리 복원")
+
+    except Exception as e:
+        logger.error(f"[Preload] 실패: {e} — 워밍업 모드로 계속 진행")
+
+
 # ── 롤링 딜리트 ───────────────────────────
 async def run_cleanup():
     """1시간마다 호출 - 오래된 데이터 정리"""
