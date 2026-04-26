@@ -4,13 +4,12 @@
 # ══════════════════════════════════════════
 
 import threading
-import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict
 
 lock = threading.Lock()
-logger = logging.getLogger(__name__)
+
 
 @dataclass
 class SymbolState:
@@ -59,9 +58,10 @@ def update_trade(exchange: str, symbol: str, price: float, qty: float, is_buy: b
 
 
 def update_oi(exchange: str, symbol: str, oi: float):
+    """OI 폴링 결과 반영"""
     with lock:
         s = _state[exchange][symbol]
-        if s.oi_current != 0:  # ← oi_prev 조건 제거
+        if s.oi_current != 0:
             chg_pct = (oi - s.oi_current) / s.oi_current * 100
             s.oi_history.append(chg_pct)
             if len(s.oi_history) > 192:
@@ -75,17 +75,19 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
     with lock:
         s = _state[exchange][symbol]
 
+        # vol_ratio: append 전에 계산 (자기 자신을 평균에 포함시키지 않음)
+        vol_avg = sum(s.vol_history) / len(s.vol_history) if s.vol_history else None
+        vol_ratio = (s.vol_candle / vol_avg) if vol_avg else 0.0
 
-        # 평균 거래량
-        vol_avg = sum(s.vol_history) / len(s.vol_history) if s.vol_history else s.vol_candle
-        vol_ratio = s.vol_candle / vol_avg if vol_avg > 0 else 1.0
+        # 히스토리 업데이트 (ratio 계산 후)
         s.vol_history.append(s.vol_candle)
         if len(s.vol_history) > 96:
             s.vol_history.pop(0)
+
         s.cvd_history.append(s.cvd_candle)
         if len(s.cvd_history) > 10:
             s.cvd_history.pop(0)
-            
+
         # 가격 변화율
         price_chg = 0.0
         if s.price_open > 0:
