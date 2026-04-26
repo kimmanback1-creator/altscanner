@@ -59,10 +59,6 @@ async def candle_loop():
             logger.info(f"[캔들] {exchange} 심볼 수: {len(symbols)}")
             for symbol in symbols:
                 snap = state.snapshot_and_reset(exchange, symbol)
-                if snap["vol_candle"] == 0:
-                    logger.info(f"[캔들] vol=0 스킵: {exchange} {symbol}")
-                    continue
-
                 result = calc_score(snap)
                 if result is None:
                     continue
