@@ -69,8 +69,6 @@ async def trades_ws_chunk(symbols: list, chunk_id: int):
                     msg_count += 1
                     if msg_count <= 3:
                         logger.info(f"[Binance] 청크{chunk_id} RAW: {str(raw)[:150]}")
-                    if msg_count % 1000 == 0:  # ← 여기 추가
-                        logger.info(f"[Binance] 청크{chunk_id} 틱 누적: {msg_count}개")
                     try:
                         msg  = json.loads(raw)
                         data = msg.get("data", msg)
