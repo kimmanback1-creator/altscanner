@@ -146,7 +146,7 @@ async def preload_history():
         res = get_client().table("candle_data")\
             .select("exchange, symbol, cvd_delta, oi_chg, vol_ratio")\
             .order("ts", desc=True)\
-            .limit(192 * 10)\
+            .limit(19200)\
             .execute()
 
         if not res.data:
