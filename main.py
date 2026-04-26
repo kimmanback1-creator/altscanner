@@ -12,6 +12,7 @@ import exchanges.okx     as okx
 import exchanges.bybit   as bybit
 from core.candle   import candle_loop
 from webhook.server import app
+from db.supabase   import preload_history
 from config        import WEBHOOK_PORT
 
 logging.basicConfig(
@@ -40,6 +41,9 @@ async def main():
     logger.info("  거래소: Binance / OKX / Bybit")
     logger.info("  기준: CVD + OI + 거래량 (15분봉)")
     logger.info("=" * 50)
+
+    # 재시작해도 히스토리 유지 — gather 전에 완료되어야 함
+    await preload_history()
 
     await asyncio.gather(
         binance.run(),       # Binance WS + OI
