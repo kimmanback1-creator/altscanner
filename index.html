@@ -558,12 +558,21 @@ function scorePill(r) {
 
 function diagClass(d) {
   const map={
+    // 새 진단 (추세 기반)
+    '신규 롱 진입':'dg-healthy-up',
+    '숏스퀴즈':'dg-squeeze',
+    '하락 다이버전스':'dg-div-bear',
+    '매수 소진':'dg-exhaust',
+    '신규 숏 진입':'dg-healthy-dn',
+    '투매성 하락':'dg-healthy-dn',
+    '매집 가능성':'dg-accum',
+    '상승 다이버전스':'dg-div-bull',
+    // 옛 진단 호환 (히스토리 페이지에서 어제 데이터 색상 유지)
     '건강한 상승':'dg-healthy-up','건강한 상승 (거래량 동반)':'dg-healthy-up',
-    '숏스퀴즈':'dg-squeeze','숏스퀴즈 (거래량 동반)':'dg-squeeze',
-    '하락 다이버전스':'dg-div-bear','상승 다이버전스':'dg-div-bull',
+    '숏스퀴즈 (거래량 동반)':'dg-squeeze',
     '건강한 하락':'dg-healthy-dn','건강한 하락 (거래량 동반)':'dg-healthy-dn',
     '롱청산 하락':'dg-healthy-dn','롱청산 하락 (거래량 동반)':'dg-healthy-dn',
-    '매집 가능성':'dg-accum','매수 소진 주의':'dg-exhaust',
+    '매수 소진 주의':'dg-exhaust',
   }
   return map[d]||'dg-weak'
 }
@@ -895,14 +904,6 @@ function renderHistory() {
   document.getElementById('history-tbody').innerHTML = html
 }
 
-async function init() {
-  loadParams()
-  await loadLatestCandles()
-  subscribeRealtime()
-  setInterval(loadLatestCandles, 15*60*1000)
-}
-
-init()
 init()
 
 </script>
