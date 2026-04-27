@@ -522,9 +522,31 @@ function subscribeRealtime() {
       if(selKey === row.exchange+':'+row.symbol) selectRow(row.exchange, row.symbol)
     }).subscribe()
 }
+  
+// 백엔드 check_signal과 일치 (15분 진단 카테고리)
+const LONG_DIAGS = [
+  // 새 진단
+  '신규 롱 진입', '숏스퀴즈',
+  // 옛 진단 호환 (DB에 남은 어제 데이터)
+  '건강한 상승', '건강한 상승 (거래량 동반)', '숏스퀴즈 (거래량 동반)',
+]
 
-function isLongSig(r) { return r.cvd_pct>=LP.cvd && r.oi_pct>=LP.oi && r.vol_pct>=LP.vol }
-function isShortSig(r) { return r.cvd_pct<=-SP.cvd && r.oi_pct<=-SP.oi && r.vol_pct>=SP.vol }
+const SHORT_DIAGS = [
+  // 새 진단
+  '신규 숏 진입', '투매성 하락', '매수 소진',
+  // 옛 진단 호환
+  '건강한 하락', '건강한 하락 (거래량 동반)',
+  '롱청산 하락', '롱청산 하락 (거래량 동반)', '매수 소진 주의',
+]
+  
+function isLongSig(r) { 
+  return LONG_DIAGS.includes(r.diagnosis) 
+      && r.cvd_pct>=LP.cvd && r.oi_pct>=LP.oi && r.vol_pct>=LP.vol 
+}
+function isShortSig(r) { 
+  return SHORT_DIAGS.includes(r.diagnosis) 
+      && r.cvd_pct<=-SP.cvd && r.oi_pct<=-SP.oi && r.vol_pct>=SP.vol 
+}
 
 function exTag(ex) {
   const map={binance:'BNC',okx:'OKX',bybit:'BYB'}
