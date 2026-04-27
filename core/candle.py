@@ -96,11 +96,10 @@ async def candle_loop():
                     result_4h = calc_score_4h(snap_4h)
                     if result_4h is None:
                         continue
-                    result_4h["timeframe"] = "4h"
                     results_4h.append(result_4h)
 
-                    # Supabase 저장 (timeframe 컬럼 추가될 때까지는 일단 보류)
-                    # await insert_candle(result_4h, ts_4h)
+                    # Supabase 저장 (timeframe='4h')
+                    await insert_candle(result_4h, ts_4h)
             logger.info(f"[캔들] 4시간 분석 완료 — {len(results_4h)}개 심볼")
 
         # 신호 판정 + 텔레그램
