@@ -102,7 +102,7 @@ def check_signal(result: dict, long_params: dict, short_params: dict) -> str | N
     diag = result["diagnosis"]
 
     # LONG: 가격↑ 진단 + percentile 임계값
-    long_diags = ("신규 롱 진입", "숏커버 (숏스퀴즈)", "매집 가능성")
+    long_diags = ("신규 롱 진입", "숏스퀴즈", "매집 가능성")
     if diag in long_diags:
         if (cvd >= long_params["cvd"] and
             oi  >= long_params["oi"] and
@@ -110,7 +110,7 @@ def check_signal(result: dict, long_params: dict, short_params: dict) -> str | N
             return "LONG"
 
     # SHORT: 가격↓ 진단 + percentile 임계값
-    short_diags = ("신규 숏 진입", "롱 청산 (투매)", "매수 소진 (천장 의심)", "하락 다이버전스")
+    short_diags = ("신규 숏 진입", "투매성 하락", "매수 소진", "하락 다이버전스")
     if diag in short_diags:
         if (cvd <= -short_params["cvd"] and
             oi  <= -short_params["oi"] and
