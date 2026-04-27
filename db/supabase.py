@@ -31,7 +31,7 @@ def today_kst() -> date:
 
 # ── candle_data ───────────────────────────
 async def insert_candle(result: dict, ts: int):
-    """15분봉 결과값 저장"""
+    """봉 결과값 저장 (15m 또는 4h)"""
     try:
         get_client().table("candle_data").insert({
             "exchange":  result["exchange"],
@@ -48,6 +48,7 @@ async def insert_candle(result: dict, ts: int):
             "price":     result["price"],
             "price_chg": result["price_chg"],
             "diagnosis": result["diagnosis"],
+            "timeframe": result.get("timeframe", "15m"),
         }).execute()
     except Exception as e:
         logger.error(f"[DB] candle insert 실패 {result['symbol']}: {e}")
@@ -156,6 +157,7 @@ async def preload_history():
         # 가장 많이 필요한 192봉 기준으로 조회
         res = get_client().table("candle_data")\
             .select("exchange, symbol, cvd_delta, oi_chg, vol_candle, price")\
+            .eq("timeframe", "15m")\
             .order("ts", desc=True)\
             .limit(19200)\
             .execute()
