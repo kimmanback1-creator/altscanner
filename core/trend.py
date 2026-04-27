@@ -12,7 +12,7 @@ TREND_THRESHOLD = {
 }
 
 # 추세 판정 최소 데이터 길이
-MIN_HISTORY = 5
+MIN_HISTORY = 2
 
 
 def linear_slope(values: list) -> float:
