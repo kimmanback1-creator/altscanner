@@ -20,17 +20,17 @@ def diagnose_v2(price_t: str, oi_t: str, cvd_t: str) -> str | None:
     if price_t == 'up' and oi_t == 'up' and cvd_t == 'up':
         return "신규 롱 진입"           # 건강한 상승
     if price_t == 'up' and oi_t == 'down' and cvd_t == 'up':
-        return "숏커버 (숏스퀴즈)"
+        return "숏스퀴즈"
     if price_t == 'up' and oi_t == 'up' and cvd_t == 'down':
         return "하락 다이버전스"        # 가격↑인데 매도 우위 + 신규 숏 누적
     if price_t == 'up' and oi_t == 'down' and cvd_t == 'down':
-        return "매수 소진 (천장 의심)"
+        return "매수 소진"
 
     # 가격 하락 4가지
     if price_t == 'down' and oi_t == 'up' and cvd_t == 'down':
         return "신규 숏 진입"           # 건강한 하락
     if price_t == 'down' and oi_t == 'down' and cvd_t == 'down':
-        return "롱 청산 (투매)"
+        return "투매성 하락"
     if price_t == 'down' and oi_t == 'up' and cvd_t == 'up':
         return "매집 가능성"             # 가격↓인데 매수 + 신규 포지션
     if price_t == 'down' and oi_t == 'down' and cvd_t == 'up':
