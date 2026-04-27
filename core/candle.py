@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
-from core.scorer import calc_score, check_signal, format_telegram
+from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
 from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup
 from notify.telegram import send_message
 
@@ -93,7 +93,7 @@ async def candle_loop():
                 symbols = state.get_all_symbols(exchange)
                 for symbol in symbols:
                     snap_4h = state.snapshot_and_reset_4h(exchange, symbol)
-                    result_4h = calc_score(snap_4h)
+                    result_4h = calc_score_4h(snap_4h)
                     if result_4h is None:
                         continue
                     result_4h["timeframe"] = "4h"
