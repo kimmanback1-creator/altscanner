@@ -881,11 +881,14 @@ function renderHistory() {
     </tr>`
     const dataRows = rows.map(r => {
       const dirCls = r.direction === 'LONG' ? 'h-long' : 'h-short'
-      const dirSym = r.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'
+      const sent = r.sent !== false  // null/undefined도 true로 (옛 데이터 호환)
+      const dirSym = (r.direction === 'LONG' ? '▲ LONG' : '▼ SHORT') 
+                   + (sent ? '' : ' 🔇')
+      const rowStyle = sent ? '' : 'opacity:0.45;'
       const cvdCls = r.cvd_pct >= 0 ? 'h-pos' : 'h-neg'
       const oiCls  = r.oi_pct  >= 0 ? 'h-pos' : 'h-neg'
       const pnlCls = r.pnl == null ? '' : (r.pnl >= 0 ? 'h-pnl-pos' : 'h-pnl-neg')
-      return `<tr class="group-row">
+      return `<tr class="group-row" style="${rowStyle}">
         <td>${fmtTime(r.sent_at)}</td>
         <td style="color:#666">↳</td>
         <td class="${dirCls}">${dirSym}</td>
