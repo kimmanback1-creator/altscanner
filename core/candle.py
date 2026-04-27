@@ -37,9 +37,22 @@ def _candle_ts() -> int:
     interval = CANDLE_MIN * 60
     return now - (now % interval)
 
+def _is_4h_close() -> bool:
+    """현재 시점이 4H 봉 마감인지 (UTC 기준 0/4/8/12/16/20시 정각)"""
+    now_utc = datetime.now(timezone.utc)
+    return now_utc.hour % 4 == 0 and now_utc.minute < CANDLE_MIN
+    # 정확히 :00:00 부터 다음 15분봉 마감(:14:59)까지를 4H 마감 시점으로 처리
+    # 즉 _next_candle_close가 막 끝나서 분석 시작할 때 이게 True면 4H 마감
+
+
+def _candle_ts_4h() -> int:
+    """현재 4시간봉 시작 타임스탬프"""
+    now = int(time.time())
+    interval = 4 * 60 * 60  # 4시간 = 14400초
+    return now - (now % interval)
 
 async def candle_loop():
-    """15분마다 실행 메인 루프"""
+    """15분마다 실행 메인 루프 + 4H 마감 시 추가 분석"""
     logger.info("캔들 루프 시작")
     cleanup_counter = 0
 
@@ -52,8 +65,8 @@ async def candle_loop():
         now_kst = datetime.now(KST).strftime("%H:%M")
         logger.info(f"[캔들] {CANDLE_MIN}분봉 마감 — KST {now_kst}")
 
+        # ── 15분 분석 (기존) ──
         results = []
-
         for exchange in EXCHANGES:
             symbols = state.get_all_symbols(exchange)
             logger.info(f"[캔들] {exchange} 심볼 수: {len(symbols)}")
@@ -62,12 +75,33 @@ async def candle_loop():
                 result = calc_score(snap)
                 if result is None:
                     continue
+                result["timeframe"] = "15m"
                 results.append(result)
 
-                # Supabase 저장 (비동기)
+                # Supabase 저장
                 await insert_candle(result, ts)
 
-        logger.info(f"[캔들] 분석 완료 — {len(results)}개 심볼")
+        logger.info(f"[캔들] 15분 분석 완료 — {len(results)}개 심볼")
+
+        # ── 4시간 분석 (4H 마감 시점만) ──
+        is_4h = _is_4h_close()
+        results_4h = []
+        if is_4h:
+            ts_4h = _candle_ts_4h()
+            logger.info(f"[캔들] ★ 4시간봉 마감 — KST {now_kst}")
+            for exchange in EXCHANGES:
+                symbols = state.get_all_symbols(exchange)
+                for symbol in symbols:
+                    snap_4h = state.snapshot_and_reset_4h(exchange, symbol)
+                    result_4h = calc_score(snap_4h)
+                    if result_4h is None:
+                        continue
+                    result_4h["timeframe"] = "4h"
+                    results_4h.append(result_4h)
+
+                    # Supabase 저장 (timeframe 컬럼 추가될 때까지는 일단 보류)
+                    # await insert_candle(result_4h, ts_4h)
+            logger.info(f"[캔들] 4시간 분석 완료 — {len(results_4h)}개 심볼")
 
         # 신호 판정 + 텔레그램
         for result in results:
