@@ -298,6 +298,37 @@ tr.sig .ex-byb { color: #f7a600; }
   padding-left: 24px;
   color: #666;
 }
+
+/* ── 4H + 15M 동의 강조 (베이지) ───── */
+tr.both-agree {
+  background: #2a2418 !important;  /* 옅은 베이지/카키 */
+  border-left: 2px solid #c9a85c !important;
+}
+tr.both-agree:hover td {
+  background: #322a1c !important;
+}
+tr.both-agree td {
+  color: #d4c8a0 !important;
+}
+tr.both-agree .ticker-name {
+  color: #f0d690 !important;
+  font-weight: 500;
+}
+
+/* 4H 진단 컬럼 */
+.diag-4h {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  display: inline-block;
+  opacity: 0.8;
+}
+.diag-4h-empty {
+  color: #444;
+  font-size: 10px;
+}
+  
 </style>
 </head>
 <body>
@@ -397,7 +428,8 @@ tr.sig .ex-byb { color: #f7a600; }
             <th style="width:82px" class="c">OI</th>
             <th style="width:82px" class="c">거래량</th>
             <th style="width:48px" class="r">종합</th>
-            <th>상태 진단</th>
+            <th>15M</th>
+            <th>4H</th>
           </tr></thead>
           <tbody id="long-tbody"></tbody>
         </table>
@@ -468,6 +500,7 @@ let SP = { cvd:60, oi:50, vol:70 }
 let lSort = 'score', sSort = 'score'
 let selKey = null
 let allData = []
+let allData4h = {}  // {exchange:symbol → {diagnosis, ...}}
 
 function loadParams() {
   try {
@@ -491,7 +524,12 @@ function saveParams() {
 }
 
 async function loadLatestCandles() {
-  const { data, error } = await sb.from('candle_data').select('*').order('ts',{ascending:false}).limit(1000)
+  // 15분 데이터
+  const { data, error } = await sb.from('candle_data')
+    .select('*')
+    .eq('timeframe', '15m')
+    .order('ts',{ascending:false})
+    .limit(1000)
   if(error) { console.error(error); return; }
   const latest = {}
   for(const row of data) {
@@ -499,6 +537,22 @@ async function loadLatestCandles() {
     if(!latest[key]) latest[key] = row
   }
   allData = Object.values(latest)
+  
+  // 4시간 데이터 (별도 fetch)
+  const { data: data4h } = await sb.from('candle_data')
+    .select('exchange, symbol, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ts')
+    .eq('timeframe', '4h')
+    .order('ts',{ascending:false})
+    .limit(500)
+  
+  allData4h = {}
+  if (data4h) {
+    for(const row of data4h) {
+      const key = row.exchange+':'+row.symbol
+      if(!allData4h[key]) allData4h[key] = row
+    }
+  }
+  
   updateBadges()
   render()
 }
@@ -608,10 +662,43 @@ function sortRows(rows, key) {
   })
 }
 
+// 4H 진단 가져오기
+function get4hDiag(r) {
+  const key = r.exchange + ':' + r.symbol
+  return allData4h[key]?.diagnosis || null
+}
+
+// 15M + 4H 같은 방향인지 판정
+function isBothAgree(r) {
+  const diag4h = get4hDiag(r)
+  if (!diag4h) return false
+  
+  const diag15m = r.diagnosis
+  const isLong15 = LONG_DIAGS.includes(diag15m)
+  const isShort15 = SHORT_DIAGS.includes(diag15m)
+  
+  // 4H에서 LONG 카테고리 진단 (8개 중 가격↑)
+  const long4h  = ['신규 롱 진입', '숏스퀴즈', '매집 가능성', '상승 다이버전스']
+  const short4h = ['신규 숏 진입', '투매성 하락', '매수 소진', '하락 다이버전스']
+  
+  if (isLong15 && long4h.includes(diag4h)) return true
+  if (isShort15 && short4h.includes(diag4h)) return true
+  return false
+}
+  
 function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
   const k=r.exchange+':'+r.symbol
   const sel=selKey===k?'selected':'', dim=!isSig?'dim':'', dc=diagClass(r.diagnosis||'')
-  return `<tr class="${isSig?sigCls:''} ${isSig?'sig':''} ${dim} ${sel}" onclick="selectRow('${r.exchange}','${r.symbol}')">
+  
+  // 4H 진단 + 동의 판정
+  const diag4h = get4hDiag(r)
+  const dc4h = diag4h ? diagClass(diag4h) : ''
+  const bothAgree = isBothAgree(r) ? 'both-agree' : ''
+  const diag4hCell = diag4h 
+    ? `<span class="diag ${dc4h}">${diag4h}</span>` 
+    : `<span class="diag-4h-empty">—</span>`
+  
+  return `<tr class="${isSig?sigCls:''} ${isSig?'sig':''} ${dim} ${sel} ${bothAgree}" onclick="selectRow('${r.exchange}','${r.symbol}')">
     <td><span class="ticker-name">${r.symbol}</span>${exTag(r.exchange)}</td>
     <td class="c">${priceBar(r.price_chg||0)}</td>
     <td class="c">${dualBar(r.cvd_pct||0,cvdThr)}</td>
@@ -619,6 +706,7 @@ function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
     <td class="c">${volBar(r.vol_pct||0,volThr)}</td>
     <td class="r">${scorePill(r)}</td>
     <td><span class="diag ${dc}">${r.diagnosis||'—'}</span></td>
+    <td>${diag4hCell}</td>
   </tr>`
 }
 
