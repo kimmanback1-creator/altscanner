@@ -170,6 +170,134 @@ tr.sig .ex-byb { color: #f7a600; }
 .spark { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
 .empty-detail { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text4); font-size: 12px; }
+/* ── 히스토리 패널 ───────────────────────── */
+.btn-history {
+  background: #1a1a1a; color: #888; border: 0.5px solid #2a2a2a;
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.btn-history:hover { color: #e0e0e0; border-color: #3a3a3a; }
+.btn-history.active { color: #f0b90b; border-color: #f0b90b; }
+
+.history-overlay {
+  display: none;
+  position: fixed; top: 36px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 1000; padding: 14px 18px;
+  overflow: hidden; flex-direction: column;
+}
+.history-overlay.show { display: flex; }
+
+.history-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; flex-shrink: 0;
+}
+.history-head h2 { font-size: 13px; color: #e0e0e0; font-weight: 500; }
+.history-filters { display: flex; gap: 6px; }
+.history-filters button {
+  background: #1a1a1a; color: #888; border: 0.5px solid #2a2a2a;
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.history-filters button.active { color: #f0b90b; border-color: #f0b90b; }
+.history-close {
+  background: #2a2a2a; color: #888; border: none;
+  padding: 4px 12px; font-size: 12px; cursor: pointer; border-radius: 3px;
+}
+
+.history-table-wrap {
+  flex: 1; overflow-y: auto; border: 0.5px solid #1a1a1a;
+}
+.history-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+}
+.history-table thead {
+  position: sticky; top: 0; background: #181818; z-index: 1;
+}
+.history-table th {
+  padding: 6px 8px; text-align: left; color: #666;
+  border-bottom: 0.5px solid #222; font-weight: normal;
+}
+.history-table td {
+  padding: 5px 8px; border-bottom: 0.5px solid #1a1a1a;
+  color: #aaa;
+}
+.history-table tr.ticker-group td {
+  border-top: 1px solid #2a2a2a;
+}
+.history-table .ticker-header {
+  background: #1a1a1a; font-size: 11px;
+}
+.history-table .ticker-header td {
+  padding: 6px 8px; color: #f0b90b; font-weight: 500;
+  border-bottom: 0.5px solid #2a2a2a;
+}
+.h-long  { color: #2ecc71; }
+.h-short { color: #e74c3c; }
+.h-pos   { color: #2ecc71; }
+.h-neg   { color: #e74c3c; }
+.h-pnl-pos { color: #2ecc71; font-weight: 500; }
+.h-pnl-neg { color: #e74c3c; font-weight: 500; }
+.h-empty {
+  text-align: center; padding: 40px; color: #666; font-size: 12px;
+}
+/* ── 검색창 ───────────────────────── */
+.search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.search-input {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 0.5px solid #2a2a2a;
+  padding: 3px 24px 3px 10px;
+  font-size: 11px;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+  width: 140px;
+  outline: none;
+}
+.search-input:focus {
+  border-color: #f0b90b;
+}
+.search-input::placeholder {
+  color: #555;
+}
+.search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  padding: 0 2px;
+}
+.search-clear.show { display: block; }
+.search-clear:hover { color: #e0e0e0; }
+
+/* ── 히스토리 티커 그룹 헤더 ───────── */
+.history-table tr.ticker-group-header {
+  background: #1c1c1c;
+}
+.history-table tr.ticker-group-header td {
+  padding: 7px 8px;
+  color: #f0b90b;
+  font-weight: 500;
+  font-size: 11px;
+  border-top: 1px solid #2a2a2a;
+  border-bottom: 0.5px solid #2a2a2a;
+}
+.history-table tr.ticker-group-header .group-count {
+  color: #888;
+  font-weight: normal;
+  margin-left: 6px;
+}
+.history-table tr.group-row td:first-child {
+  padding-left: 24px;
+  color: #666;
+}
 </style>
 </head>
 <body>
@@ -181,6 +309,11 @@ tr.sig .ex-byb { color: #f7a600; }
     <span style="font-size:11px;color:#444" id="status-text">연결 중...</span>
   </div>
   <div class="topbar-right">
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="search-input" placeholder="🔍 티커 검색..." oninput="onSearchChange(this.value)">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+    </div> 
+    <button class="btn-history" id="btn-history" onclick="toggleHistory()">📋 히스토리</button>
     <span class="badge on" id="badge-bnc">BNC —</span>
     <span class="badge on" id="badge-okx">OKX —</span>
     <span class="badge on" id="badge-byb">BYB —</span>
@@ -259,6 +392,7 @@ tr.sig .ex-byb { color: #f7a600; }
         <table>
           <thead><tr>
             <th style="width:110px">티커</th>
+            <th style="width:60px" class="c">가격%</th>
             <th style="width:82px" class="c">CVD</th>
             <th style="width:82px" class="c">OI</th>
             <th style="width:82px" class="c">거래량</th>
@@ -275,6 +409,7 @@ tr.sig .ex-byb { color: #f7a600; }
         <table>
           <thead><tr>
             <th style="width:110px">티커</th>
+            <th style="width:60px" class="c">가격%</th>
             <th style="width:82px" class="c">CVD</th>
             <th style="width:82px" class="c">OI</th>
             <th style="width:82px" class="c">거래량</th>
@@ -410,6 +545,12 @@ function volBar(val, thr) {
   return `<div class="dual-bar"><div class="dual-track"><div class="dual-center"></div><div class="dual-fill df-vol${over?' over':''}" style="width:${half}%"></div></div><span class="dual-num ${over?'dn-vol-over':''}">${val.toFixed(1)}%</span></div>`
 }
 
+function priceBar(val) {
+  const isPos = val >= 0
+  const color = isPos ? '#5fb35f' : '#d05f5f'
+  return `<span style="color:${color};font-size:11px;font-weight:500">${isPos?'+':''}${val.toFixed(2)}%</span>`
+}
+
 function scorePill(r) {
   const s=Math.round((Math.abs(r.cvd_pct)+Math.abs(r.oi_pct)+r.vol_pct)/3)
   return `<span class="score-pill ${s>=70?'sp-hi':s>=40?'sp-md':'sp-lo'}">${s}%</span>`
@@ -441,6 +582,7 @@ function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
   const sel=selKey===k?'selected':'', dim=!isSig?'dim':'', dc=diagClass(r.diagnosis||'')
   return `<tr class="${isSig?sigCls:''} ${isSig?'sig':''} ${dim} ${sel}" onclick="selectRow('${r.exchange}','${r.symbol}')">
     <td><span class="ticker-name">${r.symbol}</span>${exTag(r.exchange)}</td>
+    <td class="c">${priceBar(r.price_chg||0)}</td>
     <td class="c">${dualBar(r.cvd_pct||0,cvdThr)}</td>
     <td class="c">${dualBar(r.oi_pct||0,oiThr)}</td>
     <td class="c">${volBar(r.vol_pct||0,volThr)}</td>
@@ -450,8 +592,8 @@ function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
 }
 
 function render() {
-  const longs=allData.filter(r=>r.cvd_pct>0)
-  const shorts=allData.filter(r=>r.cvd_pct<0)
+  const longs=allData.filter(r=>r.cvd_pct>0 && matchSearch(r.symbol))
+  const shorts=allData.filter(r=>r.cvd_pct<0 && matchSearch(r.symbol))
   const lr=sortRows(longs,lSort)
   const lSig=lr.filter(r=>isLongSig(r)), lNo=lr.filter(r=>!isLongSig(r))
   document.getElementById('long-tbody').innerHTML=[...lSig,...lNo].map(r=>makeRow(r,isLongSig(r),'long-sig',LP.cvd,LP.oi,LP.vol)).join('')
@@ -582,7 +724,220 @@ async function init() {
   subscribeRealtime()
   setInterval(loadLatestCandles, 15*60*1000)
 }
+// ══════════════════════════════════════
+//  검색
+// ══════════════════════════════════════
+let searchQuery = ''
+
+function onSearchChange(v) {
+  searchQuery = v.trim().toUpperCase()
+  document.getElementById('search-clear').classList.toggle('show', searchQuery.length > 0)
+  const historyOpen = document.getElementById('history-overlay').classList.contains('show')
+  if (historyOpen) {
+    renderHistory()
+  } else {
+    render()
+  }
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = ''
+  searchQuery = ''
+  document.getElementById('search-clear').classList.remove('show')
+  const historyOpen = document.getElementById('history-overlay').classList.contains('show')
+  if (historyOpen) renderHistory(); else render()
+}
+
+function matchSearch(symbol) {
+  if (!searchQuery) return true
+  return symbol.toUpperCase().includes(searchQuery)
+}
+
+// ══════════════════════════════════════
+//  히스토리 패널
+// ══════════════════════════════════════
+let historyData = []
+let historyFilter = 'all'
+
+function toggleHistory() {
+  const overlay = document.getElementById('history-overlay')
+  const btn = document.getElementById('btn-history')
+  const isOpen = overlay.classList.contains('show')
+  if (isOpen) {
+    overlay.classList.remove('show')
+    btn.classList.remove('active')
+  } else {
+    overlay.classList.add('show')
+    btn.classList.add('active')
+    loadHistory()
+  }
+}
+
+function setHistoryFilter(f) {
+  historyFilter = f
+  document.querySelectorAll('.history-filters button').forEach(b => b.classList.remove('active'))
+  document.getElementById('hf-' + f).classList.add('active')
+  renderHistory()
+}
+
+async function loadHistory() {
+  const todayKst = new Date(Date.now() + 9*60*60*1000).toISOString().slice(0, 10)
+  const { data: signals, error } = await sb
+    .from('signal_log')
+    .select('*')
+    .eq('date_kst', todayKst)
+    .order('sent_at', { ascending: false })
+  if (error) {
+    console.error('[history] signal_log fetch failed:', error)
+    document.getElementById('history-tbody').innerHTML = 
+      `<tr><td colspan="10" class="h-empty">데이터 로딩 실패: ${error.message}</td></tr>`
+    return
+  }
+  if (!signals || signals.length === 0) {
+    document.getElementById('history-tbody').innerHTML = 
+      `<tr><td colspan="10" class="h-empty">오늘 알림 내역 없음</td></tr>`
+    historyData = []
+    return
+  }
+  historyData = signals.map(s => {
+    const cur = allData.find(d => d.exchange === s.exchange && d.symbol === s.symbol)
+    const currentPrice = cur ? cur.price : null
+    const pnl = (currentPrice && s.price)
+      ? ((currentPrice - s.price) / s.price * 100) * (s.direction === 'LONG' ? 1 : -1)
+      : null
+    return { ...s, current_price: currentPrice, pnl }
+  })
+  renderHistory()
+}
+
+function renderHistory() {
+  // 1) 필터링: 방향 + 검색어
+  let filtered = historyData.filter(r => {
+    if (historyFilter === 'long' && r.direction !== 'LONG') return false
+    if (historyFilter === 'short' && r.direction !== 'SHORT') return false
+    if (!matchSearch(r.symbol)) return false
+    return true
+  })
+
+  if (filtered.length === 0) {
+    document.getElementById('history-tbody').innerHTML = 
+      `<tr><td colspan="10" class="h-empty">조건에 맞는 데이터 없음</td></tr>`
+    return
+  }
+
+  // 2) 티커별 그룹핑
+  const groups = {}
+  for (const r of filtered) {
+    const key = r.exchange + ':' + r.symbol
+    if (!groups[key]) groups[key] = []
+    groups[key].push(r)
+  }
+
+  // 3) 그룹 정렬: 가장 최근 신호 시간 내림차순
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    const aLatest = Math.max(...groups[a].map(r => new Date(r.sent_at).getTime()))
+    const bLatest = Math.max(...groups[b].map(r => new Date(r.sent_at).getTime()))
+    return bLatest - aLatest
+  })
+
+  // 4) 각 그룹 내부 시간 내림차순
+  for (const key of sortedKeys) {
+    groups[key].sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at))
+  }
+
+  // 5) 헬퍼
+  const fmtTime = ts => {
+    const d = new Date(ts)
+    const kst = new Date(d.getTime() + 9*60*60*1000)
+    return kst.toISOString().slice(11, 16)
+  }
+  const fmtPrice = p => {
+    if (p == null) return '—'
+    if (p >= 1)    return '$' + p.toFixed(2)
+    if (p >= 0.01) return '$' + p.toFixed(4)
+    return '$' + p.toFixed(6)
+  }
+  const fmtPct = (v, sign=true) => {
+    if (v == null) return '—'
+    return (sign && v >= 0 ? '+' : '') + v.toFixed(1) + '%'
+  }
+
+  // 6) HTML 생성
+  const html = sortedKeys.map(key => {
+    const rows = groups[key]
+    const sym = rows[0].symbol
+    const ex = rows[0].exchange
+    const headerRow = `<tr class="ticker-group-header">
+      <td colspan="10">${sym} <span style="color:#666;font-size:9px">${ex.toUpperCase().slice(0,3)}</span><span class="group-count">— ${rows.length}건</span></td>
+    </tr>`
+    const dataRows = rows.map(r => {
+      const dirCls = r.direction === 'LONG' ? 'h-long' : 'h-short'
+      const dirSym = r.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'
+      const cvdCls = r.cvd_pct >= 0 ? 'h-pos' : 'h-neg'
+      const oiCls  = r.oi_pct  >= 0 ? 'h-pos' : 'h-neg'
+      const pnlCls = r.pnl == null ? '' : (r.pnl >= 0 ? 'h-pnl-pos' : 'h-pnl-neg')
+      return `<tr class="group-row">
+        <td>${fmtTime(r.sent_at)}</td>
+        <td style="color:#666">↳</td>
+        <td class="${dirCls}">${dirSym}</td>
+        <td class="${cvdCls}">${fmtPct(r.cvd_pct)}</td>
+        <td class="${oiCls}">${fmtPct(r.oi_pct)}</td>
+        <td>${fmtPct(r.vol_pct, false)}</td>
+        <td>${fmtPrice(r.price)}</td>
+        <td>${fmtPrice(r.current_price)}</td>
+        <td class="${pnlCls}">${r.pnl == null ? '—' : fmtPct(r.pnl)}</td>
+        <td style="color:#888">${r.diagnosis || '—'}</td>
+      </tr>`
+    }).join('')
+    return headerRow + dataRows
+  }).join('')
+
+  document.getElementById('history-tbody').innerHTML = html
+}
+
+async function init() {
+  loadParams()
+  await loadLatestCandles()
+  subscribeRealtime()
+  setInterval(loadLatestCandles, 15*60*1000)
+}
+
 init()
+init()
+
 </script>
+<!-- ── 히스토리 오버레이 패널 ─────────── -->
+<div class="history-overlay" id="history-overlay">
+  <div class="history-head">
+    <h2>📋 알림 히스토리</h2>
+    <div class="history-filters">
+      <button class="active" id="hf-all" onclick="setHistoryFilter('all')">전체</button>
+      <button id="hf-long" onclick="setHistoryFilter('long')">▲ LONG</button>
+      <button id="hf-short" onclick="setHistoryFilter('short')">▼ SHORT</button>
+    </div>
+    <button class="history-close" onclick="toggleHistory()">✕ 닫기</button>
+  </div>
+  <div class="history-table-wrap">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th style="width:80px">시각</th>
+          <th style="width:140px">티커</th>
+          <th style="width:60px">방향</th>
+          <th style="width:65px">CVD</th>
+          <th style="width:65px">OI</th>
+          <th style="width:65px">Vol</th>
+          <th style="width:90px">신호가</th>
+          <th style="width:90px">현재가</th>
+          <th style="width:80px">수익률</th>
+          <th>진단</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr><td colspan="10" class="h-empty">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </body>
 </html>
