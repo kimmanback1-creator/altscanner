@@ -30,7 +30,7 @@ class SymbolState:
     # ── 가격 ─────────────────────────────
     price_open:    float = 0.0
     price_current: float = 0.0
-
+    price_history: List[float] = field(default_factory=list)
     # ── 메타 ─────────────────────────────
     exchange: str = ""
 
@@ -86,9 +86,15 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
             s.vol_history.pop(0)
 
         s.cvd_history.append(s.cvd_candle)
-        if len(s.cvd_history) > 10:
+        if len(s.cvd_history) > 20:
             s.cvd_history.pop(0)
 
+        # 가격 history 업데이트 (마감가 저장)
+        s.price_history.append(s.price_current)
+        if len(s.price_history) > 20:
+            s.price_history.pop(0)
+
+        
         # 가격 변화율
         price_chg = 0.0
         if s.price_open > 0:
@@ -109,6 +115,7 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
             "oi_history":  list(s.oi_history),
             "price_chg":   price_chg,
             "price":       s.price_current,
+            "price_history": list(s.price_history),
         }
 
         # 캔들 초기화
