@@ -54,15 +54,20 @@ async def insert_candle(result: dict, ts: int):
 
 
 # ── signal_log ────────────────────────────
-async def already_sent_today(exchange: str, symbol: str, direction: str) -> bool:
-    """오늘 KST 기준 이미 보냈는지 확인"""
+async def sent_within_hours(exchange: str, symbol: str, direction: str, hours: int = 4) -> bool:
+    """
+    최근 N시간 안에 같은 (exchange, symbol, direction)으로 텔레그램 전송됐는지
+    sent=True인 것만 카운트 (차단 기록은 무시)
+    """
     try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         res = get_client().table("signal_log")\
             .select("id")\
             .eq("exchange",  exchange)\
             .eq("symbol",    symbol)\
             .eq("direction", direction)\
-            .eq("date_kst",  str(today_kst()))\
+            .eq("sent",      True)\
+            .gte("sent_at",  cutoff)\
             .limit(1)\
             .execute()
         return len(res.data) > 0
@@ -71,8 +76,12 @@ async def already_sent_today(exchange: str, symbol: str, direction: str) -> bool
         return False
 
 
-async def log_signal(result: dict, direction: str):
-    """텔레그램 전송 기록 저장"""
+async def log_signal(result: dict, direction: str, sent: bool = True):
+    """
+    신호 기록 저장
+    sent=True: 텔레그램 전송됨
+    sent=False: 쿨다운으로 차단됨 (관찰용 기록)
+    """
     try:
         get_client().table("signal_log").insert({
             "exchange":  result["exchange"],
@@ -84,6 +93,7 @@ async def log_signal(result: dict, direction: str):
             "price":     result["price"],
             "diagnosis": result["diagnosis"],
             "date_kst":  str(today_kst()),
+            "sent":      sent,
         }).execute()
     except Exception as e:
         logger.error(f"[DB] signal_log insert 실패: {e}")
