@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
 from core.scorer import calc_score, check_signal, format_telegram
-from db.supabase import insert_candle, already_sent_today, log_signal, run_cleanup
+from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup
 from notify.telegram import send_message
 
 logger = logging.getLogger(__name__)
@@ -78,15 +78,16 @@ async def candle_loop():
             symbol   = result["symbol"]
             exchange = result["exchange"]
 
-            # 오늘 이미 보냈는지 체크
-            if await already_sent_today(exchange, symbol, direction):
-                logger.info(f"[알림] 오늘 이미 전송 — {symbol} {direction}")
+           # 4시간 쿨다운 체크
+            if await sent_within_hours(exchange, symbol, direction, hours=4):
+                logger.info(f"[알림] 쿨다운 — {symbol} {direction} (4h 이내 전송됨)")
+                await log_signal(result, direction, sent=False)  # 관찰용 기록
                 continue
 
             # 텔레그램 전송
             msg = format_telegram(result, direction)
             await send_message(msg)
-            await log_signal(result, direction)
+            await log_signal(result, direction, sent=True)
             await asyncio.sleep(0.3)  # rate limit 방지
 
         # 1시간마다 롤링 딜리트
