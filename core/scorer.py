@@ -6,7 +6,7 @@ from core.percentile import cvd_percentile, oi_percentile, vol_percentile, is_wa
 from core.trend import trend_price, trend_cvd, trend_oi
 
 
-def diagnose_v2(price_t: str, oi_t: str, cvd_t: str) -> str | None:
+def diagnose_15m(price_t: str, oi_t: str, cvd_t: str) -> str | None:
     """
     추세 조합 → 진단
     flat 끼면 None (진단 보류)
@@ -21,8 +21,6 @@ def diagnose_v2(price_t: str, oi_t: str, cvd_t: str) -> str | None:
         return "신규 롱 진입"           # 건강한 상승
     if price_t == 'up' and oi_t == 'down' and cvd_t == 'up':
         return "숏스퀴즈"
-    if price_t == 'up' and oi_t == 'up' and cvd_t == 'down':
-        return "하락 다이버전스"        # 가격↑인데 매도 우위 + 신규 숏 누적
     if price_t == 'up' and oi_t == 'down' and cvd_t == 'down':
         return "매수 소진"
 
@@ -31,13 +29,38 @@ def diagnose_v2(price_t: str, oi_t: str, cvd_t: str) -> str | None:
         return "신규 숏 진입"           # 건강한 하락
     if price_t == 'down' and oi_t == 'down' and cvd_t == 'down':
         return "투매성 하락"
-    if price_t == 'down' and oi_t == 'up' and cvd_t == 'up':
-        return "매집 가능성"             # 가격↓인데 매수 + 신규 포지션
-    if price_t == 'down' and oi_t == 'down' and cvd_t == 'up':
-        return "상승 다이버전스"        # 가격↓인데 매수 우위 + 청산
 
     return None
+    
+def diagnose_4h(price_t: str, oi_t: str, cvd_t: str) -> str | None:
+    """
+    4시간 진단 — 큰 흐름. 8개 모두 사용
+    flat 끼면 None
+    """
+    if 'flat' in (price_t, oi_t, cvd_t):
+        return None
 
+    # 가격 상승 4가지
+    if price_t == 'up' and oi_t == 'up' and cvd_t == 'up':
+        return "신규 롱 진입"
+    if price_t == 'up' and oi_t == 'down' and cvd_t == 'up':
+        return "숏스퀴즈"
+    if price_t == 'up' and oi_t == 'up' and cvd_t == 'down':
+        return "하락 다이버전스"
+    if price_t == 'up' and oi_t == 'down' and cvd_t == 'down':
+        return "매수 소진"
+
+    # 가격 하락 4가지
+    if price_t == 'down' and oi_t == 'up' and cvd_t == 'down':
+        return "신규 숏 진입"
+    if price_t == 'down' and oi_t == 'down' and cvd_t == 'down':
+        return "투매성 하락"
+    if price_t == 'down' and oi_t == 'up' and cvd_t == 'up':
+        return "매집 가능성"
+    if price_t == 'down' and oi_t == 'down' and cvd_t == 'up':
+        return "상승 다이버전스"
+
+    return None
 
 def calc_score(snap: dict) -> dict | None:
     """
@@ -63,7 +86,7 @@ def calc_score(snap: dict) -> dict | None:
     cvd_t   = trend_cvd(cvd_h)
 
     # ── 진단 (flat 끼면 None) ──
-    diagnosis = diagnose_v2(price_t, oi_t, cvd_t)
+    diagnosis = diagnose_15m(price_t, oi_t, cvd_t)
     if diagnosis is None:
         return None  # 횡보 또는 데이터 부족
 
@@ -102,7 +125,7 @@ def check_signal(result: dict, long_params: dict, short_params: dict) -> str | N
     diag = result["diagnosis"]
 
     # LONG: 가격↑ 진단 + percentile 임계값
-    long_diags = ("신규 롱 진입", "숏스퀴즈", "매집 가능성")
+    long_diags = ("신규 롱 진입", "숏스퀴즈")
     if diag in long_diags:
         if (cvd >= long_params["cvd"] and
             oi  >= long_params["oi"] and
@@ -110,7 +133,7 @@ def check_signal(result: dict, long_params: dict, short_params: dict) -> str | N
             return "LONG"
 
     # SHORT: 가격↓ 진단 + percentile 임계값
-    short_diags = ("신규 숏 진입", "투매성 하락", "매수 소진", "하락 다이버전스")
+    short_diags = ("신규 숏 진입", "투매성 하락", "매수 소진")
     if diag in short_diags:
         if (cvd <= -short_params["cvd"] and
             oi  <= -short_params["oi"] and
