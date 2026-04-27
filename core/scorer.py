@@ -113,6 +113,58 @@ def calc_score(snap: dict) -> dict | None:
         "oi_trend":    oi_t,
     }
 
+def calc_score_4h(snap: dict) -> dict | None:
+    """
+    4시간봉 스냅샷 → 추세 분석 → 진단
+    - 15분과 같은 알고리즘
+    - 진단 함수만 diagnose_4h (8가지 모두 사용)
+    """
+    cvd_h   = snap["cvd_history"]
+    oi_h    = snap["oi_history"]
+    vol_h   = snap["vol_history"]
+    price_h = snap["price_history"]
+
+    # 워밍업 체크 (현재는 항상 True)
+    if not is_warmed_up(vol_h, oi_h, cvd_h):
+        return None
+
+    # 거래 없으면 스킵
+    if snap["vol_candle"] == 0:
+        return None
+
+    # ── 추세 판정 ──
+    price_t = trend_price(price_h)
+    oi_t    = trend_oi(oi_h)
+    cvd_t   = trend_cvd(cvd_h)
+
+    # ── 진단 (4H 전용 — 8개 모두 사용) ──
+    diagnosis = diagnose_4h(price_t, oi_t, cvd_t)
+    if diagnosis is None:
+        return None
+
+    # ── 백분위 (참고용) ──
+    cvd_pct = cvd_percentile(cvd_h)
+    oi_pct  = oi_percentile(snap["oi_chg"], oi_h)
+    vol_pct = vol_percentile(snap["vol_candle"], vol_h)
+
+    return {
+        "exchange":    snap["exchange"],
+        "symbol":      snap["symbol"],
+        "cvd_pct":     cvd_pct,
+        "oi_pct":      oi_pct,
+        "vol_pct":     vol_pct,
+        "cvd_delta":   snap["cvd_delta"],
+        "oi_chg":      snap["oi_chg"],
+        "vol_ratio":   snap["vol_ratio"],
+        "vol_candle":  snap["vol_candle"],
+        "price":       snap["price"],
+        "price_chg":   snap["price_chg"],
+        "diagnosis":   diagnosis,
+        "price_trend": price_t,
+        "cvd_trend":   cvd_t,
+        "oi_trend":    oi_t,
+        "timeframe":   "4h",
+    }
 
 def check_signal(result: dict, long_params: dict, short_params: dict) -> str | None:
     """
