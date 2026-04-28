@@ -48,6 +48,8 @@ class SymbolState:
 
     # ── 메타 ─────────────────────────────
     exchange: str = ""
+    # ── 24h 변화율 (거래소 ticker API에서 가져옴) ──
+    price_chg_24h: float = 0.0
 
 
 # 거래소별 심볼 상태
@@ -89,7 +91,12 @@ def update_oi(exchange: str, symbol: str, oi: float):
                 s.oi_history.pop(0)
         s.oi_prev    = s.oi_current
         s.oi_current = oi
-
+        
+def update_24h_chg(exchange: str, symbol: str, chg_pct: float):
+    """거래소 ticker API에서 가져온 24h 변화율 업데이트"""
+    with lock:
+        s = _state[exchange][symbol]
+        s.price_chg_24h = chg_pct
 
 def snapshot_and_reset(exchange: str, symbol: str) -> dict:
     """15분봉 마감 시 스냅샷 반환 + 캔들 값 초기화"""
@@ -135,6 +142,7 @@ def snapshot_and_reset(exchange: str, symbol: str) -> dict:
             "price_chg":     price_chg,
             "price":         s.price_current,
             "price_history": list(s.price_history),
+            "price_chg_24h": s.price_chg_24h,
         }
 
         # 15분 캔들 초기화
@@ -191,6 +199,7 @@ def snapshot_and_reset_4h(exchange: str, symbol: str) -> dict:
             "price_chg":     price_chg,
             "price":         s.price_current,
             "price_history": list(s.price_4h_history),
+            "price_chg_24h": s.price_chg_24h,
         }
 
         # 4H 캔들 초기화
