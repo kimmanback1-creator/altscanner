@@ -25,10 +25,34 @@ async def fetch_top_symbols() -> list[str]:
         and float(t.get("quoteVolume", 0)) >= MIN_QUOTE_VOL
     ]
     filtered.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
-    symbols = [t["symbol"] for t in filtered[:TOP_N_SYMBOLS]]
+    top = filtered[:TOP_N_SYMBOLS]
+
+    # 24h 변화율 같이 저장
+    for t in top:
+        try:
+            chg_24h = float(t.get("priceChangePercent", 0))
+            state.update_24h_chg(EXCHANGE, t["symbol"], chg_24h)
+        except (ValueError, TypeError):
+            pass
+
+    symbols = [t["symbol"] for t in top]
     logger.info(f"[Binance] 심볼 {len(symbols)}개 선정")
     return symbols
 
+async def fetch_24h_only():
+    """24h 변화율만 갱신 (심볼 리스트 변경 없음)"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(BINANCE["rest_top"]) as resp:
+                data = await resp.json()
+        for t in data:
+            try:
+                chg_24h = float(t.get("priceChangePercent", 0))
+                state.update_24h_chg(EXCHANGE, t["symbol"], chg_24h)
+            except (ValueError, TypeError):
+                continue
+    except Exception as e:
+        logger.error(f"[Binance] 24h 갱신 실패: {e}")
 
 async def oi_poller(symbols_ref: list):
     """OI 30초 폴링"""
