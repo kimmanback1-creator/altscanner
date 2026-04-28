@@ -26,10 +26,34 @@ async def fetch_top_symbols() -> list[str]:
         and float(t.get("turnover24h", 0)) >= MIN_QUOTE_VOL
     ]
     filtered.sort(key=lambda x: float(x.get("turnover24h", 0)), reverse=True)
-    symbols = [t["symbol"] for t in filtered[:TOP_N_SYMBOLS]]
+    top = filtered[:TOP_N_SYMBOLS]
+
+    # 24h 변화율 같이 저장 (Bybit는 소수 → ×100)
+    for t in top:
+        try:
+            chg_24h = float(t.get("price24hPcnt", 0)) * 100
+            state.update_24h_chg(EXCHANGE, t["symbol"], chg_24h)
+        except (ValueError, TypeError):
+            pass
+
+    symbols = [t["symbol"] for t in top]
     logger.info(f"[Bybit] 심볼 {len(symbols)}개 선정")
     return symbols
 
+async def fetch_24h_only():
+    """24h 변화율만 갱신 (심볼 리스트 변경 없음)"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(BYBIT["rest_top"]) as resp:
+                data = await resp.json()
+        for t in data.get("result", {}).get("list", []):
+            try:
+                chg_24h = float(t.get("price24hPcnt", 0)) * 100
+                state.update_24h_chg(EXCHANGE, t["symbol"], chg_24h)
+            except (ValueError, TypeError):
+                continue
+    except Exception as e:
+        logger.error(f"[Bybit] 24h 갱신 실패: {e}")
 
 async def oi_poller(symbols_ref: list):
     async with aiohttp.ClientSession() as session:
