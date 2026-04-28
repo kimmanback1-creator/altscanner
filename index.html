@@ -405,6 +405,7 @@ tr.both-agree .ticker-name {
     <button class="sb" id="ls-cvd" onclick="setSort('long','cvd')">CVD</button>
     <button class="sb" id="ls-oi" onclick="setSort('long','oi')">OI</button>
     <button class="sb" id="ls-vol" onclick="setSort('long','vol')">거래량</button>
+    <button class="sb" id="ls-recent" onclick="setSort('long','recent')">최신</button>
   </div>
   <div class="sort-section">
     <span class="sort-label">정렬</span>
@@ -412,6 +413,7 @@ tr.both-agree .ticker-name {
     <button class="sb" id="ss-cvd" onclick="setSort('short','cvd')">CVD</button>
     <button class="sb" id="ss-oi" onclick="setSort('short','oi')">OI</button>
     <button class="sb" id="ss-vol" onclick="setSort('short','vol')">거래량</button>
+    <button class="sb" id="ls-recent" onclick="setSort('long','recent')">최신</button>
   </div>
 </div>
 
@@ -659,6 +661,7 @@ function sortRows(rows, key) {
     if(key==='cvd') return Math.abs(b.cvd_pct)-Math.abs(a.cvd_pct)
     if(key==='oi')  return Math.abs(b.oi_pct)-Math.abs(a.oi_pct)
     if(key==='vol') return b.vol_pct-a.vol_pct
+    if(key==='recent') return (b.ts||0)-(a.ts||0) 
     return (Math.abs(b.cvd_pct)+Math.abs(b.oi_pct)+b.vol_pct)-(Math.abs(a.cvd_pct)+Math.abs(a.oi_pct)+a.vol_pct)
   })
 }
