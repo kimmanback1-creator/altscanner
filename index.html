@@ -555,6 +555,15 @@ async function loadLatestCandles() {
       if(!allData4h[key]) allData4h[key] = row
     }
   }
+
+  // ticker_counts 가져오기
+  const { data: dataCnt } = await sb.from('ticker_counts').select('*')
+  window._counts = {}
+  if (dataCnt) {
+    for (const row of dataCnt) {
+      window._counts[row.exchange + ':' + row.symbol] = row.cnt
+    }
+  }
   
   updateBadges()
   render()
@@ -716,6 +725,10 @@ function isBothAgree(r) {
 function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
   const k=r.exchange+':'+r.symbol
   const sel=selKey===k?'selected':'', dim=!isSig?'dim':'', dc=diagClass(r.diagnosis||'')
+
+  // 누적 카운트
+  const cnt = (window._counts && window._counts[k]) || 0
+  const cntText = cnt > 0 ? ` <span style="color:#555;font-size:9px">${cnt}</span>` : ''
   
   // 15M 시간
   const age15m = fmtAge(r.ts)
@@ -732,7 +745,7 @@ function makeRow(r, isSig, sigCls, cvdThr, oiThr, volThr) {
     : `<span class="diag-4h-empty">—</span>`
   
   return `<tr class="${isSig?sigCls:''} ${isSig?'sig':''} ${dim} ${sel} ${bothAgree}" onclick="selectRow('${r.exchange}','${r.symbol}')">
-    <td><span class="ticker-name">${r.symbol}</span>${exTag(r.exchange)}</td>
+    <td><span class="ticker-name">${r.symbol}</span>${cntText}${exTag(r.exchange)}</td>
     <td class="c">${priceBar(r.price_chg||0)}</td>
     <td class="c">${dualBar(r.cvd_pct||0,cvdThr)}</td>
     <td class="c">${dualBar(r.oi_pct||0,oiThr)}</td>
