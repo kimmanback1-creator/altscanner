@@ -213,3 +213,11 @@ async def run_cleanup():
         logger.info("[DB] 롤링 딜리트 완료")
     except Exception as e:
         logger.error(f"[DB] cleanup 실패: {e}")
+
+async def refresh_ticker_counts():
+    """ticker_counts materialized view 갱신 (15분 사이클 끝에 호출)"""
+    try:
+        get_client().rpc("refresh_ticker_counts").execute()
+        logger.info("[DB] ticker_counts refresh 완료")
+    except Exception as e:
+        logger.error(f"[DB] ticker_counts refresh 실패: {e}")
