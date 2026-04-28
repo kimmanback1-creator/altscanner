@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
 from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
-from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup
+from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts
 from notify.telegram import send_message
 
 logger = logging.getLogger(__name__)
@@ -128,3 +128,5 @@ async def candle_loop():
         if cleanup_counter >= (60 // CANDLE_MIN):
             await run_cleanup()
             cleanup_counter = 0
+        # ticker_counts 갱신 (사이클 끝, INSERT/DELETE 모두 반영)
+        await refresh_ticker_counts()
