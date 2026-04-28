@@ -47,6 +47,7 @@ async def insert_candle(result: dict, ts: int):
             "vol_candle": result["vol_candle"],
             "price":     result["price"],
             "price_chg": result["price_chg"],
+            "price_chg_24h": result.get("price_chg_24h", 0.0),
             "diagnosis": result["diagnosis"],
             "timeframe": result.get("timeframe", "15m"),
         }).execute()
