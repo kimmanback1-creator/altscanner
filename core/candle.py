@@ -13,6 +13,7 @@ import core.state as state
 from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
 from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts
 from notify.telegram import send_message
+from exchanges import binance as ex_binance, okx as ex_okx, bybit as ex_bybit
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,17 @@ async def candle_loop():
         now_kst = datetime.now(KST).strftime("%H:%M")
         logger.info(f"[캔들] {CANDLE_MIN}분봉 마감 — KST {now_kst}")
 
+        # ── 24h 변화율 갱신 (3거래소 병렬, 분석 전에) ──
+        try:
+            await asyncio.gather(
+                ex_binance.fetch_24h_only(),
+                ex_okx.fetch_24h_only(),
+                ex_bybit.fetch_24h_only(),
+            )
+            logger.info("[캔들] 24h 변화율 갱신 완료")
+        except Exception as e:
+            logger.error(f"[캔들] 24h 갱신 실패: {e}")
+            
         # ── 15분 분석 (기존) ──
         results = []
         for exchange in EXCHANGES:
