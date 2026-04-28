@@ -26,10 +26,40 @@ async def fetch_top_symbols() -> list[str]:
         and float(t.get("volCcy24h", 0)) * float(t.get("last", 1)) >= MIN_QUOTE_VOL
     ]
     filtered.sort(key=lambda x: float(x.get("volCcy24h", 0)), reverse=True)
-    symbols = [t["instId"] for t in filtered[:TOP_N_SYMBOLS]]
+    top = filtered[:TOP_N_SYMBOLS]
+
+    # 24h 변화율 같이 저장 (OKX는 last/open24h로 계산)
+    for t in top:
+        try:
+            last    = float(t.get("last", 0))
+            open24h = float(t.get("open24h", 0))
+            if open24h > 0:
+                chg_24h = (last - open24h) / open24h * 100
+                state.update_24h_chg(EXCHANGE, t["instId"], chg_24h)
+        except (ValueError, TypeError):
+            pass
+
+    symbols = [t["instId"] for t in top]
     logger.info(f"[OKX] 심볼 {len(symbols)}개 선정")
     return symbols
 
+async def fetch_24h_only():
+    """24h 변화율만 갱신 (심볼 리스트 변경 없음)"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(OKX["rest_top"]) as resp:
+                data = await resp.json()
+        for t in data.get("data", []):
+            try:
+                last    = float(t.get("last", 0))
+                open24h = float(t.get("open24h", 0))
+                if open24h > 0:
+                    chg_24h = (last - open24h) / open24h * 100
+                    state.update_24h_chg(EXCHANGE, t["instId"], chg_24h)
+            except (ValueError, TypeError):
+                continue
+    except Exception as e:
+        logger.error(f"[OKX] 24h 갱신 실패: {e}")
 
 async def oi_poller(symbols_ref: list):
     async with aiohttp.ClientSession() as session:
