@@ -1224,7 +1224,7 @@ function renderLiqMap() {
   const wrap = document.getElementById('liqmap-canvas-wrap')
   const W = wrap.clientWidth
   const H = wrap.clientHeight
-  const PAD_LEFT = 60
+  const PAD_LEFT = 70
   const PAD_RIGHT = 30
   const PAD_TOP = 30
   const PAD_BOTTOM = 40
@@ -1244,53 +1244,110 @@ function renderLiqMap() {
   }
   
   // ── Y 좌표 변환: USD → 픽셀 (로그 스케일) ──
-  // log10(usd_value) 기준 정규화 (1 ~ 24h 최대값)
   const maxUsd = (liqMapSummary?.max_usd || 1)
   const logMax = Math.log10(maxUsd + 1)
   const usdToY = (usd, side) => {
     const logVal = Math.log10(Math.max(1, usd) + 1)
-    const ratio = logVal / logMax  // 0 ~ 1
-    const halfH = chartH / 2 - 10  // 위/아래 여백 10px
+    const ratio = logVal / logMax
+    const halfH = chartH / 2 - 10
     const offset = ratio * halfH
     return side === 'SHORT' ? centerY - offset : centerY + offset
+  }
+  
+  // ── USD → 동그라미 크기 (로그 스케일) ──
+  const usdToRadius = (usd) => {
+    const logVal = Math.log10(Math.max(1, usd) + 1)
+    const ratio = logVal / logMax  // 0 ~ 1
+    return 3 + ratio * 9  // 3px ~ 12px
+  }
+  
+  // ── USD → 진하기 (로그 스케일) ──
+  const usdToOpacity = (usd) => {
+    const logVal = Math.log10(Math.max(1, usd) + 1)
+    const ratio = logVal / logMax
+    return 0.35 + ratio * 0.55  // 0.35 ~ 0.9
   }
   
   // ── SVG 시작 ──
   let html = ''
   
-  // 배경 격자
+  // 가로 중앙선
   html += `<line x1="${PAD_LEFT}" y1="${centerY}" x2="${W - PAD_RIGHT}" y2="${centerY}" 
            stroke="#2a2a2a" stroke-width="1"/>`
   
-  // 세로 격자 (시간) - 시간 단위마다
-  const timeGridCount = liqMapHours <= 4 ? liqMapHours * 2 : Math.min(12, liqMapHours)
-  for (let i = 0; i <= timeGridCount; i++) {
-    const x = PAD_LEFT + (i / timeGridCount) * chartW
-    html += `<line x1="${x}" y1="${PAD_TOP}" x2="${x}" y2="${PAD_TOP + chartH}" 
+  // ── Y축 격자 — 청산액 단위 ($1K, $10K, $100K, $1M) ──
+  const yGridLevels = [1_000, 10_000, 100_000, 1_000_000]
+  for (const level of yGridLevels) {
+    if (level > maxUsd * 1.5) continue  // 최대값 너무 넘는 라인은 안 그림
+    const logVal = Math.log10(level + 1)
+    const ratio = logVal / logMax
+    const halfH = chartH / 2 - 10
+    const offset = ratio * halfH
+    const yShort = centerY - offset
+    const yLong = centerY + offset
+    
+    // 위쪽 격자 (숏 청산)
+    html += `<line x1="${PAD_LEFT}" y1="${yShort}" x2="${W - PAD_RIGHT}" y2="${yShort}" 
              stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    // 아래쪽 격자 (롱 청산)
+    html += `<line x1="${PAD_LEFT}" y1="${yLong}" x2="${W - PAD_RIGHT}" y2="${yLong}" 
+             stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    
+    // 라벨 (왼쪽)
+    const labelStr = level >= 1_000_000 ? `$${level/1_000_000}M`
+                  : level >= 1_000 ? `$${level/1_000}K`
+                  : `$${level}`
+    html += `<text x="${PAD_LEFT - 6}" y="${yShort + 3}" 
+             fill="#444" font-size="9" text-anchor="end">${labelStr}</text>`
+    html += `<text x="${PAD_LEFT - 6}" y="${yLong + 3}" 
+             fill="#444" font-size="9" text-anchor="end">${labelStr}</text>`
   }
   
-  // Y축 라벨
-  html += `<text x="${PAD_LEFT - 8}" y="${PAD_TOP + 12}" 
-           fill="#5bd5c8" font-size="10" text-anchor="end">숏 청산</text>`
-  html += `<text x="${PAD_LEFT - 8}" y="${PAD_TOP + chartH - 4}" 
-           fill="#d55b9b" font-size="10" text-anchor="end">롱 청산</text>`
-  html += `<text x="${PAD_LEFT - 8}" y="${centerY + 4}" 
-           fill="#444" font-size="9" text-anchor="end">0</text>`
+  // ── X축 시간 격자 (1시간 단위) ──
+  const hoursToShow = liqMapHours  // 1, 4, 24
+  for (let h = 0; h <= hoursToShow; h++) {
+    const ratio = h / hoursToShow
+    const x = PAD_LEFT + ratio * chartW
+    
+    // 격자선 (1시간마다)
+    html += `<line x1="${x}" y1="${PAD_TOP}" x2="${x}" y2="${PAD_TOP + chartH}" 
+             stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    
+    // 시각 라벨 (1h는 매 시간, 4h는 매 시간, 24h는 3시간 단위로 자동 thin out)
+    const labelInterval = liqMapHours === 24 ? 3 : 1
+    if ((hoursToShow - h) % labelInterval === 0) {
+      // 그 시간대의 시각 계산 (KST)
+      const ms = now - (hoursToShow - h) * 60 * 60 * 1000
+      const d = new Date(ms)
+      const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+      const hh = String(kst.getUTCHours()).padStart(2, '0')
+      const mm = String(kst.getUTCMinutes()).padStart(2, '0')
+      const timeStr = `${hh}:${mm}`
+      
+      html += `<text x="${x}" y="${centerY + 12}" 
+               fill="#555" font-size="9" text-anchor="middle">${timeStr}</text>`
+    }
+  }
   
-  // X축 시간 라벨 (양쪽 끝만)
+  // ── Y축 라벨 (위/아래) ──
+  html += `<text x="${PAD_LEFT - 6}" y="${PAD_TOP + 12}" 
+           fill="#5bd5c8" font-size="10" text-anchor="end">숏 청산</text>`
+  html += `<text x="${PAD_LEFT - 6}" y="${PAD_TOP + chartH - 4}" 
+           fill="#d55b9b" font-size="10" text-anchor="end">롱 청산</text>`
+  
+  // ── X축 양 끝 라벨 ──
   html += `<text x="${PAD_LEFT}" y="${H - 12}" 
            fill="#666" font-size="9">${liqMapHours}h 전</text>`
   html += `<text x="${W - PAD_RIGHT}" y="${H - 12}" 
            fill="#666" font-size="9" text-anchor="end">현재</text>`
   
   // ── 동그라미 그리기 ──
-  // 큰 청산 우선 그리기 위해 정렬 (작은 것 먼저, 큰 것 위에)
+  // 작은 것 먼저, 큰 것 위에 (큰 청산이 가려지지 않게)
   const sorted = [...liqMapData].sort((a, b) => 
     Number(a.total_usd) - Number(b.total_usd)
   )
   
-  // 라벨 충돌 방지: 큰 청산만 자동 라벨 (상위 15개)
+  // 라벨 충돌 방지: 상위 15개만 자동 라벨
   const usdValues = liqMapData.map(d => Number(d.total_usd))
   usdValues.sort((a, b) => b - a)
   const labelThreshold = usdValues[Math.min(14, usdValues.length - 1)] || 0
@@ -1299,6 +1356,8 @@ function renderLiqMap() {
     const usd = Number(d.total_usd)
     const x = tsToX(d.bucket_ts)
     const y = usdToY(usd, d.side)
+    const r = usdToRadius(usd)
+    const opacity = usdToOpacity(usd)
     const isShort = d.side === 'SHORT'
     const color = isShort ? '#5bd5c8' : '#d55b9b'
     const showLabel = usd >= labelThreshold
@@ -1307,9 +1366,10 @@ function renderLiqMap() {
     if (x < PAD_LEFT || x > W - PAD_RIGHT) continue
     if (y < PAD_TOP || y > PAD_TOP + chartH) continue
     
-    // 동그라미 (모두 같은 크기, 결정한 대로)
-    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" 
-             fill="${color}" fill-opacity="0.7" stroke="${color}" stroke-width="0.5"
+    // 동그라미 (크기 + 진하기 둘 다 변화)
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" 
+             fill="${color}" fill-opacity="${opacity.toFixed(2)}" 
+             stroke="${color}" stroke-width="0.5" stroke-opacity="${(opacity + 0.1).toFixed(2)}"
              data-symbol="${d.symbol}" 
              data-exchange="${d.exchange}"
              data-side="${d.side}"
@@ -1320,7 +1380,7 @@ function renderLiqMap() {
     
     // 라벨 (큰 청산만)
     if (showLabel) {
-      const labelY = isShort ? y - 8 : y + 14
+      const labelY = isShort ? y - r - 4 : y + r + 11
       html += `<text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" 
                fill="${color}" font-size="9" text-anchor="middle" 
                style="pointer-events:none">${d.symbol}</text>`
@@ -1364,7 +1424,6 @@ function renderLiqMap() {
       const rect = wrap.getBoundingClientRect()
       let x = e.clientX - rect.left + 10
       let y = e.clientY - rect.top + 10
-      // 화면 끝 넘어가면 반대 방향으로
       if (x + 150 > rect.width) x = e.clientX - rect.left - 160
       if (y + 80 > rect.height) y = e.clientY - rect.top - 90
       tooltip.style.left = x + 'px'
