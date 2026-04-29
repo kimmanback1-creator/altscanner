@@ -5,6 +5,7 @@
 # ══════════════════════════════════════════
 
 import threading
+import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -97,6 +98,39 @@ def update_24h_chg(exchange: str, symbol: str, chg_pct: float):
     with lock:
         s = _state[exchange][symbol]
         s.price_chg_24h = chg_pct
+
+# 청산 저장 임계값
+LIQ_MIN_USD = 1000.0
+
+
+async def insert_liquidation(exchange: str, symbol: str, side: str, qty: float, price: float):
+    """
+    청산 이벤트를 Supabase에 저장.
+    side: 'LONG' (롱 청산) 또는 'SHORT' (숏 청산)
+    임계값 ($1000) 이하는 무시.
+    """
+    usd_value = qty * price
+    if usd_value < LIQ_MIN_USD:
+        return  # 작은 청산 무시
+
+    # 비순환 import 회피 — 함수 안에서 import
+    from db.supabase import get_client
+    
+    try:
+        get_client().table("liquidation_events").insert({
+            "exchange":  exchange,
+            "symbol":    symbol,
+            "side":      side,
+            "qty":       qty,
+            "price":     price,
+            "usd_value": usd_value,
+        }).execute()
+    except Exception as e:
+        # 에러는 로그만 (재시도 안 함 — 청산은 빈번해서 한두 건 놓쳐도 OK)
+        import logging
+        logging.getLogger(__name__).warning(
+            f"[State] 청산 저장 실패 {exchange}:{symbol}: {e}"
+        )
 
 def snapshot_and_reset(exchange: str, symbol: str) -> dict:
     """15분봉 마감 시 스냅샷 반환 + 캔들 값 초기화"""
