@@ -222,3 +222,11 @@ async def refresh_ticker_counts():
         logger.info("[DB] ticker_counts refresh 완료")
     except Exception as e:
         logger.error(f"[DB] ticker_counts refresh 실패: {e}")
+
+async def cleanup_liquidations():
+    """24시간 지난 청산 이벤트 삭제"""
+    try:
+        get_client().rpc("cleanup_liquidation_events").execute()
+        logger.info("[DB] 청산 이벤트 cleanup 완료")
+    except Exception as e:
+        logger.error(f"[DB] 청산 cleanup 실패: {e}")
