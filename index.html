@@ -1254,18 +1254,21 @@ function renderLiqMap() {
     return side === 'SHORT' ? centerY - offset : centerY + offset
   }
   
-  // ── USD → 동그라미 크기 (로그 스케일) ──
+  // ── USD → 동그라미 크기 (로그 + 강조) ──
   const usdToRadius = (usd) => {
     const logVal = Math.log10(Math.max(1, usd) + 1)
-    const ratio = logVal / logMax  // 0 ~ 1
-    return 3 + ratio * 9  // 3px ~ 12px
+    const ratio = logVal / logMax
+    // ratio를 1.5제곱해서 큰 청산 더 강조 (작은 건 더 작게)
+    const emphasized = Math.pow(ratio, 1.5)
+    return 2 + emphasized * 16  // 2px ~ 18px
   }
   
-  // ── USD → 진하기 (로그 스케일) ──
+  // ── USD → 진하기 (로그 + 강조) ──
   const usdToOpacity = (usd) => {
     const logVal = Math.log10(Math.max(1, usd) + 1)
     const ratio = logVal / logMax
-    return 0.35 + ratio * 0.55  // 0.35 ~ 0.9
+    const emphasized = Math.pow(ratio, 1.5)
+    return 0.2 + emphasized * 0.8  // 0.2 ~ 1.0
   }
   
   // ── SVG 시작 ──
@@ -1303,30 +1306,35 @@ function renderLiqMap() {
              fill="#444" font-size="9" text-anchor="end">${labelStr}</text>`
   }
   
-  // ── X축 시간 격자 (1시간 단위) ──
-  const hoursToShow = liqMapHours  // 1, 4, 24
-  for (let h = 0; h <= hoursToShow; h++) {
-    const ratio = h / hoursToShow
+  
+  // ── X축 시간 격자 (정시 단위로 정렬) ──
+  const nowDate = new Date(now)
+  // 가장 최근 정시 (분/초/ms 0으로)
+  const lastHour = new Date(nowDate)
+  lastHour.setMinutes(0, 0, 0)
+  // 24h이면 3시간 단위, 그 외는 1시간 단위
+  const hourStep = liqMapHours === 24 ? 3 : 1
+  
+  // 차트 시작 시점부터 가장 최근 정시까지, 매 hourStep 시간마다 그리기
+  for (let h = 0; h <= liqMapHours; h += hourStep) {
+    const labelTime = new Date(lastHour.getTime() - h * 60 * 60 * 1000)
+    if (labelTime.getTime() < startMs) break
+    
+    // X 좌표
+    const ratio = (labelTime.getTime() - startMs) / (now - startMs)
     const x = PAD_LEFT + ratio * chartW
     
-    // 격자선 (1시간마다)
+    // 그리드선
     html += `<line x1="${x}" y1="${PAD_TOP}" x2="${x}" y2="${PAD_TOP + chartH}" 
              stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
     
-    // 시각 라벨 (1h는 매 시간, 4h는 매 시간, 24h는 3시간 단위로 자동 thin out)
-    const labelInterval = liqMapHours === 24 ? 3 : 1
-    if ((hoursToShow - h) % labelInterval === 0) {
-      // 그 시간대의 시각 계산 (KST)
-      const ms = now - (hoursToShow - h) * 60 * 60 * 1000
-      const d = new Date(ms)
-      const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
-      const hh = String(kst.getUTCHours()).padStart(2, '0')
-      const mm = String(kst.getUTCMinutes()).padStart(2, '0')
-      const timeStr = `${hh}:${mm}`
-      
-      html += `<text x="${x}" y="${centerY + 12}" 
-               fill="#555" font-size="9" text-anchor="middle">${timeStr}</text>`
-    }
+    // 시각 라벨 (KST)
+    const kst = new Date(labelTime.getTime() + 9 * 60 * 60 * 1000)
+    const hh = String(kst.getUTCHours()).padStart(2, '0')
+    const timeStr = `${hh}:00`
+    
+    html += `<text x="${x}" y="${centerY + 12}" 
+             fill="#555" font-size="9" text-anchor="middle">${timeStr}</text>`
   }
   
   // ── Y축 라벨 (위/아래) ──
