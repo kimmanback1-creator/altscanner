@@ -690,6 +690,31 @@ function fmtAge(ts) {
   const diffDay = Math.floor(diffHour / 24)
   return `${diffDay}일 전`
 }
+
+// raw 거래량 단위 포맷 (천 단위 콤마, 큰 숫자는 K/M)
+function fmtRaw(val, signed) {
+  if (val == null) return '—'
+  const abs = Math.abs(val)
+  let str
+  if (abs >= 1_000_000) {
+    str = (val / 1_000_000).toFixed(2) + 'M'
+  } else if (abs >= 1_000) {
+    str = (val / 1_000).toFixed(2) + 'K'
+  } else if (abs >= 1) {
+    str = val.toFixed(2)
+  } else {
+    str = val.toFixed(4)
+  }
+  if (signed && val >= 0 && !str.startsWith('-')) str = '+' + str
+  return str
+}
+
+// % 단위 (부호 표시)
+function fmtPctSigned(val) {
+  if (val == null) return '—'
+  return (val >= 0 ? '+' : '') + val.toFixed(2) + '%'
+}
+
 // 4H 진단 가져오기
 function get4hDiag(r) {
   const key = r.exchange + ':' + r.symbol
@@ -820,26 +845,31 @@ async function selectRow(exchange, symbol) {
     <div class="diag-detail ${dc}">${r.diagnosis||'—'}</div>
   `
 
-  document.getElementById('cvd-val').textContent = (r.cvd_pct>=0?'+':'')+r.cvd_pct?.toFixed(1)+'%'
-  document.getElementById('cvd-val').style.color = cvdC
-  document.getElementById('oi-val').textContent  = (r.oi_pct>=0?'+':'')+r.oi_pct?.toFixed(1)+'%'
-  document.getElementById('oi-val').style.color  = oiC
-  document.getElementById('vol-val').textContent = r.vol_pct?.toFixed(1)+'%'
+  // CVD delta: 절대 거래량 (음수/양수 가능)
+  document.getElementById('cvd-val').textContent = fmtRaw(r.cvd_delta, true)
+  document.getElementById('cvd-val').style.color = (r.cvd_delta||0) >= 0 ? '#2ecc71' : '#e74c3c'
+  
+  // OI chg: % 단위 (음수/양수 가능)
+  document.getElementById('oi-val').textContent  = fmtPctSigned(r.oi_chg)
+  document.getElementById('oi-val').style.color  = (r.oi_chg||0) >= 0 ? '#2ecc71' : '#e74c3c'
+  
+  // Vol candle: 절대 거래량 (항상 양수)
+  document.getElementById('vol-val').textContent = fmtRaw(r.vol_candle, false)
   document.getElementById('vol-val').style.color = '#d5a55b'
 
-  // 히스토리 조회
+  // 히스토리 조회 (진단 입력과 동일한 raw 데이터)
   const { data: hist } = await sb
     .from('candle_data')
-    .select('cvd_pct, oi_pct, vol_pct')
+    .select('cvd_delta, oi_chg, vol_candle')
     .eq('exchange', exchange)
     .eq('symbol', symbol)
     .order('ts', { ascending: true })
     .limit(20)
 
   if(hist && hist.length > 0) {
-    drawSparkReal('spark-cvd', hist.map(h => h.cvd_pct||0), cvdC)
-    drawSparkReal('spark-oi',  hist.map(h => h.oi_pct||0),  oiC)
-    drawSparkReal('spark-vol', hist.map(h => h.vol_pct||0), '#d5a55b')
+    drawSparkReal('spark-cvd', hist.map(h => h.cvd_delta||0),  cvdC)
+    drawSparkReal('spark-oi',  hist.map(h => h.oi_chg||0),     oiC)
+    drawSparkReal('spark-vol', hist.map(h => h.vol_candle||0), '#d5a55b')
   } else {
     drawSpark('spark-cvd', r.cvd_pct||0, cvdC)
     drawSpark('spark-oi',  r.oi_pct||0,  oiC)
