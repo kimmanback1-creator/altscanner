@@ -299,6 +299,62 @@ tr.sig .ex-byb { color: #f7a600; }
   color: #666;
 }
 
+/* ── 청산 맵 오버레이 ───────────────── */
+.liqmap-overlay {
+  display: none;
+  position: fixed; top: 36px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 1000; padding: 14px 18px;
+  overflow: hidden; flex-direction: column;
+}
+.liqmap-overlay.show { display: flex; }
+
+.liqmap-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; flex-shrink: 0;
+}
+.liqmap-head h2 { font-size: 13px; color: #e0e0e0; font-weight: 500; }
+
+.liqmap-time-filters { display: flex; gap: 6px; }
+.liqmap-time-filters button {
+  background: #1a1a1a; color: #888; border: 0.5px solid #2a2a2a;
+  padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.liqmap-time-filters button.active { color: #5bd5c8; border-color: #5bd5c8; }
+
+.liqmap-canvas-wrap {
+  flex: 1; position: relative;
+  border: 0.5px solid #1a1a1a;
+  background: #0e0e0e;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.liqmap-svg { width: 100%; height: 100%; display: block; }
+
+.liqmap-summary {
+  flex-shrink: 0; padding: 8px 12px; margin-top: 8px;
+  background: #181818; border: 0.5px solid #1a1a1a;
+  font-size: 11px; color: #aaa;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.liqmap-summary .ls-label { color: #666; margin-right: 4px; }
+.liqmap-summary .ls-short { color: #5bd5c8; }
+.liqmap-summary .ls-long { color: #d55b9b; }
+
+.liqmap-tooltip {
+  position: absolute; pointer-events: none;
+  background: #1a1a1a; border: 0.5px solid #2a2a2a;
+  padding: 6px 8px; border-radius: 3px; font-size: 10px;
+  color: #e0e0e0; z-index: 10; display: none;
+  white-space: nowrap;
+}
+
+.liq-empty {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #555; font-size: 12px;
+}
+
 /* ── 4H + 15M 동의 강조 (베이지) ───── */
 tr.both-agree {
   background: #2a2418 !important;  /* 옅은 베이지/카키 */
@@ -345,6 +401,7 @@ tr.both-agree .ticker-name {
       <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
     </div> 
     <button class="btn-history" id="btn-history" onclick="toggleHistory()">📋 히스토리</button>
+    <button class="btn-history" id="btn-liqmap" onclick="toggleLiqMap()">💥 청산 맵</button>
     <span class="badge on" id="badge-bnc">BNC —</span>
     <span class="badge on" id="badge-okx">OKX —</span>
     <span class="badge on" id="badge-byb">BYB —</span>
@@ -1094,6 +1151,262 @@ function renderHistory() {
   document.getElementById('history-tbody').innerHTML = html
 }
 
+// ══════════════════════════════════════
+//  청산 맵
+// ══════════════════════════════════════
+let liqMapData = []
+let liqMapSummary = null
+let liqMapHours = 24
+
+function toggleLiqMap() {
+  const overlay = document.getElementById('liqmap-overlay')
+  const btn = document.getElementById('btn-liqmap')
+  const isOpen = overlay.classList.contains('show')
+  if (isOpen) {
+    overlay.classList.remove('show')
+    btn.classList.remove('active')
+  } else {
+    overlay.classList.add('show')
+    btn.classList.add('active')
+    loadLiqMap()
+  }
+}
+
+function setLiqTime(hours) {
+  liqMapHours = hours
+  document.querySelectorAll('.liqmap-time-filters button').forEach(b => b.classList.remove('active'))
+  document.getElementById('lt-' + hours + 'h').classList.add('active')
+  loadLiqMap()
+}
+
+async function loadLiqMap() {
+  document.getElementById('liq-empty').style.display = 'block'
+  document.getElementById('liq-empty').textContent = '데이터 로딩 중...'
+  
+  try {
+    // 버킷 데이터 + 요약 통계 병렬 fetch
+    const [bucketsRes, summaryRes] = await Promise.all([
+      sb.rpc('get_liquidation_buckets', { hours_back: liqMapHours, bucket_minutes: 60 }),
+      sb.rpc('get_liquidation_summary', { hours_back: liqMapHours })
+    ])
+    
+    if (bucketsRes.error) {
+      console.error('[liqmap] buckets fetch failed:', bucketsRes.error)
+      document.getElementById('liq-empty').textContent = '데이터 로딩 실패'
+      return
+    }
+    
+    liqMapData = bucketsRes.data || []
+    liqMapSummary = summaryRes.data?.[0] || null
+    
+    renderLiqMap()
+  } catch (e) {
+    console.error('[liqmap] error:', e)
+    document.getElementById('liq-empty').textContent = '데이터 로딩 실패'
+  }
+}
+
+function renderLiqMap() {
+  const empty = document.getElementById('liq-empty')
+  const svg = document.getElementById('liqmap-svg')
+  
+  if (!liqMapData || liqMapData.length === 0) {
+    empty.style.display = 'block'
+    empty.textContent = '청산 데이터 없음 (수집 중...)'
+    svg.innerHTML = ''
+    updateLiqSummary()
+    return
+  }
+  
+  empty.style.display = 'none'
+  
+  // ── 차트 영역 크기 계산 ──
+  const wrap = document.getElementById('liqmap-canvas-wrap')
+  const W = wrap.clientWidth
+  const H = wrap.clientHeight
+  const PAD_LEFT = 60
+  const PAD_RIGHT = 30
+  const PAD_TOP = 30
+  const PAD_BOTTOM = 40
+  const chartW = W - PAD_LEFT - PAD_RIGHT
+  const chartH = H - PAD_TOP - PAD_BOTTOM
+  const centerY = PAD_TOP + chartH / 2
+  
+  // ── 시간 범위 ──
+  const now = Date.now()
+  const startMs = now - liqMapHours * 60 * 60 * 1000
+  
+  // ── X 좌표 변환: 시간 → 픽셀 ──
+  const tsToX = (ts) => {
+    const t = new Date(ts).getTime()
+    const ratio = (t - startMs) / (now - startMs)
+    return PAD_LEFT + ratio * chartW
+  }
+  
+  // ── Y 좌표 변환: USD → 픽셀 (로그 스케일) ──
+  // log10(usd_value) 기준 정규화 (1 ~ 24h 최대값)
+  const maxUsd = (liqMapSummary?.max_usd || 1)
+  const logMax = Math.log10(maxUsd + 1)
+  const usdToY = (usd, side) => {
+    const logVal = Math.log10(Math.max(1, usd) + 1)
+    const ratio = logVal / logMax  // 0 ~ 1
+    const halfH = chartH / 2 - 10  // 위/아래 여백 10px
+    const offset = ratio * halfH
+    return side === 'SHORT' ? centerY - offset : centerY + offset
+  }
+  
+  // ── SVG 시작 ──
+  let html = ''
+  
+  // 배경 격자
+  html += `<line x1="${PAD_LEFT}" y1="${centerY}" x2="${W - PAD_RIGHT}" y2="${centerY}" 
+           stroke="#2a2a2a" stroke-width="1"/>`
+  
+  // 세로 격자 (시간) - 시간 단위마다
+  const timeGridCount = liqMapHours <= 4 ? liqMapHours * 2 : Math.min(12, liqMapHours)
+  for (let i = 0; i <= timeGridCount; i++) {
+    const x = PAD_LEFT + (i / timeGridCount) * chartW
+    html += `<line x1="${x}" y1="${PAD_TOP}" x2="${x}" y2="${PAD_TOP + chartH}" 
+             stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+  }
+  
+  // Y축 라벨
+  html += `<text x="${PAD_LEFT - 8}" y="${PAD_TOP + 12}" 
+           fill="#5bd5c8" font-size="10" text-anchor="end">숏 청산</text>`
+  html += `<text x="${PAD_LEFT - 8}" y="${PAD_TOP + chartH - 4}" 
+           fill="#d55b9b" font-size="10" text-anchor="end">롱 청산</text>`
+  html += `<text x="${PAD_LEFT - 8}" y="${centerY + 4}" 
+           fill="#444" font-size="9" text-anchor="end">0</text>`
+  
+  // X축 시간 라벨 (양쪽 끝만)
+  html += `<text x="${PAD_LEFT}" y="${H - 12}" 
+           fill="#666" font-size="9">${liqMapHours}h 전</text>`
+  html += `<text x="${W - PAD_RIGHT}" y="${H - 12}" 
+           fill="#666" font-size="9" text-anchor="end">현재</text>`
+  
+  // ── 동그라미 그리기 ──
+  // 큰 청산 우선 그리기 위해 정렬 (작은 것 먼저, 큰 것 위에)
+  const sorted = [...liqMapData].sort((a, b) => 
+    Number(a.total_usd) - Number(b.total_usd)
+  )
+  
+  // 라벨 충돌 방지: 큰 청산만 자동 라벨 (상위 15개)
+  const usdValues = liqMapData.map(d => Number(d.total_usd))
+  usdValues.sort((a, b) => b - a)
+  const labelThreshold = usdValues[Math.min(14, usdValues.length - 1)] || 0
+  
+  for (const d of sorted) {
+    const usd = Number(d.total_usd)
+    const x = tsToX(d.bucket_ts)
+    const y = usdToY(usd, d.side)
+    const isShort = d.side === 'SHORT'
+    const color = isShort ? '#5bd5c8' : '#d55b9b'
+    const showLabel = usd >= labelThreshold
+    
+    // 차트 영역 안에 있는 점만 그리기
+    if (x < PAD_LEFT || x > W - PAD_RIGHT) continue
+    if (y < PAD_TOP || y > PAD_TOP + chartH) continue
+    
+    // 동그라미 (모두 같은 크기, 결정한 대로)
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" 
+             fill="${color}" fill-opacity="0.7" stroke="${color}" stroke-width="0.5"
+             data-symbol="${d.symbol}" 
+             data-exchange="${d.exchange}"
+             data-side="${d.side}"
+             data-usd="${usd}"
+             data-events="${d.event_count}"
+             data-ts="${d.bucket_ts}"
+             style="cursor:pointer"/>`
+    
+    // 라벨 (큰 청산만)
+    if (showLabel) {
+      const labelY = isShort ? y - 8 : y + 14
+      html += `<text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" 
+               fill="${color}" font-size="9" text-anchor="middle" 
+               style="pointer-events:none">${d.symbol}</text>`
+    }
+  }
+  
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+  svg.innerHTML = html
+  
+  // ── 호버 툴팁 ──
+  const tooltip = document.getElementById('liqmap-tooltip')
+  svg.querySelectorAll('circle').forEach(circle => {
+    circle.addEventListener('mouseenter', (e) => {
+      const sym = e.target.dataset.symbol
+      const ex = e.target.dataset.exchange
+      const side = e.target.dataset.side
+      const usd = Number(e.target.dataset.usd)
+      const events = e.target.dataset.events
+      const ts = new Date(e.target.dataset.ts)
+      const kst = new Date(ts.getTime() + 9*60*60*1000)
+      const timeStr = kst.toISOString().slice(11, 16)
+      
+      const usdStr = usd >= 1_000_000 ? `$${(usd/1_000_000).toFixed(2)}M`
+                  : usd >= 1_000 ? `$${(usd/1_000).toFixed(1)}K`
+                  : `$${Math.round(usd)}`
+      
+      const sideKr = side === 'SHORT' ? '숏 청산' : '롱 청산'
+      const sideColor = side === 'SHORT' ? '#5bd5c8' : '#d55b9b'
+      
+      tooltip.innerHTML = `
+        <div style="color:#fff;font-weight:500">${sym}</div>
+        <div style="color:#888">${ex.toUpperCase()} · ${timeStr} KST</div>
+        <div style="color:${sideColor}">${sideKr}: ${usdStr}</div>
+        <div style="color:#666">${events}건</div>
+      `
+      tooltip.style.display = 'block'
+    })
+    
+    circle.addEventListener('mousemove', (e) => {
+      const wrap = document.getElementById('liqmap-canvas-wrap')
+      const rect = wrap.getBoundingClientRect()
+      let x = e.clientX - rect.left + 10
+      let y = e.clientY - rect.top + 10
+      // 화면 끝 넘어가면 반대 방향으로
+      if (x + 150 > rect.width) x = e.clientX - rect.left - 160
+      if (y + 80 > rect.height) y = e.clientY - rect.top - 90
+      tooltip.style.left = x + 'px'
+      tooltip.style.top = y + 'px'
+    })
+    
+    circle.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none'
+    })
+  })
+  
+  updateLiqSummary()
+}
+
+function updateLiqSummary() {
+  const sum = liqMapSummary
+  const fmtUsd = (v) => {
+    if (v == null || v === 0) return '$0'
+    if (v >= 1_000_000) return '$' + (v / 1_000_000).toFixed(2) + 'M'
+    if (v >= 1_000) return '$' + (v / 1_000).toFixed(1) + 'K'
+    return '$' + Math.round(v)
+  }
+  
+  const summaryEl = document.getElementById('liqmap-summary')
+  const longUsd = sum?.total_long_usd || 0
+  const shortUsd = sum?.total_short_usd || 0
+  const count = sum?.total_count || 0
+  
+  summaryEl.innerHTML = `
+    <div>
+      <span class="ls-label">청산:</span>
+      <span class="ls-short">숏 ${fmtUsd(shortUsd)}</span>
+      <span style="color:#444"> | </span>
+      <span class="ls-long">롱 ${fmtUsd(longUsd)}</span>
+    </div>
+    <div>
+      <span class="ls-label">총 이벤트:</span>
+      <span style="color:#aaa">${count.toLocaleString()}</span>
+    </div>
+  `
+}
+  
 init()
 
 </script>
@@ -1130,5 +1443,36 @@ init()
     </table>
   </div>
 </div>
+
+<!-- ── 청산 맵 오버레이 ───────────────── -->
+<div class="liqmap-overlay" id="liqmap-overlay">
+  <div class="liqmap-head">
+    <h2>💥 청산 맵</h2>
+    <div class="liqmap-time-filters">
+      <button id="lt-1h" onclick="setLiqTime(1)">1h</button>
+      <button id="lt-4h" onclick="setLiqTime(4)">4h</button>
+      <button class="active" id="lt-24h" onclick="setLiqTime(24)">24h</button>
+    </div>
+    <button class="history-close" onclick="toggleLiqMap()">✕ 닫기</button>
+  </div>
+  <div class="liqmap-canvas-wrap" id="liqmap-canvas-wrap">
+    <svg class="liqmap-svg" id="liqmap-svg" preserveAspectRatio="none"></svg>
+    <div class="liqmap-tooltip" id="liqmap-tooltip"></div>
+    <div class="liq-empty" id="liq-empty">데이터 로딩 중...</div>
+  </div>
+  <div class="liqmap-summary" id="liqmap-summary">
+    <div>
+      <span class="ls-label">청산:</span>
+      <span class="ls-short">숏 $0</span>
+      <span style="color:#444"> | </span>
+      <span class="ls-long">롱 $0</span>
+    </div>
+    <div>
+      <span class="ls-label">총 이벤트:</span>
+      <span style="color:#aaa">0</span>
+    </div>
+  </div>
+</div>
+  
 </body>
 </html>
