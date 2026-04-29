@@ -114,6 +114,57 @@ async def trades_ws(symbols_ref: list):
             logger.error(f"[OKX] WS 끊김: {e} — 5초 후 재연결")
             await asyncio.sleep(5)
 
+async def liquidations_ws(symbols_ref: list):
+    """청산 WS - OKX는 instType=SWAP 단일 채널로 모든 청산 받음"""
+    while True:
+        try:
+            logger.info(f"[OKX] 청산 WS 연결 중...")
+            
+            async with websockets.connect(OKX["ws"], ping_interval=20) as ws:
+                # liquidation-orders는 instType 단위로 구독 (instId별 X)
+                await ws.send(json.dumps({
+                    "op": "subscribe",
+                    "args": [{
+                        "channel": "liquidation-orders",
+                        "instType": "SWAP",
+                    }]
+                }))
+                logger.info("[OKX] 청산 WS 구독 완료 (SWAP 전체)")
+
+                async for raw in ws:
+                    try:
+                        if raw == "pong":
+                            continue
+                        msg = json.loads(raw)
+                        if msg.get("event") == "subscribe":
+                            continue
+                        for entry in msg.get("data", []):
+                            symbol = entry.get("instId", "")
+                            # 분석 대상 심볼만 처리
+                            if symbol not in symbols_ref:
+                                continue
+                            for d in entry.get("details", []):
+                                # OKX: posSide='long'=롱청산, posSide='short'=숏청산
+                                pos_side = d.get("posSide", "").lower()
+                                if pos_side == "long":
+                                    side = "LONG"
+                                elif pos_side == "short":
+                                    side = "SHORT"
+                                else:
+                                    continue
+                                
+                                # OKX 'sz'는 계약 수, 'bkPx'는 청산가
+                                qty = float(d.get("sz", 0))
+                                price = float(d.get("bkPx", 0))
+                                if qty <= 0 or price <= 0:
+                                    continue
+                                await state.insert_liquidation(EXCHANGE, symbol, side, qty, price)
+                    except Exception as e:
+                        logger.warning(f"[OKX] 청산 파싱 오류: {e}")
+
+        except Exception as e:
+            logger.error(f"[OKX] 청산 WS 끊김: {e} — 5초 후 재연결")
+            await asyncio.sleep(5)
 
 async def symbol_refresher(symbols_ref: list):
     while True:
@@ -133,5 +184,6 @@ async def run():
     await asyncio.gather(
         trades_ws(symbols_ref),
         oi_poller(symbols_ref),
+        liquidations_ws(symbols_ref),
         symbol_refresher(symbols_ref),
     )
