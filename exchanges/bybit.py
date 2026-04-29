@@ -105,6 +105,58 @@ async def trades_ws(symbols_ref: list):
             logger.error(f"[Bybit] WS 끊김: {e} — 5초 후 재연결")
             await asyncio.sleep(5)
 
+async def liquidations_ws(symbols_ref: list):
+    """청산 WS - Bybit은 심볼별 구독"""
+    while True:
+        try:
+            args = [f"liquidation.{s}" for s in symbols_ref]
+            logger.info(f"[Bybit] 청산 WS 연결 중... ({len(args)}개)")
+
+            async with websockets.connect(BYBIT["ws"], ping_interval=20) as ws:
+                # 한 번에 너무 많이 구독하면 거부될 수 있으므로 청크로 나눠서 구독
+                chunk_size = 50
+                for i in range(0, len(args), chunk_size):
+                    await ws.send(json.dumps({
+                        "op": "subscribe",
+                        "args": args[i:i+chunk_size]
+                    }))
+                    await asyncio.sleep(0.3)
+
+                logger.info("[Bybit] 청산 WS 구독 완료")
+
+                async for raw in ws:
+                    try:
+                        msg = json.loads(raw)
+                        if msg.get("op") in ("pong", "subscribe"):
+                            continue
+                        topic = msg.get("topic", "")
+                        if not topic.startswith("liquidation"):
+                            continue
+                        # Bybit liquidation 메시지: data가 dict 또는 list
+                        data = msg.get("data", {})
+                        entries = data if isinstance(data, list) else [data]
+                        for d in entries:
+                            symbol = d.get("symbol", topic.split(".")[-1])
+                            # Bybit: side='Buy'=숏청산, side='Sell'=롱청산
+                            bybit_side = d.get("side", "")
+                            if bybit_side == "Sell":
+                                side = "LONG"  # 롱 포지션이 청산됨
+                            elif bybit_side == "Buy":
+                                side = "SHORT"  # 숏 포지션이 청산됨
+                            else:
+                                continue
+                            
+                            qty   = float(d.get("size", 0))
+                            price = float(d.get("price", 0))
+                            if qty <= 0 or price <= 0:
+                                continue
+                            await state.insert_liquidation(EXCHANGE, symbol, side, qty, price)
+                    except Exception as e:
+                        logger.warning(f"[Bybit] 청산 파싱 오류: {e}")
+
+        except Exception as e:
+            logger.error(f"[Bybit] 청산 WS 끊김: {e} — 5초 후 재연결")
+            await asyncio.sleep(5)
 
 async def symbol_refresher(symbols_ref: list):
     while True:
@@ -124,5 +176,6 @@ async def run():
     await asyncio.gather(
         trades_ws(symbols_ref),
         oi_poller(symbols_ref),
+        liquidations_ws(symbols_ref),
         symbol_refresher(symbols_ref),
     )
