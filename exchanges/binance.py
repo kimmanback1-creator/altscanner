@@ -122,6 +122,56 @@ async def trades_ws(symbols_ref: list):
         for i, chunk in enumerate(chunks)
     ])
 
+async def liquidations_ws_chunk(symbols: list, chunk_id: int):
+    """청산 WS - 심볼 청크 단위"""
+    streams = "/".join([f"{s.lower()}@forceOrder" for s in symbols])
+    url = f"{BINANCE['ws']}{streams}"
+    logger.info(f"[Binance] LiqWS청크{chunk_id} 연결 중... ({len(symbols)}개)")
+
+    while True:
+        try:
+            async with websockets.connect(
+                url,
+                ping_interval=20,
+                close_timeout=10,
+                max_size=10 * 1024 * 1024,
+            ) as ws:
+                logger.info(f"[Binance] LiqWS청크{chunk_id} 연결 완료")
+                async for raw in ws:
+                    try:
+                        msg  = json.loads(raw)
+                        data = msg.get("data", msg)
+                        order = data.get("o", {})
+                        if not order:
+                            continue
+                        symbol = order["s"]
+                        # Binance: S='SELL'=롱 청산, S='BUY'=숏 청산
+                        side = "LONG" if order["S"] == "SELL" else "SHORT"
+                        qty   = float(order["q"])
+                        price = float(order.get("ap", order.get("p", 0)))  # 평균체결가 우선
+                        if price <= 0:
+                            continue
+                        await state.insert_liquidation(EXCHANGE, symbol, side, qty, price)
+                    except Exception as e:
+                        logger.warning(f"[Binance] LiqWS청크{chunk_id} 파싱 오류: {e}")
+
+        except Exception as e:
+            logger.error(f"[Binance] LiqWS청크{chunk_id} 끊김: {e} — 5초 후 재연결")
+            await asyncio.sleep(5)
+
+
+async def liquidations_ws(symbols_ref: list):
+    """심볼을 50개씩 나눠서 병렬 청산 WS 연결"""
+    chunk_size = 50
+    chunks = [
+        symbols_ref[i:i+chunk_size]
+        for i in range(0, len(symbols_ref), chunk_size)
+    ]
+    logger.info(f"[Binance] 총 {len(chunks)}개 청크로 청산 WS 연결")
+    await asyncio.gather(*[
+        liquidations_ws_chunk(chunk, i)
+        for i, chunk in enumerate(chunks)
+    ])
 
 async def symbol_refresher(symbols_ref: list):
     """1시간마다 심볼 리스트 갱신"""
@@ -142,5 +192,6 @@ async def run():
     await asyncio.gather(
         trades_ws(symbols_ref),
         oi_poller(symbols_ref),
+        liquidations_ws(symbols_ref),
         symbol_refresher(symbols_ref),
     )
