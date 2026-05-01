@@ -384,6 +384,61 @@ tr.both-agree .ticker-name {
   color: #444;
   font-size: 10px;
 }
+
+/* ── 다이아 매트릭스 ───────────────── */
+.diamond-overlay {
+  display: none;
+  position: fixed; top: 36px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 1000; padding: 14px 18px;
+  overflow: hidden; flex-direction: column;
+}
+.diamond-overlay.show { display: flex; }
+
+.diamond-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; flex-shrink: 0; gap: 12px;
+}
+.diamond-head h2 { font-size: 13px; color: #e0e0e0; font-weight: 500; }
+.diamond-head .dh-note { font-size: 10px; color: #666; flex: 1; text-align: center; }
+
+.diamond-table-wrap {
+  flex: 1; overflow-y: auto; border: 0.5px solid #1a1a1a;
+}
+.diamond-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+  table-layout: fixed;
+}
+.diamond-table thead {
+  position: sticky; top: 0; background: #181818; z-index: 1;
+}
+.diamond-table th {
+  padding: 10px 8px; text-align: center; color: #888;
+  border-bottom: 0.5px solid #2a2a2a; font-weight: 500; font-size: 11px;
+}
+.diamond-table th:first-child { text-align: left; padding-left: 16px; }
+.diamond-table td {
+  padding: 14px 8px; border-bottom: 0.5px solid #1a1a1a;
+  text-align: center;
+}
+.diamond-table td:first-child {
+  text-align: left; padding-left: 16px;
+  font-weight: 500; color: #e0e0e0; font-size: 13px;
+}
+
+.dia { font-size: 18px; line-height: 1; }
+.dia-up   { color: var(--green); }
+.dia-down { color: var(--red); }
+.dia-age  { font-size: 10px; color: #888; margin-left: 6px; vertical-align: middle; }
+.dia-empty { color: #333; font-size: 14px; }
+.dia-note { color: #666; font-size: 9px; margin-left: 4px; }
+
+.dm-align {
+  display: inline-block;
+  font-size: 11px; padding: 3px 8px; border-radius: 3px;
+  background: #1a1a1a; color: #888; min-width: 56px;
+}
+.dm-align-bull { background: #0d2a14; color: var(--green); border: 0.5px solid #1a4a2a; }
+.dm-align-bear { background: #2a0d0d; color: var(--red);   border: 0.5px solid #4a1a1a; }
   
 </style>
 </head>
@@ -402,6 +457,7 @@ tr.both-agree .ticker-name {
     </div> 
     <button class="btn-history" id="btn-history" onclick="toggleHistory()">📋 히스토리</button>
     <button class="btn-history" id="btn-liqmap" onclick="toggleLiqMap()">💥 청산 맵</button>
+    <button class="btn-history" id="btn-diamond" onclick="toggleDiamond()">💎 다이아</button>
     <span class="badge on" id="badge-bnc">BNC —</span>
     <span class="badge on" id="badge-okx">OKX —</span>
     <span class="badge on" id="badge-byb">BYB —</span>
@@ -1473,6 +1529,143 @@ function updateLiqSummary() {
     </div>
   `
 }
+
+// ══════════════════════════════════════
+//  다이아 매트릭스
+// ══════════════════════════════════════
+const DIAMOND_TICKERS = ['BTC', 'ETH', 'USDT.D', 'TOTAL']
+const DIAMOND_TFS = ['4H', '1D', '3D', '1W', '3W', '1M']
+
+const TTL_HOURS = {
+  '4H': 10 * 4,
+  '1D': 10 * 24,
+  '3D': 10 * 24 * 3,
+  '1W': 15 * 24 * 7,
+  '3W': 15 * 24 * 21,
+  '1M': 15 * 24 * 30,
+}
+
+let diamondData = {}
+
+function toggleDiamond() {
+  const overlay = document.getElementById('diamond-overlay')
+  const btn = document.getElementById('btn-diamond')
+  const isOpen = overlay.classList.contains('show')
+  if (isOpen) {
+    overlay.classList.remove('show')
+    btn.classList.remove('active')
+  } else {
+    overlay.classList.add('show')
+    btn.classList.add('active')
+    loadDiamond()
+  }
+}
+
+async function loadDiamond() {
+  const { data, error } = await sb
+    .from('diamond_signals')
+    .select('symbol, timeframe, direction, price, received_at')
+    .eq('is_active', true)
+  if (error) { console.error('[diamond]', error); return }
+  
+  diamondData = {}
+  for (const row of data || []) {
+    if (!diamondData[row.symbol]) diamondData[row.symbol] = {}
+    const existing = diamondData[row.symbol][row.timeframe]
+    if (!existing || new Date(row.received_at) > new Date(existing.received_at)) {
+      diamondData[row.symbol][row.timeframe] = row
+    }
+  }
+  renderDiamond()
+}
+
+function isDiamondExpired(tf, receivedAt) {
+  const hoursAgo = (Date.now() - new Date(receivedAt).getTime()) / 3600000
+  return hoursAgo > (TTL_HOURS[tf] || Infinity)
+}
+
+function fmtDiamondAge(receivedAt) {
+  const minAgo = Math.floor((Date.now() - new Date(receivedAt).getTime()) / 60000)
+  if (minAgo < 60)   return `${minAgo}m`
+  const h = Math.floor(minAgo / 60)
+  if (h < 48)         return `${h}h`
+  const d = Math.floor(h / 24)
+  if (d < 14)         return `${d}d`
+  const w = Math.floor(d / 7)
+  if (w < 8)          return `${w}주`
+  const mo = Math.floor(d / 30)
+  if (mo < 24)        return `${mo}개월`
+  return `${Math.floor(mo / 12)}년`
+}
+
+function renderDiamondCell(d) {
+  if (!d) return `<td><span class="dia-empty">—</span></td>`
+  if (isDiamondExpired(d.timeframe, d.received_at)) {
+    return `<td><span class="dia-empty">—</span></td>`
+  }
+  const dirCls = d.direction === 'up' ? 'dia-up' : 'dia-down'
+  const age = fmtDiamondAge(d.received_at)
+  const priceStr = d.price >= 1 ? d.price.toFixed(2) : d.price.toFixed(4)
+  const tooltip = `$${priceStr} · ${new Date(d.received_at).toLocaleString('ko-KR')}`
+  return `<td title="${tooltip}">
+    <span class="dia ${dirCls}">◆</span>
+    <span class="dia-age">${age}</span>
+  </td>`
+}
+
+function renderDiamond() {
+  const html = DIAMOND_TICKERS.map(sym => {
+    const row = diamondData[sym] || {}
+    const isInverse = (sym === 'USDT.D')
+    
+    let upCnt = 0, downCnt = 0
+    for (const tf of DIAMOND_TFS) {
+      const d = row[tf]
+      if (!d || isDiamondExpired(tf, d.received_at)) continue
+      const effectiveDir = isInverse 
+        ? (d.direction === 'up' ? 'down' : 'up')
+        : d.direction
+      if (effectiveDir === 'up') upCnt++
+      else downCnt++
+    }
+    
+    let alignCls = 'dm-align', alignTxt = '—'
+    if (upCnt + downCnt > 0) {
+      alignTxt = `${upCnt}↑ ${downCnt}↓`
+      if (upCnt >= 3 && downCnt === 0) {
+        alignCls += ' dm-align-bull'
+        alignTxt = `★ ${upCnt}↑`
+      } else if (downCnt >= 3 && upCnt === 0) {
+        alignCls += ' dm-align-bear'
+        alignTxt = `★ ${downCnt}↓`
+      }
+    }
+    
+    const cells = DIAMOND_TFS.map(tf => renderDiamondCell(row[tf])).join('')
+    const note = isInverse ? '<span class="dia-note">(역방향)</span>' : ''
+    
+    return `<tr>
+      <td>${sym}${note}</td>
+      ${cells}
+      <td><span class="${alignCls}">${alignTxt}</span></td>
+    </tr>`
+  }).join('')
+  
+  document.getElementById('diamond-tbody').innerHTML = html
+}
+
+sb.channel('diamond_rt')
+  .on('postgres_changes', {event:'*', schema:'public', table:'diamond_signals'}, () => {
+    if (document.getElementById('diamond-overlay').classList.contains('show')) {
+      loadDiamond()
+    }
+  }).subscribe()
+
+setInterval(() => {
+  if (document.getElementById('diamond-overlay').classList.contains('show')) {
+    renderDiamond()
+  }
+}, 5 * 60 * 1000)
   
 init()
 
@@ -1538,6 +1731,36 @@ init()
       <span class="ls-label">총 이벤트:</span>
       <span style="color:#aaa">0</span>
     </div>
+  </div>
+</div>
+
+<!-- ── 다이아 매트릭스 오버레이 ─────── -->
+<div class="diamond-overlay" id="diamond-overlay">
+  <div class="diamond-head">
+    <h2>💎 다이아 매트릭스</h2>
+    <div class="dh-note">
+      ◆ 색 = 방향 (녹색=상승 / 빨강=하락) · USDT.D는 역방향 의미 (상승 = 시장 약세)
+    </div>
+    <button class="history-close" onclick="toggleDiamond()">✕ 닫기</button>
+  </div>
+  <div class="diamond-table-wrap">
+    <table class="diamond-table">
+      <thead>
+        <tr>
+          <th style="width:140px">티커</th>
+          <th style="width:13%">4H</th>
+          <th style="width:13%">1D</th>
+          <th style="width:13%">3D</th>
+          <th style="width:13%">1W</th>
+          <th style="width:13%">3W</th>
+          <th style="width:13%">1M</th>
+          <th style="width:90px">정렬</th>
+        </tr>
+      </thead>
+      <tbody id="diamond-tbody">
+        <tr><td colspan="8" style="color:#666;padding:40px">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
   
