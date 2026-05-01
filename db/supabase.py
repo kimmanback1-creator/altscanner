@@ -102,30 +102,17 @@ async def log_signal(result: dict, direction: str, sent: bool = True):
 
 
 # ── diamond_signals ───────────────────────
-async def insert_diamond(symbol: str, timeframe: str, direction: str, price: float):
-    """
-    TradingView 웹훅 다이아 신호 저장
-    같은 (symbol, timeframe)의 이전 활성 신호는 자동 비활성화
-    → 매트릭스엔 항상 '최신 1개'만 보임
-    """
+async def insert_diamond(symbol: str, direction: str, price: float):
+    """TradingView 웹훅 다이아 신호 저장"""
     try:
-        client = get_client()
-        # 같은 셀의 이전 활성 신호 OFF
-        client.table("diamond_signals")\
-            .update({"is_active": False})\
-            .eq("symbol", symbol)\
-            .eq("timeframe", timeframe)\
-            .eq("is_active", True)\
-            .execute()
-        # 새 신호 INSERT
-        client.table("diamond_signals").insert({
+        get_client().table("diamond_signals").insert({
             "symbol":    symbol,
             "direction": direction,    # 'up' | 'down'
             "price":     price,
-            "timeframe": timeframe,
+            "timeframe": "4H",
             "is_active": True,
         }).execute()
-        logger.info(f"[DB] 다이아 저장: {symbol} {timeframe} {direction} ${price}")
+        logger.info(f"[DB] 다이아 저장: {symbol} {direction} ${price}")
     except Exception as e:
         logger.error(f"[DB] diamond insert 실패: {e}")
 
