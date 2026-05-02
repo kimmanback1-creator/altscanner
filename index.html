@@ -1655,7 +1655,7 @@ function renderDiamondMatrix() {
         html += `<td class="empty">—</td>`
       } else {
         const isUp = d.direction === 'up'
-        const icon = isUp ? '▲' : '▼'
+        const icon = isUp ? '◆' : '◆'
         const cls = isUp ? 'up' : 'down'
         const ago = fmtAgo(Number(d.hours_ago))
         const left = fmtLeft(Number(d.hours_left))
