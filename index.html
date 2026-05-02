@@ -355,6 +355,97 @@ tr.sig .ex-byb { color: #f7a600; }
   color: #555; font-size: 12px;
 }
 
+/* ── 다이아 시그널 오버레이 ─────────── */
+.diamond-overlay {
+  display: none;
+  position: fixed; top: 36px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 1000; padding: 14px 18px;
+  overflow: hidden; flex-direction: column;
+}
+.diamond-overlay.show { display: flex; }
+
+.diamond-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px; flex-shrink: 0;
+}
+.diamond-head h2 { font-size: 13px; color: #e0e0e0; font-weight: 500; }
+
+.diamond-matrix-wrap {
+  flex: 1;
+  overflow: auto;
+  border: 0.5px solid #1a1a1a;
+  background: #0e0e0e;
+}
+
+.diamond-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.diamond-matrix th {
+  padding: 10px 14px;
+  text-align: left;
+  background: #181818;
+  color: #888;
+  font-weight: 500;
+  border-bottom: 0.5px solid #2a2a2a;
+  border-right: 0.5px solid #1a1a1a;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.diamond-matrix th.tf-col {
+  width: 80px;
+  text-align: center;
+  color: #aaa;
+}
+.diamond-matrix td {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid #1a1a1a;
+  border-right: 0.5px solid #1a1a1a;
+  vertical-align: middle;
+  height: 60px;
+}
+.diamond-matrix td.tf-cell {
+  background: #181818;
+  color: #f0b90b;
+  font-weight: 500;
+  text-align: center;
+  font-size: 12px;
+}
+.diamond-matrix td.empty {
+  color: #444;
+  text-align: center;
+  font-size: 14px;
+}
+.diamond-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.diamond-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.diamond-icon.up { color: #5bd5c8; }
+.diamond-icon.down { color: #d55b9b; }
+.diamond-time-ago {
+  font-size: 10px;
+  color: #aaa;
+}
+.diamond-time-left {
+  font-size: 9px;
+  color: #666;
+}
+.diamond-empty {
+  text-align: center;
+  padding: 60px;
+  color: #555;
+  font-size: 12px;
+}
+
+  
 /* ── 4H + 15M 동의 강조 (베이지) ───── */
 tr.both-agree {
   background: #2a2418 !important;  /* 옅은 베이지/카키 */
@@ -402,6 +493,7 @@ tr.both-agree .ticker-name {
     </div> 
     <button class="btn-history" id="btn-history" onclick="toggleHistory()">📋 히스토리</button>
     <button class="btn-history" id="btn-liqmap" onclick="toggleLiqMap()">💥 청산 맵</button>
+    <button class="btn-history" id="btn-diamond" onclick="toggleDiamond()">🔷 다이아</button>
     <span class="badge on" id="badge-bnc">BNC —</span>
     <span class="badge on" id="badge-okx">OKX —</span>
     <span class="badge on" id="badge-byb">BYB —</span>
@@ -1473,6 +1565,118 @@ function updateLiqSummary() {
     </div>
   `
 }
+
+// ══════════════════════════════════════
+//  다이아 시그널
+// ══════════════════════════════════════
+let diamondData = []
+
+const DIAMOND_SYMBOLS = ['BTC', 'ETH', 'USDT.D', 'TOTAL']
+const DIAMOND_TFS = ['4H', '1D', '3D', '1W', '3W', '1M']
+
+function toggleDiamond() {
+  const overlay = document.getElementById('diamond-overlay')
+  const btn = document.getElementById('btn-diamond')
+  const isOpen = overlay.classList.contains('show')
+  if (isOpen) {
+    overlay.classList.remove('show')
+    btn.classList.remove('active')
+  } else {
+    overlay.classList.add('show')
+    btn.classList.add('active')
+    loadDiamonds()
+  }
+}
+
+async function loadDiamonds() {
+  const empty = document.getElementById('diamond-empty')
+  empty.textContent = '데이터 로딩 중...'
+  
+  try {
+    const { data, error } = await sb.rpc('get_active_diamonds')
+    
+    if (error) {
+      console.error('[diamond] RPC error:', error)
+      empty.textContent = '데이터 로딩 실패'
+      return
+    }
+    
+    diamondData = data || []
+    renderDiamondMatrix()
+  } catch (e) {
+    console.error('[diamond] error:', e)
+    empty.textContent = '데이터 로딩 실패'
+  }
+}
+
+function renderDiamondMatrix() {
+  const wrap = document.getElementById('diamond-matrix-wrap')
+  
+  // 데이터를 (timeframe, symbol) 키로 매핑
+  const map = {}
+  for (const d of diamondData) {
+    const key = d.timeframe + ':' + d.symbol
+    map[key] = d
+  }
+  
+  // 시간 포맷 함수
+  const fmtAgo = (hours) => {
+    if (hours < 1) return '방금'
+    if (hours < 24) return `${Math.round(hours)}h 전`
+    const days = hours / 24
+    if (days < 30) return `${Math.round(days)}일 전`
+    const months = days / 30
+    return `${Math.round(months)}개월 전`
+  }
+  
+  const fmtLeft = (hours) => {
+    if (hours < 24) return `${Math.round(hours)}h 남음`
+    const days = hours / 24
+    if (days < 30) return `${Math.round(days)}일 남음`
+    const months = days / 30
+    return `${Math.round(months)}개월 남음`
+  }
+  
+  // 매트릭스 HTML 생성
+  let html = '<table class="diamond-matrix"><thead><tr>'
+  html += '<th class="tf-col">TF</th>'
+  for (const sym of DIAMOND_SYMBOLS) {
+    html += `<th>${sym}</th>`
+  }
+  html += '</tr></thead><tbody>'
+  
+  for (const tf of DIAMOND_TFS) {
+    html += `<tr><td class="tf-cell">${tf}</td>`
+    for (const sym of DIAMOND_SYMBOLS) {
+      const key = tf + ':' + sym
+      const d = map[key]
+      
+      if (!d) {
+        html += `<td class="empty">—</td>`
+      } else {
+        const isUp = d.direction === 'up'
+        const icon = isUp ? '▲' : '▼'
+        const cls = isUp ? 'up' : 'down'
+        const ago = fmtAgo(Number(d.hours_ago))
+        const left = fmtLeft(Number(d.hours_left))
+        
+        html += `
+          <td>
+            <div class="diamond-cell">
+              <span class="diamond-icon ${cls}">${icon}</span>
+              <span class="diamond-time-ago">${ago}</span>
+              <span class="diamond-time-left">${left}</span>
+            </div>
+          </td>
+        `
+      }
+    }
+    html += '</tr>'
+  }
+  
+  html += '</tbody></table>'
+  wrap.innerHTML = html
+}
   
 init()
 
@@ -1538,6 +1742,17 @@ init()
       <span class="ls-label">총 이벤트:</span>
       <span style="color:#aaa">0</span>
     </div>
+  </div>
+</div>
+
+<!-- ── 다이아 시그널 오버레이 ─────────── -->
+<div class="diamond-overlay" id="diamond-overlay">
+  <div class="diamond-head">
+    <h2>🔷 다이아 시그널</h2>
+    <button class="history-close" onclick="toggleDiamond()">✕ 닫기</button>
+  </div>
+  <div class="diamond-matrix-wrap" id="diamond-matrix-wrap">
+    <div class="diamond-empty" id="diamond-empty">데이터 로딩 중...</div>
   </div>
 </div>
   
