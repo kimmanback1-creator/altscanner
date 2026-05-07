@@ -232,7 +232,7 @@ async def cleanup_liquidations():
         logger.error(f"[DB] 청산 cleanup 실패: {e}")
 # ── major_hourly ──────────────────────────
 async def insert_major_hourly(snap: dict, ts: int):
-    """BTC/ETH/SOL 1시간 데이터 저장"""
+    """BTC/ETH/SOL 1시간 데이터 저장 (진단 포함)"""
     try:
         get_client().table("major_hourly").insert({
             "ts":         ts,
@@ -244,10 +244,13 @@ async def insert_major_hourly(snap: dict, ts: int):
             "vol_candle": snap["vol_candle"],
             "price":      snap["price"],
             "price_chg":  snap["price_chg"],
+            "diagnosis":  snap.get("diagnosis"),
+            "cvd_pct":    snap.get("cvd_pct"),
+            "oi_pct":     snap.get("oi_pct"),
+            "vol_pct":    snap.get("vol_pct"),
         }).execute()
     except Exception as e:
         logger.error(f"[DB] major_hourly insert 실패 {snap['symbol']}: {e}")
-
 async def cleanup_major_hourly_db():
     """7일 지난 메이저 데이터 삭제"""
     try:
