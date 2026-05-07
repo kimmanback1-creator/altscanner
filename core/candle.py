@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
 from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
-from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations
+from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations, insert_major_hourly, cleanup_major_hourly_db
 from notify.telegram import send_message
 from exchanges import binance as ex_binance, okx as ex_okx, bybit as ex_bybit
 
@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 KST = timezone(timedelta(hours=9))
 EXCHANGES = ["binance", "okx", "bybit"]
+
+# ── 메이저 (BTC/ETH/SOL) 거래소별 심볼 ──
+MAJOR_SYMBOLS = {
+    "binance": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "okx":     ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"],
+    "bybit":   ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+}
 
 # 기본 임계값 (페이지 슬라이더로 변경 가능 → 추후 Supabase config 테이블로 연동)
 LONG_PARAMS  = {"cvd": 60.0, "oi": 50.0, "vol": 70.0}
@@ -51,6 +58,17 @@ def _candle_ts_4h() -> int:
     now = int(time.time())
     interval = 4 * 60 * 60  # 4시간 = 14400초
     return now - (now % interval)
+
+def _is_1h_close() -> bool:
+    """현재 시점이 1H 봉 마감인지 (UTC 매 정시)"""
+    now_utc = datetime.now(timezone.utc)
+    return now_utc.minute < CANDLE_MIN
+    # :00 ~ :14 사이에 분석이 시작되면 1H 마감
+
+def _candle_ts_1h() -> int:
+    """현재 1시간봉 시작 타임스탬프"""
+    now = int(time.time())
+    return now - (now % 3600)
 
 async def candle_loop():
     """15분마다 실행 메인 루프 + 4H 마감 시 추가 분석"""
@@ -113,6 +131,24 @@ async def candle_loop():
                     # Supabase 저장 (timeframe='4h')
                     await insert_candle(result_4h, ts_4h)
             logger.info(f"[캔들] 4시간 분석 완료 — {len(results_4h)}개 심볼")
+
+        # ── 1시간 분석 (메이저 BTC/ETH/SOL만, 1H 마감 시) ──
+        is_1h = _is_1h_close()
+        if is_1h:
+            ts_1h = _candle_ts_1h()
+            logger.info(f"[캔들] ★ 1시간봉 마감 — KST {now_kst}")
+            count_1h = 0
+            for exchange in EXCHANGES:
+                for symbol in MAJOR_SYMBOLS.get(exchange, []):
+                    snap_1h = state.snapshot_and_reset_1h(exchange, symbol)
+                    if snap_1h["vol_candle"] == 0:
+                        continue  # 거래 없으면 스킵
+                    await insert_major_hourly(snap_1h, ts_1h)
+                    count_1h += 1
+            logger.info(f"[캔들] 1시간 메이저 저장 완료 — {count_1h}개")
+
+            # 7일 지난 데이터 정리
+            await cleanup_major_hourly_db()
 
         # 신호 판정 + 텔레그램
         for result in results:
