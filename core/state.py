@@ -32,6 +32,11 @@ class SymbolState:
     vol_4h_candle:  float = 0.0
     vol_4h_history: List[float] = field(default_factory=list)  # 최근 20봉
 
+    # ── 1시간 누적 (BTC/ETH/SOL 메이저용) ─
+    cvd_1h_candle:  float = 0.0
+    vol_1h_candle:  float = 0.0
+    price_1h_open:  float = 0.0
+    
     # ── OI ───────────────────────────────
     oi_current:    float = 0.0
     oi_prev:       float = 0.0
@@ -66,17 +71,21 @@ def update_trade(exchange: str, symbol: str, price: float, qty: float, is_buy: b
     with lock:
         s = _state[exchange][symbol]
         delta = qty if is_buy else -qty
-        # 누적 (15분 + 4시간)
+        # 누적 (15분 + 1시간 + 4시간)
         s.cvd_cum       += delta
         s.cvd_candle    += delta
+        s.cvd_1h_candle += delta
         s.cvd_4h_candle += delta
         s.vol_candle    += qty
+        s.vol_1h_candle += qty
         s.vol_4h_candle += qty
         # 가격 + 메타
         s.price_current = price
         s.exchange = exchange
         if s.price_open == 0:
             s.price_open = price
+        if s.price_1h_open == 0:
+            s.price_1h_open = price
         if s.price_4h_open == 0:
             s.price_4h_open = price
 
@@ -243,6 +252,35 @@ def snapshot_and_reset_4h(exchange: str, symbol: str) -> dict:
 
         return snap
 
+def snapshot_and_reset_1h(exchange: str, symbol: str) -> dict:
+    """1시간봉 마감 시 스냅샷 반환 + 1H 캔들 값 초기화 (BTC/ETH/SOL용)"""
+    with lock:
+        s = _state[exchange][symbol]
+
+        # 가격 변화율 (1H 기준)
+        price_chg = 0.0
+        if s.price_1h_open > 0:
+            price_chg = (s.price_current - s.price_1h_open) / s.price_1h_open * 100
+
+        # OI 변화율: 가장 최근 oi_chg 값 사용
+        oi_chg = s.oi_history[-1] if s.oi_history else 0.0
+
+        snap = {
+            "exchange":   exchange,
+            "symbol":     symbol,
+            "cvd_delta":  s.cvd_1h_candle,
+            "vol_candle": s.vol_1h_candle,
+            "oi_chg":     oi_chg,
+            "price":      s.price_current,
+            "price_chg":  price_chg,
+        }
+
+        # 1H 캔들 초기화
+        s.cvd_1h_candle = 0.0
+        s.vol_1h_candle = 0.0
+        s.price_1h_open = s.price_current
+
+        return snap
 
 def get_all_symbols(exchange: str) -> list:
     with lock:
