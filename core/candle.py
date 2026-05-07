@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
-from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
+from core.scorer import calc_score, calc_score_4h, calc_score_1h, check_signal, format_telegram
 from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations, insert_major_hourly, cleanup_major_hourly_db
 from notify.telegram import send_message
 from exchanges import binance as ex_binance, okx as ex_okx, bybit as ex_bybit
@@ -143,7 +143,10 @@ async def candle_loop():
                     snap_1h = state.snapshot_and_reset_1h(exchange, symbol)
                     if snap_1h["vol_candle"] == 0:
                         continue  # 거래 없으면 스킵
-                    await insert_major_hourly(snap_1h, ts_1h)
+                    # 진단 시도 — 데이터 부족(flat 등) 시 None, 그래도 raw는 저장
+                    result_1h = calc_score_1h(snap_1h)
+                    data_to_save = result_1h if result_1h else snap_1h
+                    await insert_major_hourly(data_to_save, ts_1h)
                     count_1h += 1
             logger.info(f"[캔들] 1시간 메이저 저장 완료 — {count_1h}개")
 
