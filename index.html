@@ -475,6 +475,79 @@ tr.both-agree .ticker-name {
   color: #444;
   font-size: 10px;
 }
+
+/* ── 사이드 패널 (Phase 1) ──────────── */
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+.sidebar {
+  width: 180px;
+  background: var(--bg2);
+  border-right: 0.5px solid #2a2a2a;
+  flex-shrink: 0;
+  transition: width 0.18s ease;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar.collapsed { width: 44px; }
+.sidebar-toggle {
+  padding: 9px 12px;
+  cursor: pointer;
+  color: #888;
+  border-bottom: 0.5px solid #1e1e1e;
+  font-size: 14px;
+  user-select: none;
+  text-align: right;
+}
+.sidebar-toggle:hover { color: #e0e0e0; }
+.sidebar.collapsed .sidebar-toggle { text-align: center; }
+.sidebar-menu {
+  flex: 1;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+.sidebar-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 2px solid transparent;
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+.sidebar-item:hover { color: #ccc; background: #1a1a1a; }
+.sidebar-item.active {
+  color: #f0b90b;
+  background: #1a1a1a;
+  border-left-color: #f0b90b;
+}
+.sidebar-icon {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.sidebar.collapsed .sidebar-label { display: none; }
+.sidebar.collapsed .sidebar-item { justify-content: center; padding: 10px 0; }
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+#view-dashboard, #view-major, #view-journal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
   
 </style>
 </head>
@@ -502,6 +575,28 @@ tr.both-agree .ticker-name {
   </div>
 </div>
 
+<div class="app-shell">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-toggle" onclick="toggleSidebar()">☰</div>
+    <div class="sidebar-menu">
+      <div class="sidebar-item active" data-view="dashboard" onclick="switchView('dashboard')">
+        <span class="sidebar-icon">⊞</span>
+        <span class="sidebar-label">Dashboard</span>
+      </div>
+      <div class="sidebar-item" data-view="major" onclick="switchView('major')">
+        <span class="sidebar-icon">★</span>
+        <span class="sidebar-label">메이저</span>
+      </div>
+      <div class="sidebar-item" data-view="journal" onclick="switchView('journal')">
+        <span class="sidebar-icon">📋</span>
+        <span class="sidebar-label">매매일지</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-area">
+    <div id="view-dashboard">
+  
 <div class="containers">
   <div class="container-panel long-panel">
     <div class="container-title">
@@ -641,6 +736,18 @@ tr.both-agree .ticker-name {
   </div>
 </div>
 
+    </div>
+
+    <div id="view-major" style="display:none">
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px">메이저 뷰 — 다음 단계에서 구현</div>
+    </div>
+
+    <div id="view-journal" style="display:none">
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px">매매일지 뷰 — 다음 단계에서 구현</div>
+    </div>
+  </div>
+</div>
+      
 <script>
 const SUPABASE_URL = 'https://qjhqilkjckqpjlojppgq.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaHFpbGtqY2txcGpsb2pwcGdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTkwNzEsImV4cCI6MjA5MjYzNTA3MX0.AgjvFhkvjvPLRi282m1lQ-mL5-2Yzpq88aQNb8hMxG4'
@@ -1062,7 +1169,37 @@ function setSort(side, val) {
   render()
 }
 
+// ══════════════════════════════════════
+//  사이드 패널 / View 전환 (Phase 1)
+// ══════════════════════════════════════
+function switchView(view) {
+  const views = ['dashboard', 'major', 'journal']
+  views.forEach(v => {
+    const el = document.getElementById('view-' + v)
+    if (el) el.style.display = (v === view) ? 'flex' : 'none'
+  })
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.view === view)
+  })
+  localStorage.setItem('current_view', view)
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar')
+  const collapsed = sb.classList.toggle('collapsed')
+  localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0')
+}
+
+function initSidebar() {
+  if (localStorage.getItem('sidebar_collapsed') === '1') {
+    document.getElementById('sidebar').classList.add('collapsed')
+  }
+  const saved = localStorage.getItem('current_view') || 'dashboard'
+  switchView(saved)
+}
+
 async function init() {
+  initSidebar()
   loadParams()
   await loadLatestCandles()
   subscribeRealtime()
