@@ -36,6 +36,10 @@ class SymbolState:
     cvd_1h_candle:  float = 0.0
     vol_1h_candle:  float = 0.0
     price_1h_open:  float = 0.0
+    cvd_1h_history:   List[float] = field(default_factory=list)  # 최근 20봉 delta
+    vol_1h_history:   List[float] = field(default_factory=list)  # 최근 20봉 raw
+    oi_1h_history:    List[float] = field(default_factory=list)  # 최근 20봉
+    price_1h_history: List[float] = field(default_factory=list)  # 최근 20봉 마감가
     
     # ── OI ───────────────────────────────
     oi_current:    float = 0.0
@@ -257,22 +261,48 @@ def snapshot_and_reset_1h(exchange: str, symbol: str) -> dict:
     with lock:
         s = _state[exchange][symbol]
 
+        # vol_ratio: append 전에 계산
+        vol_avg = sum(s.vol_1h_history) / len(s.vol_1h_history) if s.vol_1h_history else None
+        vol_ratio = (s.vol_1h_candle / vol_avg) if vol_avg else 0.0
+
+        # 히스토리 업데이트 (raw 거래량)
+        s.vol_1h_history.append(s.vol_1h_candle)
+        if len(s.vol_1h_history) > 20:
+            s.vol_1h_history.pop(0)
+
+        s.cvd_1h_history.append(s.cvd_1h_candle)
+        if len(s.cvd_1h_history) > 20:
+            s.cvd_1h_history.pop(0)
+
+        s.price_1h_history.append(s.price_current)
+        if len(s.price_1h_history) > 20:
+            s.price_1h_history.pop(0)
+
+        # OI 1H history: 가장 최근 oi_chg 값 사용
+        oi_chg = s.oi_history[-1] if s.oi_history else 0.0
+        s.oi_1h_history.append(oi_chg)
+        if len(s.oi_1h_history) > 20:
+            s.oi_1h_history.pop(0)
+
         # 가격 변화율 (1H 기준)
         price_chg = 0.0
         if s.price_1h_open > 0:
             price_chg = (s.price_current - s.price_1h_open) / s.price_1h_open * 100
 
-        # OI 변화율: 가장 최근 oi_chg 값 사용
-        oi_chg = s.oi_history[-1] if s.oi_history else 0.0
-
         snap = {
-            "exchange":   exchange,
-            "symbol":     symbol,
-            "cvd_delta":  s.cvd_1h_candle,
-            "vol_candle": s.vol_1h_candle,
-            "oi_chg":     oi_chg,
-            "price":      s.price_current,
-            "price_chg":  price_chg,
+            "exchange":      exchange,
+            "symbol":        symbol,
+            "cvd_delta":     s.cvd_1h_candle,
+            "cvd_history":   list(s.cvd_1h_history),
+            "vol_candle":    s.vol_1h_candle,
+            "vol_history":   list(s.vol_1h_history),
+            "vol_ratio":     vol_ratio,
+            "oi_chg":        oi_chg,
+            "oi_history":    list(s.oi_1h_history),
+            "price_chg":     price_chg,
+            "price":         s.price_current,
+            "price_history": list(s.price_1h_history),
+            "price_chg_24h": s.price_chg_24h,
         }
 
         # 1H 캔들 초기화
