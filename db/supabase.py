@@ -230,6 +230,123 @@ async def cleanup_liquidations():
         logger.info("[DB] 청산 이벤트 cleanup 완료")
     except Exception as e:
         logger.error(f"[DB] 청산 cleanup 실패: {e}")
+
+
+# ── trade_journal 자동 기록 (OKX private WS) ──────────
+async def insert_trade_open(payload: dict):
+    """
+    포지션 진입 감지 → trade_journal에 INSERT
+    payload: {
+        "symbol": "BTC-USDT-SWAP", "exchange": "okx",
+        "direction": "LONG"|"SHORT",
+        "entry_price": float, "entry_amount_usd": float, "leverage": float,
+        "scanner_snapshot": dict | None,
+        "ext_pos_id": str | None,  # OKX 포지션 ID (중복 방지용)
+    }
+    """
+    try:
+        # 같은 외부 포지션 ID로 이미 있으면 skip (중복 INSERT 방지)
+        ext_id = payload.get("ext_pos_id")
+        if ext_id:
+            res = get_client().table("trade_journal")\
+                .select("id")\
+                .eq("ext_pos_id", ext_id)\
+                .eq("status", "open")\
+                .limit(1)\
+                .execute()
+            if res.data:
+                logger.info(f"[DB] trade_journal 중복 skip — ext_pos_id={ext_id}")
+                return res.data[0]["id"]
+
+        row = {
+            "symbol":    payload["symbol"],
+            "exchange":  payload["exchange"],
+            "direction": payload["direction"],
+            "entry_price":      payload["entry_price"],
+            "entry_amount_usd": payload["entry_amount_usd"],
+            "leverage":         payload["leverage"],
+            "source": "api",
+            "status": "open",
+            "scanner_snapshot": payload.get("scanner_snapshot"),
+            "ext_pos_id":       payload.get("ext_pos_id"),
+        }
+        res = get_client().table("trade_journal").insert(row).execute()
+        new_id = res.data[0]["id"] if res.data else None
+        logger.info(f"[DB] trade_journal 진입 기록: {payload['symbol']} {payload['direction']} @ {payload['entry_price']}")
+        return new_id
+    except Exception as e:
+        logger.error(f"[DB] trade_journal insert 실패: {e}")
+        return None
+
+
+async def update_trade_close(ext_pos_id: str, exit_price: float, pnl_pct: float, pnl_usd: float):
+    """
+    포지션 청산 감지 → trade_journal UPDATE
+    """
+    try:
+        # ext_pos_id로 찾아서 청산 처리
+        res = get_client().table("trade_journal")\
+            .update({
+                "exit_price": exit_price,
+                "pnl_pct":    round(pnl_pct, 4),
+                "pnl_usd":    round(pnl_usd, 2),
+                "closed_at":  datetime.now(timezone.utc).isoformat(),
+                "status":     "closed",
+            })\
+            .eq("ext_pos_id", ext_pos_id)\
+            .eq("status", "open")\
+            .execute()
+        if res.data:
+            logger.info(f"[DB] trade_journal 청산 기록: {ext_pos_id} @ {exit_price} ({pnl_pct:+.2f}%)")
+        else:
+            logger.warning(f"[DB] trade_journal 청산 매칭 실패 — ext_pos_id={ext_pos_id}")
+    except Exception as e:
+        logger.error(f"[DB] trade_journal update 실패: {e}")
+
+
+async def fetch_latest_scanner_state(exchange: str, symbol: str) -> dict | None:
+    """
+    백엔드용 스캐너 스냅샷 — 최근 15m + 4h candle 조회해서 JSON 반환
+    프론트엔드 captureScannerSnapshot()의 백엔드 버전
+    """
+    try:
+        # 15m
+        res15 = get_client().table("candle_data")\
+            .select("ts, diagnosis, cvd_pct, oi_pct, vol_pct, price, price_chg, price_chg_24h")\
+            .eq("exchange", exchange)\
+            .eq("symbol", symbol)\
+            .eq("timeframe", "15m")\
+            .order("ts", desc=True)\
+            .limit(1)\
+            .execute()
+
+        # 4h
+        res4h = get_client().table("candle_data")\
+            .select("ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg")\
+            .eq("exchange", exchange)\
+            .eq("symbol", symbol)\
+            .eq("timeframe", "4h")\
+            .order("ts", desc=True)\
+            .limit(1)\
+            .execute()
+
+        d15 = res15.data[0] if res15.data else None
+        d4h = res4h.data[0] if res4h.data else None
+
+        if not d15 and not d4h:
+            return None
+
+        return {
+            "captured_at":    datetime.now(timezone.utc).isoformat(),
+            "matched_symbol": symbol,
+            "source":         "backend",
+            "15m":            d15,
+            "4h":             d4h,
+        }
+    except Exception as e:
+        logger.error(f"[DB] scanner snapshot 조회 실패: {e}")
+        return None
+        
 # ── major_hourly ──────────────────────────
 async def insert_major_hourly(snap: dict, ts: int):
     """BTC/ETH/SOL 1시간 데이터 저장 (진단 포함)"""
