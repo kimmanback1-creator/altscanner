@@ -321,6 +321,18 @@ async def update_trade_close(ext_pos_id: str, exit_price: float, pnl_pct: float,
         logger.error(f"[DB] trade_journal update 실패: {e}")
 
 
+async def update_ai_opinion(trade_id: str, ai_opinion: str):
+    """trade_journal에 AI 의견 추가"""
+    try:
+        get_client().table("trade_journal")\
+            .update({"ai_opinion": ai_opinion})\
+            .eq("id", trade_id)\
+            .execute()
+        logger.info(f"[DB] AI 의견 저장: trade_id={trade_id}")
+    except Exception as e:
+        logger.error(f"[DB] AI 의견 저장 실패: {e}")
+
+
 async def fetch_latest_scanner_state(exchange: str, symbol: str) -> dict | None:
     """
     백엔드용 스캐너 스냅샷 — 최근 15m + 4h candle 조회해서 JSON 반환
