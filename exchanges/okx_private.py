@@ -82,10 +82,27 @@ async def _handle_position_msg(positions: list):
             pos_id  = pos.get("posId", "")
 
             # ── 캐시 체크: 같은 (pos_id, pos_size) 조합이면 스킵 ──
+            # OKX가 보내는 값 정규화 (precision/형식 차이 흡수)
+            def _norm(v):
+                try:
+                    return f"{float(v):.8f}"
+                except (TypeError, ValueError):
+                    return str(v) if v is not None else ""
+
             cache_key = pos_id
-            cache_val = (pos.get("pos", "0"), pos.get("avgPx", "0"))
+            cache_val = (_norm(pos.get("pos")), _norm(pos.get("avgPx")))
             cached = _pos_cache.get(cache_key)
+
+            # 진단 로그 (첫 3번만 — 그 후는 너무 많아서)
+            if not hasattr(_handle_position_msg, "_debug_count"):
+                _handle_position_msg._debug_count = 0
+            if _handle_position_msg._debug_count < 3:
+                _handle_position_msg._debug_count += 1
+                logger.info(f"[OKX-Private] 진단{_handle_position_msg._debug_count}: cached={cached}, current={cache_val}, raw_pos={pos.get('pos')}, raw_avgPx={pos.get('avgPx')}")
+
             if cached == cache_val:
+                continue  # 변화 없음 — DB 조회/INSERT 모두 스킵
+            _pos_cache[cache_key] = cache_val
                 continue  # 변화 없음 — DB 조회/INSERT 모두 스킵
             _pos_cache[cache_key] = cache_val
             pos_side_raw = pos.get("posSide", "").lower()  # 'long'|'short'|'net'
