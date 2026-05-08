@@ -84,6 +84,14 @@ async def _handle_position_msg(positions: list):
     OKX positions push: 포지션 변화(open/close/update)
     같은 상태 push는 캐시로 무시 (5초마다 heartbeat 방지)
     """
+    # 디버그: 들어오는 모든 push 핵심 필드를 한 줄로 (캐시 hit 여부와 무관하게)
+    if positions:
+        summary = " | ".join([
+            f"{p.get('instId','?')}:{p.get('posSide','?')}:pos={p.get('pos','?')}:avg={p.get('avgPx','?')}"
+            for p in positions
+        ])
+        logger.info(f"[OKX-Private] 📥 push ({len(positions)}건) {summary}")
+
     for pos in positions:
         try:
             inst_id = pos.get("instId", "")
@@ -125,12 +133,32 @@ async def _handle_position_msg(positions: list):
 
             # ── 청산 (pos_size == 0) ──
             if abs(pos_size) < 1e-12:
+                # 1차: OKX push에서 가격 추출
                 close_px = float(pos.get("markPx") or pos.get("last") or 0)
+
+                # 2차 폴백: candle_data에서 최신 가격
+                if close_px <= 0 and inst_id:
+                    try:
+                        from db.supabase import get_client
+                        res = get_client().table("candle_data")\
+                            .select("price")\
+                            .eq("exchange", EXCHANGE)\
+                            .eq("symbol", inst_id)\
+                            .eq("timeframe", "15m")\
+                            .order("ts", desc=True)\
+                            .limit(1)\
+                            .execute()
+                        if res.data and res.data[0].get("price"):
+                            close_px = float(res.data[0]["price"])
+                            logger.info(f"[OKX-Private] 청산가 폴백 (candle_data): {inst_id} → {close_px}")
+                    except Exception as e:
+                        logger.warning(f"[OKX-Private] 청산가 폴백 실패: {e}")
+
                 if close_px <= 0:
-                    logger.warning(f"[OKX-Private] 청산 가격 없음 — pos_id={pos_id}")
+                    logger.warning(f"[OKX-Private] 청산 가격 없음 (폴백도 실패) — pos_id={pos_id}, inst_id={inst_id}")
                     continue
+
                 await _close_position_from_db(pos_id, close_px)
-                # 청산 후 캐시에서 제거 (재진입 시 다시 처리되도록)
                 _pos_cache.pop(pos_id, None)
                 continue
 
