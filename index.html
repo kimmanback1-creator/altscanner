@@ -985,6 +985,7 @@ tr.both-agree .ticker-name {
   cursor: pointer;
 }
 .jd-screenshot-upload {
+  display: block;
   border: 1px dashed #2a2a2a;
   border-radius: 3px;
   padding: 18px;
@@ -993,6 +994,12 @@ tr.both-agree .ticker-name {
   color: #666;
   cursor: pointer;
   background: #0e0e0e;
+}
+.jd-paste-hint {
+  font-size: 10px;
+  color: #555;
+  text-align: center;
+  margin-top: 6px;
 }
 .jd-screenshot-upload:hover { border-color: #f0b90b; color: #aaa; }
 .jd-screenshot-upload input { display: none; }
@@ -2132,6 +2139,7 @@ function renderTradeDetail(r) {
                클릭해서 이미지 업로드 (PNG/JPG, 5MB 이하)
                <input type="file" accept="image/*" onchange="uploadScreenshot(event)">
              </label>`}
+        <div class="jd-paste-hint">또는 이 패널이 열린 상태에서 <b style="color:#888">Ctrl+V</b>로 붙여넣기 (TradingView 등에서 이미지 복사 후)</div>
       </div>
     </div>
 
@@ -2180,16 +2188,25 @@ async function saveTradeDetail() {
 }
 
 async function uploadScreenshot(event) {
-  if (!currentTradeId) return
   const file = event.target.files[0]
   if (!file) return
+  await uploadScreenshotFile(file)
+}
+
+async function uploadScreenshotFile(file) {
+  if (!currentTradeId) {
+    alert('패널을 먼저 열어주세요')
+    return
+  }
 
   if (file.size > 5 * 1024 * 1024) {
     alert('파일 크기 5MB 초과')
     return
   }
 
-  const ext = file.name.split('.').pop().toLowerCase()
+  // 확장자 — file.name 비어있을 수 있음 (클립보드 paste 시), MIME에서 추출
+  let ext = (file.name?.split('.').pop() || '').toLowerCase()
+  if (!ext || ext.length > 5) ext = (file.type.split('/')[1] || 'png').toLowerCase()
   const path = `${currentTradeId}/${Date.now()}.${ext}`
 
   const { error: upErr } = await sb.storage
@@ -2202,7 +2219,6 @@ async function uploadScreenshot(event) {
     return
   }
 
-  // 비공개 버킷이라 signed URL 또는 public URL 사용
   const { data: urlData } = sb.storage.from('trade-screenshots').getPublicUrl(path)
   const screenshot_url = urlData.publicUrl
 
@@ -2218,6 +2234,24 @@ async function uploadScreenshot(event) {
   await loadJournal()
   const r = journalData.find(t => t.id === currentTradeId)
   if (r) renderTradeDetail(r)
+}
+
+function handleScreenshotPaste(e) {
+  // 매매일지 상세 패널이 열려 있을 때만 동작
+  if (!currentTradeId) return
+
+  const items = e.clipboardData?.items || []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        e.preventDefault()
+        uploadScreenshotFile(file)
+        return
+      }
+    }
+  }
+  // 이미지 아니면 기본 paste 동작 (textarea 텍스트 붙여넣기 등)
 }
 
 async function deleteTrade() {
@@ -2405,6 +2439,7 @@ async function init() {
   subscribeRealtime()
   setInterval(loadLatestCandles, 15*60*1000)
   setInterval(render, 5*60*1000)  // 1분마다 시간 표시 갱신
+  document.addEventListener('paste', handleScreenshotPaste)
 }
 // ══════════════════════════════════════
 //  검색
