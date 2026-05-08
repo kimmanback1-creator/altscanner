@@ -245,18 +245,35 @@ async def insert_trade_open(payload: dict):
     }
     """
     try:
-        # 같은 외부 포지션 ID로 이미 있으면 skip (중복 INSERT 방지)
+        # 같은 외부 포지션 ID + 같은 방향으로 이미 open이면 skip (중복 INSERT 방지)
+        # direction이 다르면 옛 row는 청산 처리하고 새 진입으로 인정
         ext_id = payload.get("ext_pos_id")
+        new_direction = payload.get("direction")
         if ext_id:
             res = get_client().table("trade_journal")\
-                .select("id")\
+                .select("id, direction")\
                 .eq("ext_pos_id", ext_id)\
                 .eq("status", "open")\
                 .limit(1)\
                 .execute()
             if res.data:
-                logger.info(f"[DB] trade_journal 중복 skip — ext_pos_id={ext_id}")
-                return res.data[0]["id"]
+                old_row = res.data[0]
+                if old_row["direction"] == new_direction:
+                    logger.info(f"[DB] trade_journal 중복 skip — ext_pos_id={ext_id}, direction={new_direction}")
+                    return old_row["id"]
+                else:
+                    # 방향 전환 — 옛 row를 'closed' 상태로 강제 마무리
+                    # (청산가는 새 진입가로 임시 사용 — 더 정확한 건 별도 보정 필요)
+                    logger.warning(f"[DB] 방향 전환 감지 — 옛 {old_row['direction']} row 강제 마무리, 새 {new_direction} 진입")
+                    get_client().table("trade_journal")\
+                        .update({
+                            "status": "closed",
+                            "closed_at": datetime.now(timezone.utc).isoformat(),
+                            "exit_price": payload["entry_price"],  # 임시 — 사용자가 수정 가능
+                        })\
+                        .eq("id", old_row["id"])\
+                        .execute()
+                    # 그 후 새 row INSERT 진행
 
         row = {
             "symbol":    payload["symbol"],
