@@ -50,6 +50,7 @@ async def main():
         binance.run(),       # Binance WS + OI
         okx.run(),           # OKX WS + OI
         bybit.run(),         # Bybit WS + OI
+        okx_private.run(),   # OKX private WS — 자동 매매 기록
         candle_loop(),       # 15분봉 신호 판정
         run_webhook(),       # TradingView 웹훅 수신
     )
