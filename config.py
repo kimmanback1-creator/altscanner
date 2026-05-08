@@ -12,6 +12,11 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# ── OKX Private API (read-only) ──────────
+OKX_API_KEY    = os.getenv("OKX_API_KEY", "")
+OKX_API_SECRET = os.getenv("OKX_API_SECRET", "")
+OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE", "")
+
 # ── 텔레그램 ──────────────────────────────
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
