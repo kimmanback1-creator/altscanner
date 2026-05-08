@@ -10,6 +10,7 @@ import uvicorn
 import exchanges.binance as binance
 import exchanges.okx     as okx
 import exchanges.bybit   as bybit
+import exchanges.okx_private as okx_private
 from core.candle   import candle_loop
 from webhook.server import app
 from db.supabase   import preload_history
