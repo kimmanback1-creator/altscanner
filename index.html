@@ -2007,6 +2007,53 @@ function closeTradeModal() {
   document.getElementById('journal-modal-bg').classList.remove('show')
 }
 
+// 거래소별 심볼 형식 변환
+function normalizeSymbolForExchange(symbol, exchange) {
+  // 입력: "BTCUSDT" 같은 raw 심볼
+  if (exchange === 'okx') {
+    // BTCUSDT → BTC-USDT-SWAP
+    if (symbol.endsWith('USDT')) {
+      return symbol.slice(0, -4) + '-USDT-SWAP'
+    }
+    return symbol
+  }
+  // binance, bybit는 "BTCUSDT" 그대로
+  return symbol
+}
+
+// 진입 시점의 스캐너 상태를 추출해서 JSONB로 반환
+function captureScannerSnapshot(symbol, exchange) {
+  const exSymbol = normalizeSymbolForExchange(symbol, exchange)
+  const r15 = allData.find(d => d.exchange === exchange && d.symbol === exSymbol)
+  const key = exchange + ':' + exSymbol
+  const r4h = allData4h[key]
+
+  if (!r15 && !r4h) return null  // 둘 다 없으면 첨부 안 함
+
+  return {
+    captured_at: new Date().toISOString(),
+    matched_symbol: exSymbol,
+    '15m': r15 ? {
+      ts: r15.ts,
+      diagnosis: r15.diagnosis,
+      cvd_pct: r15.cvd_pct,
+      oi_pct: r15.oi_pct,
+      vol_pct: r15.vol_pct,
+      price: r15.price,
+      price_chg: r15.price_chg,
+      price_chg_24h: r15.price_chg_24h,
+    } : null,
+    '4h': r4h ? {
+      ts: r4h.ts,
+      diagnosis: r4h.diagnosis,
+      cvd_pct: r4h.cvd_pct,
+      oi_pct: r4h.oi_pct,
+      vol_pct: r4h.vol_pct,
+      price_chg: r4h.price_chg,
+    } : null,
+  }
+}
+
 async function saveTradeManual() {
   const symbol      = document.getElementById('jm-symbol').value.trim().toUpperCase()
   const exchange    = document.getElementById('jm-exchange').value
@@ -2021,12 +2068,16 @@ async function saveTradeManual() {
     return
   }
 
+  // 진입 시점 스캐너 상태 캡처
+  const scanner_snapshot = captureScannerSnapshot(symbol, exchange)
+
   const { error } = await sb.from('trade_journal').insert({
     symbol, exchange, direction,
     entry_price, entry_amount_usd, leverage,
     reason,
     source: 'manual',
     status: 'open',
+    scanner_snapshot,
   })
 
   if (error) {
@@ -2038,7 +2089,6 @@ async function saveTradeManual() {
   closeTradeModal()
   await loadJournal()
 }
-
 // ── 상세 슬라이드 패널 ────────────────
 let currentTradeId = null
 
