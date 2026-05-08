@@ -65,15 +65,29 @@ def _calc_pnl(entry: float, exit_: float, leverage: float, amount: float, direct
     return pnl_pct, pnl_usd
 
 
+# 메모리 캐시: 같은 포지션 상태 반복 push 무시
+# {pos_id: (pos_size_str, ts)}
+_pos_cache: dict = {}
+
+
 async def _handle_position_msg(positions: list):
     """
     positions 채널 메시지 처리
     OKX positions push: 포지션 변화(open/close/update)
+    같은 상태 push는 캐시로 무시 (5초마다 heartbeat 방지)
     """
     for pos in positions:
         try:
             inst_id = pos.get("instId", "")
             pos_id  = pos.get("posId", "")
+
+            # ── 캐시 체크: 같은 (pos_id, pos_size) 조합이면 스킵 ──
+            cache_key = pos_id
+            cache_val = (pos.get("pos", "0"), pos.get("avgPx", "0"))
+            cached = _pos_cache.get(cache_key)
+            if cached == cache_val:
+                continue  # 변화 없음 — DB 조회/INSERT 모두 스킵
+            _pos_cache[cache_key] = cache_val
             pos_side_raw = pos.get("posSide", "").lower()  # 'long'|'short'|'net'
             pos_size = float(pos.get("pos") or 0)          # 계약 수 (음수=숏 가능)
             avg_px   = float(pos.get("avgPx")  or 0)
@@ -102,16 +116,13 @@ async def _handle_position_msg(positions: list):
 
             # ── 청산 (pos_size == 0) ──
             if abs(pos_size) < 1e-12:
-                # 청산가 = avgPx 아닌 last 가격 필요 → OKX는 close 시점의 markPx 활용
                 close_px = float(pos.get("markPx") or pos.get("last") or 0)
                 if close_px <= 0:
                     logger.warning(f"[OKX-Private] 청산 가격 없음 — pos_id={pos_id}")
                     continue
-                # entry_price/leverage/amount는 DB에 저장된 진입 정보로부터 계산해야 정확
-                # 일단 OKX upl 활용한 근사: pnl_usd ≈ upl
-                # 정확도를 위해 update_trade_close 안에서 DB의 entry 정보로 재계산하는 게 맞음
-                # → 여기선 close_px만 넘기고, supabase 함수에서 직접 다시 계산하도록
                 await _close_position_from_db(pos_id, close_px)
+                # 청산 후 캐시에서 제거 (재진입 시 다시 처리되도록)
+                _pos_cache.pop(pos_id, None)
                 continue
 
             # ── 진입 또는 보유 중 (pos_size != 0) ──
