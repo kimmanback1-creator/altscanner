@@ -19,9 +19,23 @@ async def fetch_top_symbols() -> list[str]:
     async with aiohttp.ClientSession() as session:
         async with session.get(BINANCE["rest_top"]) as resp:
             data = await resp.json()
+
+    # Binance가 에러 시 dict로 응답하는 경우 방어
+    if not isinstance(data, list):
+        logger.error(f"[Binance] fetch_top_symbols: 예상치 못한 응답 형태 {type(data).__name__}: {str(data)[:200]}")
+        # 빈 리스트 반환하면 main에서 죽으므로, 5초 대기 후 한 번 재시도
+        await asyncio.sleep(5)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(BINANCE["rest_top"]) as resp:
+                data = await resp.json()
+        if not isinstance(data, list):
+            logger.error(f"[Binance] 재시도도 실패 — 빈 심볼 리스트로 진행")
+            return []
+
     filtered = [
         t for t in data
-        if t["symbol"].endswith("USDT")
+        if isinstance(t, dict)
+        and t.get("symbol", "").endswith("USDT")
         and float(t.get("quoteVolume", 0)) >= MIN_QUOTE_VOL
     ]
     filtered.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
@@ -45,7 +59,12 @@ async def fetch_24h_only():
         async with aiohttp.ClientSession() as session:
             async with session.get(BINANCE["rest_top"]) as resp:
                 data = await resp.json()
+        if not isinstance(data, list):
+            logger.warning(f"[Binance] 24h 응답 비정상: {str(data)[:200]}")
+            return
         for t in data:
+            if not isinstance(t, dict):
+                continue
             try:
                 chg_24h = float(t.get("priceChangePercent", 0))
                 state.update_24h_chg(EXCHANGE, t["symbol"], chg_24h)
