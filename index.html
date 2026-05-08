@@ -652,6 +652,215 @@ tr.both-agree .ticker-name {
   color: #555;
   font-size: 12px;
 }
+
+/* ── 매매일지 ───────────────────── */
+.journal-head {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.journal-head h2 {
+  font-size: 13px;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+.journal-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.journal-btn {
+  background: #1a1a1a;
+  color: #aaa;
+  border: 0.5px solid #2a2a2a;
+  padding: 4px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.journal-btn:hover { color: #e0e0e0; border-color: #3a3a3a; }
+.journal-btn.primary {
+  background: #1a2a18;
+  color: #5fb35f;
+  border-color: #2a4a28;
+}
+.journal-btn.primary:hover { color: #7fc77f; }
+.journal-filters {
+  padding: 8px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.journal-filter-group { display: flex; gap: 4px; }
+.journal-filter-btn {
+  background: transparent;
+  color: #666;
+  border: 0.5px solid #222;
+  padding: 3px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.journal-filter-btn:hover { color: #aaa; }
+.journal-filter-btn.active {
+  background: #1a1a1a;
+  color: #f0b90b;
+  border-color: #3a3a1a;
+}
+.journal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 18px;
+}
+.journal-empty {
+  padding: 80px;
+  text-align: center;
+  color: #555;
+  font-size: 12px;
+}
+.journal-date-group {
+  margin-bottom: 16px;
+}
+.journal-date-label {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 0;
+  border-bottom: 0.5px solid #1a1a1a;
+  margin-bottom: 8px;
+}
+.journal-row {
+  background: #181818;
+  border: 0.5px solid #1a1a1a;
+  border-left: 2px solid #2a2a2a;
+  border-radius: 3px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 100px 50px 100px 110px 1fr 80px;
+  gap: 12px;
+  align-items: center;
+}
+.journal-row:hover { background: #1c1c1c; }
+.journal-row.long  { border-left-color: #2ecc71; }
+.journal-row.short { border-left-color: #e74c3c; }
+.journal-row.closed { opacity: 0.55; }
+.jr-symbol { font-size: 12px; color: #ddd; font-weight: 500; }
+.jr-dir-long  { color: #2ecc71; font-size: 11px; }
+.jr-dir-short { color: #e74c3c; font-size: 11px; }
+.jr-price { font-size: 11px; color: #aaa; }
+.jr-amount { font-size: 10px; color: #888; }
+.jr-status-open   { color: #f0b90b; font-size: 10px; }
+.jr-status-closed { color: #888; font-size: 10px; }
+.jr-pnl-pos { color: #2ecc71; font-size: 11px; font-weight: 500; }
+.jr-pnl-neg { color: #e74c3c; font-size: 11px; font-weight: 500; }
+.jr-meta {
+  font-size: 9px;
+  color: #555;
+  display: flex;
+  gap: 6px;
+}
+.jr-meta-item { display: inline-flex; align-items: center; gap: 2px; }
+.jr-meta-filled { color: #888; }
+
+/* ── 매매일지 모달 ────────────────── */
+.journal-modal-bg {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+.journal-modal-bg.show { display: flex; }
+.journal-modal {
+  background: #181818;
+  border: 0.5px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 18px 22px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.journal-modal h3 {
+  font-size: 13px;
+  color: #e0e0e0;
+  font-weight: 500;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.journal-modal-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+}
+.journal-modal-close:hover { color: #e0e0e0; }
+.jm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.jm-label {
+  font-size: 11px;
+  color: #888;
+  width: 80px;
+  flex-shrink: 0;
+}
+.jm-input, .jm-select, .jm-textarea {
+  flex: 1;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 0.5px solid #2a2a2a;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+  outline: none;
+}
+.jm-input:focus, .jm-select:focus, .jm-textarea:focus { border-color: #f0b90b; }
+.jm-textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+.jm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 0.5px solid #1a1a1a;
+}
+.jm-actions button {
+  padding: 5px 14px;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'Consolas', monospace;
+}
+.jm-cancel {
+  background: #1a1a1a;
+  color: #888;
+  border: 0.5px solid #2a2a2a;
+}
+.jm-save {
+  background: #1a2a18;
+  color: #5fb35f;
+  border: 0.5px solid #2a4a28;
+}
+.jm-save:hover { color: #7fc77f; }
   
 </style>
 </head>
@@ -860,7 +1069,28 @@ tr.both-agree .ticker-name {
     </div>
 
     <div id="view-journal" style="display:none">
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px">매매일지 뷰 — 다음 단계에서 구현</div>
+      <div class="journal-head">
+        <h2>📋 매매일지</h2>
+        <div class="journal-actions">
+          <button class="journal-btn" onclick="openMetaCheck()">🧠 중간점검</button>
+          <button class="journal-btn primary" onclick="openTradeModal()">+ 새 기록</button>
+        </div>
+      </div>
+      <div class="journal-filters">
+        <div class="journal-filter-group">
+          <button class="journal-filter-btn active" data-status="all" onclick="setJournalFilter('status','all')">전체</button>
+          <button class="journal-filter-btn" data-status="open" onclick="setJournalFilter('status','open')">오픈</button>
+          <button class="journal-filter-btn" data-status="closed" onclick="setJournalFilter('status','closed')">청산</button>
+        </div>
+        <div class="journal-filter-group">
+          <button class="journal-filter-btn active" data-dir="all" onclick="setJournalFilter('dir','all')">방향 전체</button>
+          <button class="journal-filter-btn" data-dir="LONG" onclick="setJournalFilter('dir','LONG')">▲ LONG</button>
+          <button class="journal-filter-btn" data-dir="SHORT" onclick="setJournalFilter('dir','SHORT')">▼ SHORT</button>
+        </div>
+      </div>
+      <div class="journal-content" id="journal-content">
+        <div class="journal-empty">데이터 로딩 중...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1300,9 +1530,15 @@ function switchView(view) {
   })
   localStorage.setItem('current_view', view)
 
+
   // 메이저 뷰 활성화 시 데이터 로드
   if (view === 'major') {
     loadMajorData()
+  }
+
+  // 매매일지 뷰 활성화 시 데이터 로드
+  if (view === 'journal') {
+    loadJournal()
   }
 }
 
@@ -1437,6 +1673,183 @@ function renderMajor() {
     drawMajorChart(`major-chart-${base}-oi`,  byEx, 'oi_chg',     true)
     drawMajorChart(`major-chart-${base}-vol`, byEx, 'vol_candle', false)
   }
+}
+
+// ══════════════════════════════════════
+//  매매일지
+// ══════════════════════════════════════
+let journalData = []
+let journalFilters = { status: 'all', dir: 'all' }
+
+async function loadJournal() {
+  const { data, error } = await sb.from('trade_journal')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (error) {
+    console.error('[journal] fetch failed:', error)
+    document.getElementById('journal-content').innerHTML =
+      `<div class="journal-empty">데이터 로딩 실패: ${error.message}</div>`
+    return
+  }
+  journalData = data || []
+  renderJournal()
+}
+
+function setJournalFilter(kind, value) {
+  journalFilters[kind] = value
+  document.querySelectorAll(`.journal-filter-btn[data-${kind === 'status' ? 'status' : 'dir'}]`).forEach(b => b.classList.remove('active'))
+  document.querySelector(`.journal-filter-btn[data-${kind === 'status' ? 'status' : 'dir'}="${value}"]`)?.classList.add('active')
+  renderJournal()
+}
+
+function renderJournal() {
+  const wrap = document.getElementById('journal-content')
+
+  let filtered = journalData.filter(r => {
+    if (journalFilters.status !== 'all' && r.status !== journalFilters.status) return false
+    if (journalFilters.dir !== 'all' && r.direction !== journalFilters.dir) return false
+    if (!matchSearch(r.symbol)) return false
+    return true
+  })
+
+  if (filtered.length === 0) {
+    wrap.innerHTML = '<div class="journal-empty">기록 없음 — [+ 새 기록] 클릭해서 시작</div>'
+    return
+  }
+
+  // 날짜별 그룹핑 (KST 기준)
+  const groups = {}
+  for (const r of filtered) {
+    const d = new Date(r.created_at)
+    const kst = new Date(d.getTime() + 9*60*60*1000)
+    const dateKey = kst.toISOString().slice(0, 10)
+    if (!groups[dateKey]) groups[dateKey] = []
+    groups[dateKey].push(r)
+  }
+
+  const sortedKeys = Object.keys(groups).sort().reverse()
+  const fmtTime = ts => {
+    const d = new Date(ts)
+    const kst = new Date(d.getTime() + 9*60*60*1000)
+    return kst.toISOString().slice(11, 16)
+  }
+  const fmtPrice = p => {
+    if (p == null) return '—'
+    if (p >= 1)    return '$' + Number(p).toLocaleString(undefined, {maximumFractionDigits: 2})
+    if (p >= 0.01) return '$' + Number(p).toFixed(4)
+    return '$' + Number(p).toFixed(6)
+  }
+  const fmtUsd = v => {
+    if (v == null) return '—'
+    return (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2)
+  }
+  const fmtPct = v => {
+    if (v == null) return '—'
+    return (v >= 0 ? '+' : '') + Number(v).toFixed(1) + '%'
+  }
+
+  let html = ''
+  for (const dateKey of sortedKeys) {
+    html += `<div class="journal-date-group">
+      <div class="journal-date-label">${dateKey}</div>`
+    for (const r of groups[dateKey]) {
+      const dirCls = r.direction === 'LONG' ? 'long' : 'short'
+      const dirTxt = r.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'
+      const dirSpan = r.direction === 'LONG' ? 'jr-dir-long' : 'jr-dir-short'
+      const closedCls = r.status === 'closed' ? 'closed' : ''
+      const priceStr = r.status === 'closed' && r.exit_price
+        ? `${fmtPrice(r.entry_price)} → ${fmtPrice(r.exit_price)}`
+        : fmtPrice(r.entry_price)
+      const amountStr = r.entry_amount_usd
+        ? `$${Number(r.entry_amount_usd).toLocaleString()} × ${r.leverage || 1}x`
+        : ''
+      const statusOrPnl = r.status === 'closed'
+        ? (r.pnl_usd != null
+            ? `<span class="${r.pnl_usd >= 0 ? 'jr-pnl-pos' : 'jr-pnl-neg'}">${fmtPct(r.pnl_pct)} (${fmtUsd(r.pnl_usd)})</span>`
+            : '<span class="jr-status-closed">청산</span>')
+        : '<span class="jr-status-open">● 오픈</span>'
+
+      const reasonFilled = r.reason ? '📝' : '<span style="color:#333">📝</span>'
+      const screenshotFilled = r.screenshot_url ? '📷' : '<span style="color:#333">📷</span>'
+      const aiFilled = r.ai_opinion ? '🤖' : '<span style="color:#333">🤖</span>'
+      const sourceTag = r.source === 'api' ? `<span style="color:#5b9bd5;font-size:9px">[API]</span> ` : ''
+
+      html += `<div class="journal-row ${dirCls} ${closedCls}" onclick="openTradeDetail('${r.id}')">
+        <span class="jr-symbol">${sourceTag}${r.symbol}</span>
+        <span class="${dirSpan}">${dirTxt}</span>
+        <span class="jr-price">${priceStr}</span>
+        <span class="jr-amount">${amountStr}</span>
+        <span class="jr-meta">
+          <span class="jr-meta-item">${aiFilled}</span>
+          <span class="jr-meta-item">${reasonFilled}</span>
+          <span class="jr-meta-item">${screenshotFilled}</span>
+          <span style="color:#444;margin-left:6px">${fmtTime(r.created_at)}</span>
+        </span>
+        ${statusOrPnl}
+      </div>`
+    }
+    html += `</div>`
+  }
+  wrap.innerHTML = html
+}
+
+// ── 모달 ──────────────────────────────
+function openTradeModal() {
+  document.getElementById('jm-symbol').value = ''
+  document.getElementById('jm-exchange').value = 'okx'
+  document.getElementById('jm-direction').value = 'LONG'
+  document.getElementById('jm-entry-price').value = ''
+  document.getElementById('jm-amount').value = ''
+  document.getElementById('jm-leverage').value = '10'
+  document.getElementById('jm-reason').value = ''
+  document.getElementById('journal-modal-bg').classList.add('show')
+}
+
+function closeTradeModal() {
+  document.getElementById('journal-modal-bg').classList.remove('show')
+}
+
+async function saveTradeManual() {
+  const symbol      = document.getElementById('jm-symbol').value.trim().toUpperCase()
+  const exchange    = document.getElementById('jm-exchange').value
+  const direction   = document.getElementById('jm-direction').value
+  const entry_price = parseFloat(document.getElementById('jm-entry-price').value)
+  const entry_amount_usd = parseFloat(document.getElementById('jm-amount').value)
+  const leverage    = parseFloat(document.getElementById('jm-leverage').value)
+  const reason      = document.getElementById('jm-reason').value.trim() || null
+
+  if (!symbol || isNaN(entry_price) || isNaN(entry_amount_usd) || isNaN(leverage)) {
+    alert('심볼/진입가/마진/레버리지는 필수')
+    return
+  }
+
+  const { error } = await sb.from('trade_journal').insert({
+    symbol, exchange, direction,
+    entry_price, entry_amount_usd, leverage,
+    reason,
+    source: 'manual',
+    status: 'open',
+  })
+
+  if (error) {
+    alert('저장 실패: ' + error.message)
+    console.error(error)
+    return
+  }
+
+  closeTradeModal()
+  await loadJournal()
+}
+
+function openTradeDetail(id) {
+  // 다음 단계(3-D)에서 구현 — 일단 임시
+  console.log('detail clicked:', id)
+  alert('상세 패널은 다음 단계에서 구현됩니다 (id: ' + id.slice(0,8) + ')')
+}
+
+function openMetaCheck() {
+  alert('중간점검은 Phase 6에서 구현됩니다')
 }
 
 function drawMajorChart(svgId, byEx, key, hasZero) {
@@ -2185,6 +2598,56 @@ init()
     <div>
       <span class="ls-label">총 이벤트:</span>
       <span style="color:#aaa">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── 매매일지 모달 ───────────────── -->
+<div class="journal-modal-bg" id="journal-modal-bg">
+  <div class="journal-modal">
+    <h3>
+      <span id="journal-modal-title">새 거래 기록</span>
+      <button class="journal-modal-close" onclick="closeTradeModal()">✕</button>
+    </h3>
+    <div class="jm-row">
+      <span class="jm-label">심볼</span>
+      <input type="text" class="jm-input" id="jm-symbol" placeholder="BTCUSDT">
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">거래소</span>
+      <select class="jm-select" id="jm-exchange">
+        <option value="okx">OKX</option>
+        <option value="binance">Binance</option>
+        <option value="bybit">Bybit</option>
+        <option value="manual">기타</option>
+      </select>
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">방향</span>
+      <select class="jm-select" id="jm-direction">
+        <option value="LONG">▲ LONG</option>
+        <option value="SHORT">▼ SHORT</option>
+      </select>
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">진입가 ($)</span>
+      <input type="number" class="jm-input" id="jm-entry-price" step="any" placeholder="80500">
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">마진 ($)</span>
+      <input type="number" class="jm-input" id="jm-amount" step="any" placeholder="1000">
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">레버리지 (x)</span>
+      <input type="number" class="jm-input" id="jm-leverage" step="any" placeholder="10">
+    </div>
+    <div class="jm-row" style="align-items:flex-start">
+      <span class="jm-label" style="margin-top:5px">진입 이유</span>
+      <textarea class="jm-textarea" id="jm-reason" placeholder="(선택, 나중에 채워도 됨)"></textarea>
+    </div>
+    <div class="jm-actions">
+      <button class="jm-cancel" onclick="closeTradeModal()">취소</button>
+      <button class="jm-save" onclick="saveTradeManual()">저장</button>
     </div>
   </div>
 </div>
