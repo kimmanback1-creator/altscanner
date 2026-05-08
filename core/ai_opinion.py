@@ -40,3 +40,80 @@ SYSTEM_PROMPT = """당신은 암호화폐 트레이더의 매매일지에 진단
 - 마지막에 한 줄로 **🟢 정합 / 🟡 혼합 / 🔴 역행** 중 하나로 종합 평가.
 
 예시 출력:
+
+"""
+
+
+def _build_user_prompt(trade: dict, snapshot: dict) -> str:
+    """
+    trade: trade_journal row 일부
+        symbol, direction, entry_price, entry_amount_usd, leverage
+    snapshot: scanner_snapshot JSONB
+        15m: {diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
+        4h:  {diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
+    """
+    s15 = (snapshot or {}).get("15m") or {}
+    s4h = (snapshot or {}).get("4h")  or {}
+
+    def fmt_tf(name: str, d: dict) -> str:
+        if not d:
+            return f"[{name}] 데이터 없음"
+        return (
+            f"[{name}] 진단={d.get('diagnosis','—')}, "
+            f"CVD={d.get('cvd_pct','—')}%, "
+            f"OI={d.get('oi_pct','—')}%, "
+            f"Vol={d.get('vol_pct','—')}%, "
+            f"가격변화={d.get('price_chg','—')}%"
+        )
+
+    return (
+        f"=== 진입 정보 ===\n"
+        f"심볼: {trade.get('symbol')}\n"
+        f"방향: {trade.get('direction')}\n"
+        f"진입가: {trade.get('entry_price')}\n"
+        f"마진: ${trade.get('entry_amount_usd')}\n"
+        f"레버리지: {trade.get('leverage')}x\n"
+        f"\n"
+        f"=== 스캐너 스냅샷 ===\n"
+        f"{fmt_tf('15분봉', s15)}\n"
+        f"{fmt_tf('4시간봉', s4h)}\n"
+        f"\n"
+        f"위 데이터로 진입 정합성을 진단해주세요."
+    )
+
+
+async def generate_opinion(trade: dict, snapshot: dict) -> str | None:
+    """
+    AI 의견 생성. 실패하면 None 반환 (시스템 동작에 영향 X)
+    """
+    client = _get_client()
+    if not client:
+        logger.warning("[AI] ANTHROPIC_API_KEY 없음 — AI 의견 생성 skip")
+        return None
+
+    if not snapshot:
+        logger.info(f"[AI] 스캐너 스냅샷 없음 — {trade.get('symbol')} skip")
+        return None
+
+    try:
+        prompt = _build_user_prompt(trade, snapshot)
+        msg = await client.messages.create(
+            model=AI_MODEL,
+            max_tokens=400,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        # 응답에서 텍스트만 추출
+        if msg.content and len(msg.content) > 0:
+            text = "".join(
+                block.text for block in msg.content
+                if hasattr(block, "text")
+            ).strip()
+            if text:
+                logger.info(f"[AI] 의견 생성: {trade.get('symbol')} ({len(text)}자)")
+                return text
+        logger.warning(f"[AI] 빈 응답 — {trade.get('symbol')}")
+        return None
+    except Exception as e:
+        logger.error(f"[AI] 호출 실패 {trade.get('symbol')}: {e}")
+        return None
