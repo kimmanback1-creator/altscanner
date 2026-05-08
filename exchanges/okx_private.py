@@ -67,7 +67,7 @@ def _calc_pnl(entry: float, exit_: float, leverage: float, amount: float, direct
 
 # 메모리 캐시: 같은 포지션 상태 반복 push 무시
 _pos_cache: dict = {}
-_debug_counter = 0
+
 
 
 def _norm(v) -> str:
@@ -93,13 +93,6 @@ async def _handle_position_msg(positions: list):
             cache_key = pos_id
             cache_val = (_norm(pos.get("pos")), _norm(pos.get("avgPx")))
             cached = _pos_cache.get(cache_key)
-
-            # 진단 로그 (첫 3번만)
-            global _debug_counter
-            if _debug_counter < 3:
-                _debug_counter += 1
-                logger.info(f"[OKX-Private] 진단{_debug_counter}: cached={cached}, current={cache_val}, raw_pos={pos.get('pos')}, raw_avgPx={pos.get('avgPx')}")
-
             if cached == cache_val:
                 continue
             _pos_cache[cache_key] = cache_val
