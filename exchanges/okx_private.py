@@ -66,8 +66,16 @@ def _calc_pnl(entry: float, exit_: float, leverage: float, amount: float, direct
 
 
 # 메모리 캐시: 같은 포지션 상태 반복 push 무시
-# {pos_id: (pos_size_str, ts)}
 _pos_cache: dict = {}
+_debug_counter = 0
+
+
+def _norm(v) -> str:
+    """OKX가 보내는 숫자 값 정규화 (precision 차이 흡수)"""
+    try:
+        return f"{float(v):.8f}"
+    except (TypeError, ValueError):
+        return str(v) if v is not None else ""
 
 
 async def _handle_position_msg(positions: list):
@@ -82,29 +90,20 @@ async def _handle_position_msg(positions: list):
             pos_id  = pos.get("posId", "")
 
             # ── 캐시 체크: 같은 (pos_id, pos_size) 조합이면 스킵 ──
-            # OKX가 보내는 값 정규화 (precision/형식 차이 흡수)
-            def _norm(v):
-                try:
-                    return f"{float(v):.8f}"
-                except (TypeError, ValueError):
-                    return str(v) if v is not None else ""
-
             cache_key = pos_id
             cache_val = (_norm(pos.get("pos")), _norm(pos.get("avgPx")))
             cached = _pos_cache.get(cache_key)
 
-            # 진단 로그 (첫 3번만 — 그 후는 너무 많아서)
-            if not hasattr(_handle_position_msg, "_debug_count"):
-                _handle_position_msg._debug_count = 0
-            if _handle_position_msg._debug_count < 3:
-                _handle_position_msg._debug_count += 1
-                logger.info(f"[OKX-Private] 진단{_handle_position_msg._debug_count}: cached={cached}, current={cache_val}, raw_pos={pos.get('pos')}, raw_avgPx={pos.get('avgPx')}")
+            # 진단 로그 (첫 3번만)
+            global _debug_counter
+            if _debug_counter < 3:
+                _debug_counter += 1
+                logger.info(f"[OKX-Private] 진단{_debug_counter}: cached={cached}, current={cache_val}, raw_pos={pos.get('pos')}, raw_avgPx={pos.get('avgPx')}")
 
             if cached == cache_val:
-                continue  # 변화 없음 — DB 조회/INSERT 모두 스킵
+                continue
             _pos_cache[cache_key] = cache_val
-                continue  # 변화 없음 — DB 조회/INSERT 모두 스킵
-            _pos_cache[cache_key] = cache_val
+
             pos_side_raw = pos.get("posSide", "").lower()  # 'long'|'short'|'net'
             pos_size = float(pos.get("pos") or 0)          # 계약 수 (음수=숏 가능)
             avg_px   = float(pos.get("avgPx")  or 0)
