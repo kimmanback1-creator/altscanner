@@ -17,6 +17,10 @@ OKX_API_KEY    = os.getenv("OKX_API_KEY", "")
 OKX_API_SECRET = os.getenv("OKX_API_SECRET", "")
 OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE", "")
 
+# ── Anthropic API (AI 의견 생성) ─────────
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+AI_MODEL          = os.getenv("AI_MODEL", "claude-haiku-4-5-20251001")
+
 # ── 텔레그램 ──────────────────────────────
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
