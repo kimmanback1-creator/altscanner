@@ -22,9 +22,7 @@ EXCHANGES = ["binance", "okx", "bybit"]
 
 # ── 메이저 (BTC/ETH/SOL) 거래소별 심볼 ──
 MAJOR_SYMBOLS = {
-    "binance": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
-    "okx":     ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"],
-    "bybit":   ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "okx":     ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"],   
 }
 
 # 기본 임계값 (페이지 슬라이더로 변경 가능 → 추후 Supabase config 테이블로 연동)
