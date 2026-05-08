@@ -84,14 +84,6 @@ async def _handle_position_msg(positions: list):
     OKX positions push: 포지션 변화(open/close/update)
     같은 상태 push는 캐시로 무시 (5초마다 heartbeat 방지)
     """
-    # 디버그: 들어오는 모든 push 핵심 필드를 한 줄로 (캐시 hit 여부와 무관하게)
-    if positions:
-        summary = " | ".join([
-            f"{p.get('instId','?')}:{p.get('posSide','?')}:pos={p.get('pos','?')}:avg={p.get('avgPx','?')}"
-            for p in positions
-        ])
-        logger.info(f"[OKX-Private] 📥 push ({len(positions)}건) {summary}")
-
     for pos in positions:
         try:
             inst_id = pos.get("instId", "")
@@ -104,6 +96,9 @@ async def _handle_position_msg(positions: list):
             if cached == cache_val:
                 continue
             _pos_cache[cache_key] = cache_val
+
+            # 디버그: 캐시 변경된 push만 로깅 (heartbeat 도배 방지)
+            logger.info(f"[OKX-Private] 🔄 변화 감지: {inst_id} posSide={pos.get('posSide')} pos={pos.get('pos')} avg={pos.get('avgPx')}")
 
             pos_side_raw = pos.get("posSide", "").lower()  # 'long'|'short'|'net'
             pos_size = float(pos.get("pos") or 0)          # 계약 수 (음수=숏 가능)
