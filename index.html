@@ -861,7 +861,197 @@ tr.both-agree .ticker-name {
   border: 0.5px solid #2a4a28;
 }
 .jm-save:hover { color: #7fc77f; }
-  
+
+/* ── 매매일지 상세 슬라이드 패널 ────── */
+.journal-detail-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1900;
+}
+.journal-detail-overlay.show { display: block; }
+.journal-detail {
+  position: fixed;
+  top: 0;
+  right: -560px;
+  width: 540px;
+  max-width: 95vw;
+  height: 100vh;
+  background: #181818;
+  border-left: 0.5px solid #2a2a2a;
+  z-index: 1950;
+  transition: right 0.22s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.journal-detail.show { right: 0; }
+.jd-head {
+  padding: 14px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.jd-head-left { display: flex; align-items: center; gap: 10px; }
+.jd-symbol { font-size: 14px; color: #e0e0e0; font-weight: 500; }
+.jd-dir-long  { color: #2ecc71; font-size: 12px; }
+.jd-dir-short { color: #e74c3c; font-size: 12px; }
+.jd-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.jd-close:hover { color: #e0e0e0; }
+.jd-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+}
+.jd-section {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 0.5px solid #1a1a1a;
+}
+.jd-section:last-child { border-bottom: none; }
+.jd-section-title {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.jd-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+}
+.jd-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.jd-stat-label { color: #888; }
+.jd-stat-val { color: #ddd; font-weight: 500; }
+.jd-pnl-pos { color: #2ecc71; }
+.jd-pnl-neg { color: #e74c3c; }
+.jd-ai-box {
+  background: #0e0e0e;
+  border: 0.5px solid #1a1a1a;
+  border-left: 2px solid #5b9bd5;
+  border-radius: 3px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.jd-ai-empty {
+  font-size: 11px;
+  color: #555;
+  font-style: italic;
+}
+.jd-input, .jd-textarea {
+  width: 100%;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 0.5px solid #2a2a2a;
+  padding: 6px 10px;
+  font-size: 11px;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+  outline: none;
+}
+.jd-input:focus, .jd-textarea:focus { border-color: #f0b90b; }
+.jd-textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.jd-screenshot-wrap {
+  margin-top: 8px;
+}
+.jd-screenshot-img {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 3px;
+  border: 0.5px solid #2a2a2a;
+  display: block;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.jd-screenshot-upload {
+  border: 1px dashed #2a2a2a;
+  border-radius: 3px;
+  padding: 18px;
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  background: #0e0e0e;
+}
+.jd-screenshot-upload:hover { border-color: #f0b90b; color: #aaa; }
+.jd-screenshot-upload input { display: none; }
+.jd-actions {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-top: 0.5px solid #1a1a1a;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+.jd-actions-left, .jd-actions-right { display: flex; gap: 6px; }
+.jd-btn {
+  padding: 5px 12px;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'Consolas', monospace;
+}
+.jd-btn-save {
+  background: #1a2a18;
+  color: #5fb35f;
+  border: 0.5px solid #2a4a28;
+}
+.jd-btn-save:hover { color: #7fc77f; }
+.jd-btn-close-pos {
+  background: #2a1818;
+  color: #e0916f;
+  border: 0.5px solid #4a2828;
+}
+.jd-btn-close-pos:hover { color: #f5b090; }
+.jd-btn-delete {
+  background: #1a1a1a;
+  color: #888;
+  border: 0.5px solid #2a2a2a;
+}
+.jd-btn-delete:hover { color: #e74c3c; border-color: #4a2828; }
+
+/* 청산 모달 */
+.exit-modal {
+  width: 380px;
+}
+.exit-summary {
+  background: #0e0e0e;
+  border: 0.5px solid #1a1a1a;
+  border-radius: 3px;
+  padding: 8px 12px;
+  margin: 8px 0 12px;
+  font-size: 11px;
+  color: #aaa;
+}
+.exit-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+.exit-summary-pnl-pos { color: #2ecc71; font-weight: 500; }
+.exit-summary-pnl-neg { color: #e74c3c; font-weight: 500; }
+
 </style>
 </head>
 <body>
@@ -1842,10 +2032,300 @@ async function saveTradeManual() {
   await loadJournal()
 }
 
+// ── 상세 슬라이드 패널 ────────────────
+let currentTradeId = null
+
 function openTradeDetail(id) {
-  // 다음 단계(3-D)에서 구현 — 일단 임시
-  console.log('detail clicked:', id)
-  alert('상세 패널은 다음 단계에서 구현됩니다 (id: ' + id.slice(0,8) + ')')
+  const r = journalData.find(t => t.id === id)
+  if (!r) return
+  currentTradeId = id
+  renderTradeDetail(r)
+  document.getElementById('journal-detail-overlay').classList.add('show')
+  document.getElementById('journal-detail').classList.add('show')
+}
+
+function closeTradeDetail() {
+  document.getElementById('journal-detail-overlay').classList.remove('show')
+  document.getElementById('journal-detail').classList.remove('show')
+  currentTradeId = null
+}
+
+function renderTradeDetail(r) {
+  const fmtPrice = p => {
+    if (p == null) return '—'
+    if (p >= 1)    return '$' + Number(p).toLocaleString(undefined, {maximumFractionDigits: 2})
+    if (p >= 0.01) return '$' + Number(p).toFixed(4)
+    return '$' + Number(p).toFixed(6)
+  }
+  const fmtUsd = v => {
+    if (v == null) return '—'
+    return (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2)
+  }
+  const fmtPct = v => {
+    if (v == null) return '—'
+    return (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%'
+  }
+  const fmtTime = ts => {
+    if (!ts) return '—'
+    const d = new Date(ts)
+    const kst = new Date(d.getTime() + 9*60*60*1000)
+    return kst.toISOString().slice(0, 16).replace('T', ' ')
+  }
+
+  // 헤더
+  document.getElementById('jd-symbol').textContent = r.symbol
+  const dirEl = document.getElementById('jd-direction')
+  dirEl.textContent = r.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'
+  dirEl.className = r.direction === 'LONG' ? 'jd-dir-long' : 'jd-dir-short'
+  document.getElementById('jd-source').textContent =
+    `${(r.exchange || '').toUpperCase()} · ${r.source === 'api' ? '자동' : '수동'}`
+
+  // 청산 버튼 표시 여부
+  document.getElementById('jd-close-pos-btn').style.display =
+    r.status === 'open' ? 'block' : 'none'
+
+  // PNL 행
+  const pnlClass = r.pnl_usd == null ? '' : (r.pnl_usd >= 0 ? 'jd-pnl-pos' : 'jd-pnl-neg')
+  const pnlText = r.pnl_usd != null
+    ? `<span class="${pnlClass}">${fmtPct(r.pnl_pct)} (${fmtUsd(r.pnl_usd)})</span>`
+    : '<span style="color:#888">—</span>'
+
+  const exitPriceText = r.exit_price ? fmtPrice(r.exit_price) : '<span style="color:#555">미청산</span>'
+
+  // 본문
+  let body = `
+    <div class="jd-section">
+      <div class="jd-section-title">진입 정보</div>
+      <div class="jd-stats">
+        <div class="jd-stat-row"><span class="jd-stat-label">진입가</span><span class="jd-stat-val">${fmtPrice(r.entry_price)}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">청산가</span><span class="jd-stat-val">${exitPriceText}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">마진</span><span class="jd-stat-val">$${Number(r.entry_amount_usd || 0).toLocaleString()}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">레버리지</span><span class="jd-stat-val">${r.leverage || 1}x</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">진입 시각</span><span class="jd-stat-val" style="font-size:10px">${fmtTime(r.created_at)}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">청산 시각</span><span class="jd-stat-val" style="font-size:10px">${r.closed_at ? fmtTime(r.closed_at) : '—'}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">손익</span><span class="jd-stat-val">${pnlText}</span></div>
+        <div class="jd-stat-row"><span class="jd-stat-label">상태</span><span class="jd-stat-val" style="color:${r.status === 'open' ? '#f0b90b' : '#888'}">${r.status === 'open' ? '● 오픈' : '청산'}</span></div>
+      </div>
+    </div>
+
+    <div class="jd-section">
+      <div class="jd-section-title">🤖 AI 의견 (진입 시점)</div>
+      ${r.ai_opinion
+        ? `<div class="jd-ai-box">${escapeHtml(r.ai_opinion)}</div>`
+        : `<div class="jd-ai-empty">AI 의견 없음 (Phase 4에서 자동 생성됩니다)</div>`}
+    </div>
+
+    <div class="jd-section">
+      <div class="jd-section-title">📝 진입 이유 (직접 입력)</div>
+      <textarea class="jd-textarea" id="jd-reason" placeholder="왜 이 자리에 들어갔는지 적어두세요...">${r.reason || ''}</textarea>
+    </div>
+
+    <div class="jd-section">
+      <div class="jd-section-title">📷 차트 스크린샷</div>
+      <div class="jd-screenshot-wrap" id="jd-screenshot-wrap">
+        ${r.screenshot_url
+          ? `<img class="jd-screenshot-img" src="${r.screenshot_url}" onclick="window.open('${r.screenshot_url}', '_blank')">
+             <label class="jd-screenshot-upload" style="font-size:10px;padding:8px">
+               이미지 교체하기<input type="file" accept="image/*" onchange="uploadScreenshot(event)">
+             </label>`
+          : `<label class="jd-screenshot-upload">
+               클릭해서 이미지 업로드 (PNG/JPG, 5MB 이하)
+               <input type="file" accept="image/*" onchange="uploadScreenshot(event)">
+             </label>`}
+      </div>
+    </div>
+
+    ${r.scanner_snapshot ? `
+    <div class="jd-section">
+      <div class="jd-section-title">📊 진입 시점 스캐너 상태</div>
+      <pre style="font-size:10px;color:#888;line-height:1.4;white-space:pre-wrap">${escapeHtml(JSON.stringify(r.scanner_snapshot, null, 2))}</pre>
+    </div>` : ''}
+  `
+
+  document.getElementById('jd-body').innerHTML = body
+}
+
+function escapeHtml(str) {
+  if (str == null) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+async function saveTradeDetail() {
+  if (!currentTradeId) return
+  const reason = document.getElementById('jd-reason').value.trim() || null
+
+  const { error } = await sb.from('trade_journal')
+    .update({ reason })
+    .eq('id', currentTradeId)
+
+  if (error) {
+    alert('저장 실패: ' + error.message)
+    return
+  }
+
+  await loadJournal()
+  // 패널 데이터 갱신
+  const r = journalData.find(t => t.id === currentTradeId)
+  if (r) renderTradeDetail(r)
+  // 간단 피드백
+  const btn = event.target
+  const old = btn.textContent
+  btn.textContent = '✓ 저장됨'
+  setTimeout(() => btn.textContent = old, 1200)
+}
+
+async function uploadScreenshot(event) {
+  if (!currentTradeId) return
+  const file = event.target.files[0]
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert('파일 크기 5MB 초과')
+    return
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase()
+  const path = `${currentTradeId}/${Date.now()}.${ext}`
+
+  const { error: upErr } = await sb.storage
+    .from('trade-screenshots')
+    .upload(path, file, { upsert: true })
+
+  if (upErr) {
+    alert('업로드 실패: ' + upErr.message)
+    console.error(upErr)
+    return
+  }
+
+  // 비공개 버킷이라 signed URL 또는 public URL 사용
+  const { data: urlData } = sb.storage.from('trade-screenshots').getPublicUrl(path)
+  const screenshot_url = urlData.publicUrl
+
+  const { error: updErr } = await sb.from('trade_journal')
+    .update({ screenshot_url })
+    .eq('id', currentTradeId)
+
+  if (updErr) {
+    alert('URL 저장 실패: ' + updErr.message)
+    return
+  }
+
+  await loadJournal()
+  const r = journalData.find(t => t.id === currentTradeId)
+  if (r) renderTradeDetail(r)
+}
+
+async function deleteTrade() {
+  if (!currentTradeId) return
+  if (!confirm('이 거래 기록을 삭제하시겠습니까? (복구 불가)')) return
+
+  const { error } = await sb.from('trade_journal')
+    .delete()
+    .eq('id', currentTradeId)
+
+  if (error) {
+    alert('삭제 실패: ' + error.message)
+    return
+  }
+
+  closeTradeDetail()
+  await loadJournal()
+}
+
+// ── 청산 모달 ────────────────────────
+function openExitModal() {
+  document.getElementById('exit-price').value = ''
+  document.getElementById('exit-summary').innerHTML = '청산가를 입력하면 손익 미리보기가 표시됩니다.'
+  document.getElementById('exit-modal-bg').classList.add('show')
+}
+
+function closeExitModal() {
+  document.getElementById('exit-modal-bg').classList.remove('show')
+}
+
+function calcPnl(entry, exit, leverage, amount, direction) {
+  const dir = direction === 'LONG' ? 1 : -1
+  const priceMove = (exit - entry) / entry
+  const pnl_pct = priceMove * leverage * 100 * dir
+  const pnl_usd = priceMove * leverage * amount * dir
+  return { pnl_pct, pnl_usd }
+}
+
+function updateExitPreview() {
+  if (!currentTradeId) return
+  const r = journalData.find(t => t.id === currentTradeId)
+  if (!r) return
+
+  const exitPrice = parseFloat(document.getElementById('exit-price').value)
+  const summary = document.getElementById('exit-summary')
+
+  if (isNaN(exitPrice) || exitPrice <= 0) {
+    summary.innerHTML = '청산가를 입력하면 손익 미리보기가 표시됩니다.'
+    return
+  }
+
+  const { pnl_pct, pnl_usd } = calcPnl(
+    Number(r.entry_price),
+    exitPrice,
+    Number(r.leverage || 1),
+    Number(r.entry_amount_usd || 0),
+    r.direction
+  )
+  const cls = pnl_usd >= 0 ? 'exit-summary-pnl-pos' : 'exit-summary-pnl-neg'
+  const sign = pnl_usd >= 0 ? '+' : ''
+
+  summary.innerHTML = `
+    <div class="exit-summary-row"><span>진입가</span><span>$${Number(r.entry_price).toLocaleString()}</span></div>
+    <div class="exit-summary-row"><span>청산가</span><span>$${exitPrice.toLocaleString()}</span></div>
+    <div class="exit-summary-row"><span>레버리지</span><span>${r.leverage}x</span></div>
+    <div class="exit-summary-row"><span>마진</span><span>$${Number(r.entry_amount_usd).toLocaleString()}</span></div>
+    <div class="exit-summary-row" style="border-top:0.5px solid #2a2a2a;margin-top:4px;padding-top:6px">
+      <span>손익</span>
+      <span class="${cls}">${sign}${pnl_pct.toFixed(2)}% (${sign}$${Math.abs(pnl_usd).toFixed(2)})</span>
+    </div>
+  `
+}
+
+async function confirmClosePosition() {
+  if (!currentTradeId) return
+  const r = journalData.find(t => t.id === currentTradeId)
+  if (!r) return
+
+  const exitPrice = parseFloat(document.getElementById('exit-price').value)
+  if (isNaN(exitPrice) || exitPrice <= 0) {
+    alert('청산가 확인')
+    return
+  }
+
+  const { pnl_pct, pnl_usd } = calcPnl(
+    Number(r.entry_price), exitPrice,
+    Number(r.leverage || 1),
+    Number(r.entry_amount_usd || 0),
+    r.direction
+  )
+
+  const { error } = await sb.from('trade_journal').update({
+    exit_price: exitPrice,
+    pnl_pct: Number(pnl_pct.toFixed(4)),
+    pnl_usd: Number(pnl_usd.toFixed(2)),
+    closed_at: new Date().toISOString(),
+    status: 'closed',
+  }).eq('id', currentTradeId)
+
+  if (error) {
+    alert('청산 처리 실패: ' + error.message)
+    return
+  }
+
+  closeExitModal()
+  await loadJournal()
+  const updated = journalData.find(t => t.id === currentTradeId)
+  if (updated) renderTradeDetail(updated)
 }
 
 function openMetaCheck() {
@@ -2648,6 +3128,52 @@ init()
     <div class="jm-actions">
       <button class="jm-cancel" onclick="closeTradeModal()">취소</button>
       <button class="jm-save" onclick="saveTradeManual()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 매매일지 상세 슬라이드 패널 ─────── -->
+<div class="journal-detail-overlay" id="journal-detail-overlay" onclick="closeTradeDetail()"></div>
+<div class="journal-detail" id="journal-detail">
+  <div class="jd-head">
+    <div class="jd-head-left">
+      <span class="jd-symbol" id="jd-symbol">—</span>
+      <span id="jd-direction">—</span>
+      <span style="color:#555;font-size:10px" id="jd-source">—</span>
+    </div>
+    <button class="jd-close" onclick="closeTradeDetail()">✕</button>
+  </div>
+  <div class="jd-body" id="jd-body">
+    <!-- 동적 생성 -->
+  </div>
+  <div class="jd-actions">
+    <div class="jd-actions-left">
+      <button class="jd-btn jd-btn-delete" onclick="deleteTrade()">삭제</button>
+    </div>
+    <div class="jd-actions-right">
+      <button class="jd-btn jd-btn-close-pos" id="jd-close-pos-btn" onclick="openExitModal()">청산하기</button>
+      <button class="jd-btn jd-btn-save" onclick="saveTradeDetail()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 청산 모달 ───────────────── -->
+<div class="journal-modal-bg" id="exit-modal-bg">
+  <div class="journal-modal exit-modal">
+    <h3>
+      <span>포지션 청산</span>
+      <button class="journal-modal-close" onclick="closeExitModal()">✕</button>
+    </h3>
+    <div class="jm-row">
+      <span class="jm-label">청산가 ($)</span>
+      <input type="number" class="jm-input" id="exit-price" step="any" placeholder="81000" oninput="updateExitPreview()">
+    </div>
+    <div class="exit-summary" id="exit-summary">
+      청산가를 입력하면 손익 미리보기가 표시됩니다.
+    </div>
+    <div class="jm-actions">
+      <button class="jm-cancel" onclick="closeExitModal()">취소</button>
+      <button class="jm-save" onclick="confirmClosePosition()">청산 확정</button>
     </div>
   </div>
 </div>
