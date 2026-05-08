@@ -170,7 +170,7 @@ async def _handle_position_msg(positions: list):
             # entry_amount_usd = margin (사용자가 건 증거금)
             scanner_snap = await fetch_latest_scanner_state(EXCHANGE, inst_id)
 
-            await insert_trade_open({
+            trade_payload = {
                 "symbol":           inst_id,
                 "exchange":         EXCHANGE,
                 "direction":        direction,
@@ -179,10 +179,27 @@ async def _handle_position_msg(positions: list):
                 "leverage":         lever,
                 "scanner_snapshot": scanner_snap,
                 "ext_pos_id":       pos_id,
-            })
+            }
+            new_trade_id = await insert_trade_open(trade_payload)
+
+            # AI 의견 자동 생성 (백그라운드, 실패해도 INSERT는 유지)
+            if new_trade_id and scanner_snap:
+                asyncio.create_task(_generate_ai_opinion_async(new_trade_id, trade_payload, scanner_snap))
 
         except Exception as e:
             logger.error(f"[OKX-Private] 포지션 메시지 파싱 오류: {e}")
+
+
+async def _generate_ai_opinion_async(trade_id: str, trade_payload: dict, snapshot: dict):
+    """AI 의견 백그라운드 생성 — 실패 시 로그만"""
+    try:
+        from core.ai_opinion import generate_opinion
+        from db.supabase import update_ai_opinion
+        opinion = await generate_opinion(trade_payload, snapshot)
+        if opinion:
+            await update_ai_opinion(trade_id, opinion)
+    except Exception as e:
+        logger.error(f"[OKX-Private] AI 의견 생성 실패 (무시): {e}")
 
 
 async def _close_position_from_db(ext_pos_id: str, close_px: float):
