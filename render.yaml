@@ -24,7 +24,7 @@ services:
   - type: cron
     name: altscanner-daily-report
     runtime: python
-    plan: free
+    plan: standard
     schedule: "0 0 * * *"  # UTC 00:00 = KST 09:00
     buildCommand: pip install -r requirements.txt
     startCommand: python -m notify.daily_report
