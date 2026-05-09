@@ -333,6 +333,28 @@ async def update_ai_opinion(trade_id: str, ai_opinion: str):
         logger.error(f"[DB] AI 의견 저장 실패: {e}")
 
 
+async def fetch_latest_major_state() -> dict | None:
+    """
+    BTC/ETH/SOL의 최신 1시간봉 진단 데이터 조회
+    AI에게 "지금 메이저 흐름"을 알려주는 컨텍스트
+    """
+    try:
+        result = {}
+        for symbol_short in ("BTCUSDT", "ETHUSDT", "SOLUSDT"):
+            res = get_client().table("major_hourly")\
+                .select("ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg")\
+                .eq("symbol", symbol_short)\
+                .order("ts", desc=True)\
+                .limit(1)\
+                .execute()
+            if res.data:
+                result[symbol_short.replace("USDT", "")] = res.data[0]
+        return result if result else None
+    except Exception as e:
+        logger.error(f"[DB] major state 조회 실패: {e}")
+        return None
+
+
 async def fetch_latest_scanner_state(exchange: str, symbol: str) -> dict | None:
     """
     백엔드용 스캐너 스냅샷 — 최근 15m + 4h candle 조회해서 JSON 반환
