@@ -178,7 +178,8 @@ async def _handle_position_msg(positions: list):
             new_trade_id = await insert_trade_open(trade_payload)
 
             # AI 의견 자동 생성 (백그라운드, 실패해도 INSERT는 유지)
-            if new_trade_id and scanner_snap:
+            # scanner_snap이 None이어도 메이저 흐름 기반으로 진단 가능
+            if new_trade_id:
                 asyncio.create_task(_generate_ai_opinion_async(new_trade_id, trade_payload, scanner_snap))
 
         except Exception as e:
