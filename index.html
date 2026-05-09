@@ -1120,7 +1120,35 @@ tr.both-agree .ticker-name {
   padding: 16px 18px; line-height: 1.7; font-size: 12px; color: #d8d8d8;
   white-space: normal; font-family: 'Consolas', monospace;
 }
-  
+
+/* ── 통계 차트 ── */
+.stats-chart-wrap {
+  background: #1f1f1f; border: 1px solid #2a2a2a; border-radius: 6px;
+  padding: 12px 16px 8px; margin-bottom: 16px;
+}
+.stats-chart-title {
+  font-size: 11px; color: #aaa; margin-bottom: 8px;
+}
+.stats-chart {
+  width: 100%; height: 280px; display: block;
+}
+.stats-chart-hint {
+  font-size: 10px; color: #555; text-align: right; margin-top: 4px;
+}
+.stats-extra {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px;
+  background: #1f1f1f; border: 1px solid #2a2a2a; border-radius: 6px;
+  padding: 12px 16px;
+}
+.stats-extra-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px;
+}
+.stats-extra-label { color: #888; }
+.stats-extra-val { color: #ddd; font-weight: 500; font-family: 'Consolas', monospace; }
+.stats-extra-val.pos { color: #2ecc71; }
+.stats-extra-val.neg { color: #e74c3c; }
+
 </style>
 </head>
 <body>
@@ -1331,6 +1359,7 @@ tr.both-agree .ticker-name {
       <div class="journal-head">
         <h2>📋 매매일지</h2>
         <div class="journal-actions">
+          <button class="journal-btn" onclick="openStatsModal()">📊 통계</button>
           <button class="journal-btn" onclick="openMetaCheck()">🧠 중간점검</button>
           <button class="journal-btn primary" onclick="openTradeModal()">+ 새 기록</button>
         </div>
@@ -2474,11 +2503,211 @@ async function confirmClosePosition() {
   if (updated) renderTradeDetail(updated)
 }
 
+async function openStatsModal() {
+  const old = document.getElementById('statsOverlay')
+  if (old) old.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'statsOverlay'
+  overlay.className = 'meta-check-overlay'
+  overlay.innerHTML = `
+    <div class="meta-check-modal" style="width:min(820px, 92vw)">
+      <div class="meta-check-header">
+        <h2>📊 매매 통계 — 누적 손익</h2>
+        <button class="meta-check-close" onclick="document.getElementById('statsOverlay').remove()">✕</button>
+      </div>
+      <div class="meta-check-controls">
+        <button class="period-btn" data-n="20">최근 20건</button>
+        <button class="period-btn active" data-n="50">최근 50건</button>
+        <button class="period-btn" data-n="9999">전체</button>
+      </div>
+      <div class="meta-check-body" id="statsBody">
+        <div class="meta-check-loading">데이터 불러오는 중...</div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
+
+  overlay.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      runStatsAnalysis(parseInt(btn.dataset.n))
+    })
+  })
+
+  runStatsAnalysis(50)
+}
+
+async function runStatsAnalysis(limit) {
+  const body = document.getElementById('statsBody')
+  if (!body) return
+  body.innerHTML = '<div class="meta-check-loading">분석 중...</div>'
+
+  try {
+    // closed 거래만, 시간순 (오래된 것 → 최신 누적)
+    const { data, error } = await sb
+      .from('trade_journal')
+      .select('symbol, direction, leverage, entry_amount_usd, pnl_pct, pnl_usd, closed_at, created_at')
+      .eq('status', 'closed')
+      .order('closed_at', { ascending: true })
+      .limit(limit)
+
+    if (error) throw error
+    if (!data || data.length === 0) {
+      body.innerHTML = '<div class="meta-check-empty">청산된 거래가 없습니다.</div>'
+      return
+    }
+
+    // 통계
+    const winCount = data.filter(t => (t.pnl_usd || 0) > 0).length
+    const lossCount = data.length - winCount
+    const winRate = (winCount / data.length * 100)
+    const totalPnlUsd = data.reduce((s, t) => s + (t.pnl_usd || 0), 0)
+    const wins = data.filter(t => (t.pnl_usd || 0) > 0)
+    const losses = data.filter(t => (t.pnl_usd || 0) < 0)
+    const avgWin = wins.length ? wins.reduce((s, t) => s + t.pnl_usd, 0) / wins.length : 0
+    const avgLoss = losses.length ? losses.reduce((s, t) => s + Math.abs(t.pnl_usd), 0) / losses.length : 0
+    const rr = avgLoss > 0 ? (avgWin / avgLoss) : 0
+
+    // 누적 손익 곡선 데이터
+    let cum = 0
+    const cumPoints = data.map(t => {
+      cum += (t.pnl_usd || 0)
+      return { ts: new Date(t.closed_at).getTime(), cum, pnl: t.pnl_usd || 0, symbol: t.symbol }
+    })
+
+    // 렌더
+    const totalPnlClass = totalPnlUsd >= 0 ? 'pos' : 'neg'
+    body.innerHTML = `
+      <div class="meta-check-stats">
+        <div class="meta-stat">
+          <div class="meta-stat-label">전체</div>
+          <div class="meta-stat-value">${data.length}건</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">승률</div>
+          <div class="meta-stat-value">${winRate.toFixed(1)}%</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">손익비 (R:R)</div>
+          <div class="meta-stat-value">${rr.toFixed(2)}</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">누적 PnL</div>
+          <div class="meta-stat-value ${totalPnlClass}">${totalPnlUsd >= 0 ? '+' : ''}$${totalPnlUsd.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">누적 손익 곡선</div>
+        <svg class="stats-chart" id="cumChart" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+        <div class="stats-chart-hint">x: 거래 순번 · y: 누적 PnL ($)</div>
+      </div>
+
+      <div class="stats-extra">
+        <div class="stats-extra-row">
+          <span class="stats-extra-label">평균 수익</span>
+          <span class="stats-extra-val pos">+$${avgWin.toFixed(2)}</span>
+        </div>
+        <div class="stats-extra-row">
+          <span class="stats-extra-label">평균 손실</span>
+          <span class="stats-extra-val neg">-$${avgLoss.toFixed(2)}</span>
+        </div>
+        <div class="stats-extra-row">
+          <span class="stats-extra-label">최대 수익</span>
+          <span class="stats-extra-val pos">+$${(wins.length ? Math.max(...wins.map(t => t.pnl_usd)) : 0).toFixed(2)}</span>
+        </div>
+        <div class="stats-extra-row">
+          <span class="stats-extra-label">최대 손실</span>
+          <span class="stats-extra-val neg">-$${(losses.length ? Math.max(...losses.map(t => Math.abs(t.pnl_usd))) : 0).toFixed(2)}</span>
+        </div>
+      </div>
+    `
+
+    drawCumulativeChart('cumChart', cumPoints)
+  } catch (e) {
+    body.innerHTML = `<div class="meta-check-error">⚠️ 분석 실패<br><span style="font-size:13px;opacity:0.7;">${e.message}</span></div>`
+  }
+}
+
+function drawCumulativeChart(svgId, points) {
+  const svg = document.getElementById(svgId)
+  if (!svg || points.length === 0) return
+
+  const W = 800, H = 280
+  const PAD_L = 50, PAD_R = 16, PAD_T = 16, PAD_B = 28
+  const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
+
+  const cumValues = points.map(p => p.cum)
+  let minY = Math.min(0, ...cumValues)
+  let maxY = Math.max(0, ...cumValues)
+  if (minY === maxY) { minY -= 1; maxY += 1 }
+  const padY = (maxY - minY) * 0.1
+  minY -= padY; maxY += padY
+  const rangeY = maxY - minY
+
+  const xScale = i => PAD_L + (points.length === 1 ? cw/2 : (i / (points.length - 1)) * cw)
+  const yScale = v => PAD_T + ch * (1 - (v - minY) / rangeY)
+  const yZero = yScale(0)
+
+  let html = ''
+
+  // Y 격자 (5단계)
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD_T + (ch / 4) * i
+    const val = maxY - (rangeY / 4) * i
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    html += `<text x="${PAD_L - 6}" y="${y + 3}" fill="#555" font-size="9" text-anchor="end">${val >= 0 ? '+' : ''}$${val.toFixed(0)}</text>`
+  }
+
+  // 0 기준선 (강조)
+  if (minY < 0 && maxY > 0) {
+    html += `<line x1="${PAD_L}" y1="${yZero.toFixed(1)}" x2="${W - PAD_R}" y2="${yZero.toFixed(1)}" stroke="#3a3a3a" stroke-width="1" stroke-dasharray="3,3"/>`
+  }
+
+  // 곡선 영역 (수익/손실 영역 색칠)
+  const pathD = points.map((p, i) => {
+    const x = xScale(i).toFixed(1)
+    const y = yScale(p.cum).toFixed(1)
+    return (i === 0 ? 'M' : 'L') + x + ',' + y
+  }).join(' ')
+
+  // 양수/음수 영역 분할 (그라디언트)
+  const lastY = yScale(points[points.length - 1].cum)
+  const finalCum = points[points.length - 1].cum
+  const lineColor = finalCum >= 0 ? '#2ecc71' : '#e74c3c'
+  const fillColor = finalCum >= 0 ? '#2ecc7122' : '#e74c3c22'
+
+  // 영역 채우기
+  const fillD = pathD + ` L${xScale(points.length - 1).toFixed(1)},${yZero.toFixed(1)} L${PAD_L},${yZero.toFixed(1)} Z`
+  html += `<path d="${fillD}" fill="${fillColor}"/>`
+
+  // 라인
+  html += `<path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round"/>`
+
+  // 마지막 점
+  html += `<circle cx="${xScale(points.length - 1).toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" fill="${lineColor}"/>`
+
+  // 최종값 라벨
+  const finalLabel = `${finalCum >= 0 ? '+' : ''}$${finalCum.toFixed(2)}`
+  html += `<text x="${(xScale(points.length - 1) - 8).toFixed(1)}" y="${(lastY - 10).toFixed(1)}" fill="${lineColor}" font-size="11" font-weight="600" text-anchor="end">${finalLabel}</text>`
+
+  // X축 (거래 수)
+  html += `<text x="${PAD_L}" y="${H - 8}" fill="#555" font-size="9">1</text>`
+  html += `<text x="${W - PAD_R}" y="${H - 8}" fill="#555" font-size="9" text-anchor="end">${points.length}</text>`
+
+  svg.innerHTML = html
+}
+
 async function openMetaCheck() {
   // 기존 모달 있으면 제거
   const old = document.getElementById('metaCheckOverlay')
   if (old) old.remove()
-
   const overlay = document.createElement('div')
   overlay.id = 'metaCheckOverlay'
   overlay.className = 'meta-check-overlay'
