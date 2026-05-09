@@ -159,17 +159,14 @@ def fetch_major_range(start_ts, end_ts):
 
 def fetch_alt_24h_changes(end_ts):
     """
-    end_ts 시점에서 가장 가까운 15m 캔들의 price_chg_24h를 사용
+    가장 최근 15m 캔들 사용 — ts 필터 없이 최신 데이터 우선
+    cron이 09:00에 돌 때 직전 캔들이 가장 최신이라 자연스럽게 09:00 시점 반영
     각 (exchange, symbol)별 최신 1건씩
     """
     try:
-        # end_ts 직전 2시간 이내의 15m 캔들들 (모든 활성 심볼 커버)
-        cutoff = end_ts - 7200
         res = get_client().table("candle_data") \
             .select("exchange, symbol, ts, price_chg_24h, diagnosis, cvd_pct, oi_pct, vol_pct, price") \
             .eq("timeframe", "15m") \
-            .gte("ts", cutoff) \
-            .lt("ts", end_ts) \
             .order("ts", desc=True) \
             .limit(5000) \
             .execute()
