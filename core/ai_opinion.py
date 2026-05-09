@@ -49,17 +49,37 @@ def _build_user_prompt(trade: dict, snapshot: dict) -> str:
     trade: trade_journal row 일부
         symbol, direction, entry_price, entry_amount_usd, leverage
     snapshot: scanner_snapshot JSONB
-        15m: {diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
-        4h:  {diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
+        15m: {ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
+        4h:  {ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg, ...}
     """
+    import time
     s15 = (snapshot or {}).get("15m") or {}
     s4h = (snapshot or {}).get("4h")  or {}
+
+    def fmt_age(ts) -> str:
+        """unix timestamp → '20분 전' 같은 텍스트"""
+        if not ts:
+            return "시각 미상"
+        try:
+            ts_int = int(ts)
+            diff_min = max(0, int((time.time() - ts_int) / 60))
+            if diff_min < 60:
+                return f"{diff_min}분 전 마감"
+            diff_hour = diff_min // 60
+            rem_min = diff_min % 60
+            if rem_min == 0:
+                return f"{diff_hour}시간 전 마감"
+            return f"{diff_hour}시간 {rem_min}분 전 마감"
+        except (ValueError, TypeError):
+            return "시각 미상"
 
     def fmt_tf(name: str, d: dict) -> str:
         if not d:
             return f"[{name}] 데이터 없음"
+        age = fmt_age(d.get("ts"))
         return (
-            f"[{name}] 진단={d.get('diagnosis','—')}, "
+            f"[{name}] (마지막 봉: {age}) "
+            f"진단={d.get('diagnosis','—')}, "
             f"CVD={d.get('cvd_pct','—')}%, "
             f"OI={d.get('oi_pct','—')}%, "
             f"Vol={d.get('vol_pct','—')}%, "
@@ -77,6 +97,9 @@ def _build_user_prompt(trade: dict, snapshot: dict) -> str:
         f"=== 스캐너 스냅샷 ===\n"
         f"{fmt_tf('15분봉', s15)}\n"
         f"{fmt_tf('4시간봉', s4h)}\n"
+        f"\n"
+        f"※ 데이터 신선도 참고: 15분봉은 0~14분 전, 4시간봉은 0~3시간 59분 전 마감된 봉의 결과입니다.\n"
+        f"마감 시점이 오래됐을수록 현재 시장 상황과 차이가 클 수 있으니 진단에 반영해주세요.\n"
         f"\n"
         f"위 데이터로 진입 정합성을 진단해주세요."
     )
