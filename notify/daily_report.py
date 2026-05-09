@@ -256,29 +256,50 @@ def is_major_symbol(symbol):
 
 def top_alts(alt_rows, n=5, ascending=False):
     """
-    price_chg_24h 기준 상위/하위 N
-    같은 베이스 심볼이 거래소별 중복되면 가장 큰 변화율만 유지
+    price_chg_24h 기준 상위(상승) 또는 하위(하락) N개
+    같은 베이스 심볼이 거래소별 중복되면 가장 적합한 변화율만 유지
+    - 상승 모드: 가장 큰 양수
+    - 하락 모드: 가장 작은 음수
     """
-    # 메이저 제외
+    # 메이저 제외 + 변화율 있는 것만
     rows = [r for r in alt_rows if not is_major_symbol(r.get("symbol")) and r.get("price_chg_24h") is not None]
 
-    # 베이스 심볼별 1건만 (가장 큰 변화율 유지)
+    # 모드별로 적합한 것만 필터: 상승은 양수, 하락은 음수
+    if ascending:
+        # 하락 — 음수만
+        rows = [r for r in rows if r["price_chg_24h"] < 0]
+    else:
+        # 상승 — 양수만
+        rows = [r for r in rows if r["price_chg_24h"] > 0]
+
+    # 베이스 심볼별 1건만 — 모드에 맞게 극단값 유지
     by_base = {}
     for r in rows:
         sym = r["symbol"]
         # OKX는 "BTC-USDT-SWAP" 같은 형식 → "BTC" 추출
         base = sym.split("-")[0] if "-" in sym else sym.replace("USDT", "")
         cur = by_base.get(base)
-        if cur is None or abs(r["price_chg_24h"]) > abs(cur["price_chg_24h"]):
+        if cur is None:
             by_base[base] = {**r, "_base": base}
+            continue
+        # 상승: 더 큰 값 / 하락: 더 작은 값
+        if ascending:
+            if r["price_chg_24h"] < cur["price_chg_24h"]:
+                by_base[base] = {**r, "_base": base}
+        else:
+            if r["price_chg_24h"] > cur["price_chg_24h"]:
+                by_base[base] = {**r, "_base": base}
 
     sorted_rows = sorted(by_base.values(), key=lambda x: x["price_chg_24h"], reverse=not ascending)
     return sorted_rows[:n]
 
 
-def fmt_alt_block(alts):
+def fmt_alt_block(alts, mode="up"):
     if not alts:
-        return "  (데이터 없음)"
+        if mode == "up":
+            return "  (24h 상승 종목 없음)"
+        else:
+            return "  (24h 하락 종목 없음)"
     lines = []
     ex_map = {"binance": "BNC", "okx": "OKX", "bybit": "BYB"}
     for i, a in enumerate(alts, 1):
@@ -341,10 +362,10 @@ async def build_daily_report(start_kst, end_kst):
         fmt_major_block(majors),
         "",
         "🚀 *알트 TOP 5 상승*",
-        fmt_alt_block(top_up),
+        fmt_alt_block(top_up, mode="up"),
         "",
         "📉 *알트 TOP 5 하락*",
-        fmt_alt_block(top_dn),
+        fmt_alt_block(top_dn, mode="down"),
     ]
 
     # 역행 경고
@@ -480,10 +501,10 @@ async def build_weekly_report(start_kst, end_kst):
     lines += [
         "",
         "🚀 *주말 기준 24h 알트 TOP 5 상승*",
-        fmt_alt_block(top_up),
+        fmt_alt_block(top_up, mode="up"),
         "",
         "📉 *주말 기준 24h 알트 TOP 5 하락*",
-        fmt_alt_block(top_dn),
+        fmt_alt_block(top_dn, mode="down"),
     ]
 
     return "\n".join(lines)
