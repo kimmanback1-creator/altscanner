@@ -2412,8 +2412,130 @@ async function confirmClosePosition() {
   if (updated) renderTradeDetail(updated)
 }
 
-function openMetaCheck() {
-  alert('중간점검은 Phase 6에서 구현됩니다')
+async function openMetaCheck() {
+  // 기존 모달 있으면 제거
+  const old = document.getElementById('metaCheckOverlay')
+  if (old) old.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'metaCheckOverlay'
+  overlay.className = 'meta-check-overlay'
+  overlay.innerHTML = `
+    <div class="meta-check-modal">
+      <div class="meta-check-header">
+        <h2>🧠 중간점검 — 매매 패턴 분석</h2>
+        <button class="meta-check-close" onclick="document.getElementById('metaCheckOverlay').remove()">✕</button>
+      </div>
+      <div class="meta-check-controls">
+        <button class="period-btn" data-n="5">최근 5건</button>
+        <button class="period-btn active" data-n="20">최근 20건</button>
+        <button class="period-btn" data-n="50">최근 50건</button>
+      </div>
+      <div class="meta-check-body" id="metaCheckBody">
+        <div class="meta-check-loading">불러오는 중...</div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
+
+  overlay.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      runMetaCheck(parseInt(btn.dataset.n))
+    })
+  })
+
+  runMetaCheck(20)
+}
+
+async function runMetaCheck(limit) {
+  const body = document.getElementById('metaCheckBody')
+  if (!body) return
+  body.innerHTML = `<div class="meta-check-loading">최근 ${limit}건 분석 중...<br><span style="opacity:0.6;font-size:13px;">Claude Haiku가 매매 패턴을 점검하고 있습니다</span></div>`
+
+  try {
+    // 1. Supabase에서 최근 closed 거래 fetch
+    const { data, error } = await sb
+      .from('trade_journal')
+      .select('symbol, direction, entry_price, exit_price, leverage, entry_amount_usd, pnl_pct, pnl_usd, ai_opinion, reason, created_at, closed_at, source')
+      .eq('status', 'closed')
+      .order('closed_at', { ascending: false })
+      .limit(limit)
+
+    if (error) throw error
+    if (!data || data.length === 0) {
+      body.innerHTML = '<div class="meta-check-empty">아직 청산된 거래가 없습니다.<br>거래가 쌓이면 패턴 분석이 가능합니다.</div>'
+      return
+    }
+
+    // 2. 통계 계산
+    const winCount = data.filter(t => (t.pnl_pct || 0) > 0).length
+    const lossCount = data.length - winCount
+    const totalPnlUsd = data.reduce((s, t) => s + (t.pnl_usd || 0), 0)
+    const avgPnlPct = data.reduce((s, t) => s + (t.pnl_pct || 0), 0) / data.length
+    const winRate = (winCount / data.length * 100)
+
+    // 3. AI에게 보낼 거래 요약 텍스트
+    const tradesText = data.map((t, i) => {
+      const holdMin = (t.closed_at && t.created_at)
+        ? Math.round((new Date(t.closed_at) - new Date(t.created_at)) / 60000)
+        : null
+      const judge = t.ai_opinion ? (t.ai_opinion.match(/🟢|🟡|🔴/)?.[0] || '?') : '없음'
+      const reason = t.reason ? ` 메모="${(t.reason || '').replace(/\n/g, ' ').substring(0, 80)}"` : ''
+      const hold = holdMin !== null ? ` 보유=${holdMin}분` : ''
+      return `[${i+1}] ${t.symbol} ${t.direction} ${t.leverage}x | ${t.entry_price}→${t.exit_price} | ${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct?.toFixed(2)}% (${t.pnl_usd >= 0 ? '+' : ''}$${t.pnl_usd?.toFixed(2)})${hold} | AI진단=${judge}${reason}`
+    }).join('\n')
+
+    const summary = `=== 거래 통계 ===
+총 ${data.length}건 (수익 ${winCount}건 / 손실 ${lossCount}건)
+승률: ${winRate.toFixed(1)}%
+누적 손익: ${totalPnlUsd >= 0 ? '+' : ''}$${totalPnlUsd.toFixed(2)}
+평균 PnL%: ${avgPnlPct >= 0 ? '+' : ''}${avgPnlPct.toFixed(2)}%
+
+=== 거래 내역 (최근 → 과거) ===
+${tradesText}`
+
+    // 4. Supabase Edge Function 호출 (Anthropic 키 보호)
+    const { data: result, error: fnError } = await sb.functions.invoke('meta-check', {
+      body: { trades_summary: summary }
+    })
+
+    if (fnError) throw fnError
+    if (result?.error) throw new Error(result.error)
+
+    const text = result.analysis || '응답 없음'
+
+    // 5. 결과 렌더
+    const pnlClass = totalPnlUsd >= 0 ? 'pos' : 'neg'
+    body.innerHTML = `
+      <div class="meta-check-stats">
+        <div class="meta-stat">
+          <div class="meta-stat-label">전체</div>
+          <div class="meta-stat-value">${data.length}건</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">승률</div>
+          <div class="meta-stat-value">${winRate.toFixed(1)}%</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">누적</div>
+          <div class="meta-stat-value ${pnlClass}">${totalPnlUsd >= 0 ? '+' : ''}$${totalPnlUsd.toFixed(2)}</div>
+        </div>
+        <div class="meta-stat">
+          <div class="meta-stat-label">평균 PnL%</div>
+          <div class="meta-stat-value ${avgPnlPct >= 0 ? 'pos' : 'neg'}">${avgPnlPct >= 0 ? '+' : ''}${avgPnlPct.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="meta-check-analysis">${text.replace(/\n/g, '<br>')}</div>
+    `
+  } catch (e) {
+    body.innerHTML = `<div class="meta-check-error">⚠️ 분석 실패<br><span style="font-size:13px;opacity:0.7;">${e.message}</span></div>`
+  }
 }
 
 function drawMajorChart(svgId, byEx, key, hasZero) {
