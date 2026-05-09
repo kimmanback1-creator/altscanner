@@ -1149,6 +1149,85 @@ tr.both-agree .ticker-name {
 .stats-extra-val.pos { color: #2ecc71; }
 .stats-extra-val.neg { color: #e74c3c; }
 
+/* ── 통계: 방향별 카드 ── */
+.dir-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.dir-card {
+  background: #181818; border: 1px solid #2a2a2a; border-radius: 6px;
+  padding: 12px 14px; border-left: 3px solid #2a2a2a;
+}
+.dir-card.long  { border-left-color: #2ecc71; }
+.dir-card.short { border-left-color: #e74c3c; }
+.dir-card-head {
+  font-size: 12px; font-weight: 600; margin-bottom: 10px;
+}
+.dir-card.long  .dir-card-head { color: #2ecc71; }
+.dir-card.short .dir-card-head { color: #e74c3c; }
+.dir-card-empty {
+  color: #555; font-size: 11px; padding: 8px 0; text-align: center;
+}
+.dir-card-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px;
+}
+.dir-stat-label { font-size: 10px; color: #888; }
+.dir-stat-val   { font-size: 13px; color: #ddd; font-weight: 500; }
+.dir-stat-val.pos { color: #2ecc71; }
+.dir-stat-val.neg { color: #e74c3c; }
+
+/* ── 통계: 공통 테이블 ── */
+.stat-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+  font-family: 'Consolas', monospace;
+}
+.stat-table th {
+  padding: 6px 10px; text-align: left; color: #666; font-weight: 400;
+  border-bottom: 0.5px solid #2a2a2a; font-size: 10px;
+}
+.stat-table th.r { text-align: right; }
+.stat-table td {
+  padding: 7px 10px; color: #ccc; border-bottom: 0.5px solid #1a1a1a;
+}
+.stat-table td.r { text-align: right; }
+.stat-table td.pos { color: #2ecc71; font-weight: 500; }
+.stat-table td.neg { color: #e74c3c; font-weight: 500; }
+.lev-badge {
+  display: inline-block; padding: 2px 8px; background: #232323;
+  border: 0.5px solid #333; border-radius: 4px; color: #aaa; font-size: 10px;
+}
+.sym-cell { color: #ddd; font-weight: 500; }
+.bar-bg {
+  width: 100%; height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden;
+}
+.bar-fill {
+  height: 100%; background: linear-gradient(90deg, #5b9bd5, #9b7fd5);
+  border-radius: 3px;
+}
+
+/* ── 전역 스크롤바 (다크 테마 통일) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 #141414;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: #141414;
+}
+*::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+  border: 1px solid #1a1a1a;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+*::-webkit-scrollbar-corner {
+  background: #141414;
+}
+
 </style>
 </head>
 <body>
@@ -2574,6 +2653,80 @@ async function runStatsAnalysis(limit) {
     const avgLoss = losses.length ? losses.reduce((s, t) => s + Math.abs(t.pnl_usd), 0) / losses.length : 0
     const rr = avgLoss > 0 ? (avgWin / avgLoss) : 0
 
+    // ── 방향별 통계 ──
+    const longTrades = data.filter(t => t.direction === 'LONG')
+    const shortTrades = data.filter(t => t.direction === 'SHORT')
+    const dirStats = ['LONG', 'SHORT'].map(dir => {
+      const trades = data.filter(t => t.direction === dir)
+      if (trades.length === 0) return { dir, count: 0, winRate: 0, totalPnl: 0, avgPnl: 0 }
+      const w = trades.filter(t => (t.pnl_usd || 0) > 0).length
+      const sumPnl = trades.reduce((s, t) => s + (t.pnl_usd || 0), 0)
+      return {
+        dir,
+        count: trades.length,
+        winRate: (w / trades.length) * 100,
+        totalPnl: sumPnl,
+        avgPnl: sumPnl / trades.length,
+      }
+    })
+
+    // ── 레버리지별 통계 ──
+    const levGroups = {}
+    for (const t of data) {
+      const lev = Number(t.leverage || 1)
+      if (!levGroups[lev]) levGroups[lev] = []
+      levGroups[lev].push(t)
+    }
+    const levStats = Object.keys(levGroups)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map(lev => {
+        const trades = levGroups[lev]
+        const w = trades.filter(t => (t.pnl_usd || 0) > 0).length
+        const sumPnl = trades.reduce((s, t) => s + (t.pnl_usd || 0), 0)
+        return {
+          lev,
+          count: trades.length,
+          winRate: (w / trades.length) * 100,
+          totalPnl: sumPnl,
+          avgPnl: sumPnl / trades.length,
+        }
+      })
+
+    // ── 종목별 통계 (TOP 10) ──
+    const symGroups = {}
+    for (const t of data) {
+      if (!symGroups[t.symbol]) symGroups[t.symbol] = []
+      symGroups[t.symbol].push(t)
+    }
+    const symStats = Object.entries(symGroups)
+      .map(([symbol, trades]) => {
+        const w = trades.filter(t => (t.pnl_usd || 0) > 0).length
+        const sumPnl = trades.reduce((s, t) => s + (t.pnl_usd || 0), 0)
+        return {
+          symbol,
+          count: trades.length,
+          winRate: (w / trades.length) * 100,
+          totalPnl: sumPnl,
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    // ── 보유시간 vs PnL% 산포도 데이터 ──
+    const holdPoints = data
+      .filter(t => t.created_at && t.closed_at && t.pnl_pct != null)
+      .map(t => {
+        const holdMin = (new Date(t.closed_at) - new Date(t.created_at)) / 60000
+        return {
+          holdMin,
+          pnlPct: Number(t.pnl_pct),
+          direction: t.direction,
+          symbol: t.symbol,
+        }
+      })
+      .filter(p => p.holdMin > 0)  // 음수/0 제외
+
     // 누적 손익 곡선 데이터
     let cum = 0
     const cumPoints = data.map(t => {
@@ -2609,6 +2762,12 @@ async function runStatsAnalysis(limit) {
         <div class="stats-chart-hint">x: 거래 순번 · y: 누적 PnL ($)</div>
       </div>
 
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">손익비 × 승률 평면 — 손익분기선 기준 위치</div>
+        <svg class="stats-chart" id="rrwrChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
+        <div class="stats-chart-hint">보라 곡선 = 손익분기선 (WR = 1/(1+RR)) · 빨간 점 = 본인 위치 · 곡선 위쪽 = 수익권</div>
+      </div>
+
       <div class="stats-extra">
         <div class="stats-extra-row">
           <span class="stats-extra-label">평균 수익</span>
@@ -2627,12 +2786,359 @@ async function runStatsAnalysis(limit) {
           <span class="stats-extra-val neg">-$${(losses.length ? Math.max(...losses.map(t => Math.abs(t.pnl_usd))) : 0).toFixed(2)}</span>
         </div>
       </div>
+
+      <!-- 방향별 통계 -->
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">방향별 성과 — LONG vs SHORT</div>
+        <div class="dir-stats" id="dirStats"></div>
+      </div>
+
+      <!-- 레버리지별 통계 -->
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">레버리지별 성과</div>
+        <div class="lev-stats" id="levStats"></div>
+      </div>
+
+      <!-- 종목별 TOP -->
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">자주 거래한 종목 TOP 10</div>
+        <div class="sym-stats" id="symStats"></div>
+      </div>
+
+      <!-- 보유시간 vs PnL% 산포도 -->
+      <div class="stats-chart-wrap">
+        <div class="stats-chart-title">보유시간 × PnL% — "짧게 끊는 게 좋나, 오래 가져가는 게 좋나"</div>
+        <svg class="stats-chart" id="holdChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
+        <div class="stats-chart-hint">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2ecc71;margin-right:4px"></span>LONG
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e74c3c;margin:0 4px 0 10px"></span>SHORT
+          · x: 보유 분 · y: PnL%
+        </div>
+      </div>
     `
 
     drawCumulativeChart('cumChart', cumPoints)
+    drawRRWRChart('rrwrChart', rr, winRate)
+    renderDirStats('dirStats', dirStats)
+    renderLevStats('levStats', levStats)
+    renderSymStats('symStats', symStats)
+    drawHoldChart('holdChart', holdPoints)
   } catch (e) {
     body.innerHTML = `<div class="meta-check-error">⚠️ 분석 실패<br><span style="font-size:13px;opacity:0.7;">${e.message}</span></div>`
   }
+}
+
+function renderDirStats(elId, stats) {
+  const el = document.getElementById(elId)
+  if (!el) return
+  const fmtUsd = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2)
+  
+  el.innerHTML = stats.map(s => {
+    if (s.count === 0) {
+      return `<div class="dir-card ${s.dir.toLowerCase()}">
+        <div class="dir-card-head">${s.dir === 'LONG' ? '▲ LONG' : '▼ SHORT'}</div>
+        <div class="dir-card-empty">거래 없음</div>
+      </div>`
+    }
+    const pnlClass = s.totalPnl >= 0 ? 'pos' : 'neg'
+    return `<div class="dir-card ${s.dir.toLowerCase()}">
+      <div class="dir-card-head">${s.dir === 'LONG' ? '▲ LONG' : '▼ SHORT'}</div>
+      <div class="dir-card-grid">
+        <div class="dir-stat">
+          <div class="dir-stat-label">거래</div>
+          <div class="dir-stat-val">${s.count}건</div>
+        </div>
+        <div class="dir-stat">
+          <div class="dir-stat-label">승률</div>
+          <div class="dir-stat-val">${s.winRate.toFixed(1)}%</div>
+        </div>
+        <div class="dir-stat">
+          <div class="dir-stat-label">누적</div>
+          <div class="dir-stat-val ${pnlClass}">${fmtUsd(s.totalPnl)}</div>
+        </div>
+        <div class="dir-stat">
+          <div class="dir-stat-label">평균</div>
+          <div class="dir-stat-val ${s.avgPnl >= 0 ? 'pos' : 'neg'}">${fmtUsd(s.avgPnl)}</div>
+        </div>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function renderLevStats(elId, stats) {
+  const el = document.getElementById(elId)
+  if (!el || stats.length === 0) {
+    if (el) el.innerHTML = '<div class="dir-card-empty">데이터 없음</div>'
+    return
+  }
+  
+  const fmtUsd = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2)
+  const maxCount = Math.max(...stats.map(s => s.count))
+  
+  el.innerHTML = `
+    <table class="stat-table">
+      <thead>
+        <tr>
+          <th style="width:60px">레버</th>
+          <th style="width:70px" class="r">거래수</th>
+          <th>분포</th>
+          <th style="width:70px" class="r">승률</th>
+          <th style="width:90px" class="r">누적 PnL</th>
+          <th style="width:90px" class="r">평균 PnL</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${stats.map(s => {
+          const widthPct = (s.count / maxCount) * 100
+          const pnlClass = s.totalPnl >= 0 ? 'pos' : 'neg'
+          return `<tr>
+            <td><span class="lev-badge">${s.lev}x</span></td>
+            <td class="r">${s.count}</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:${widthPct}%"></div></div></td>
+            <td class="r">${s.winRate.toFixed(1)}%</td>
+            <td class="r ${pnlClass}">${fmtUsd(s.totalPnl)}</td>
+            <td class="r ${s.avgPnl >= 0 ? 'pos' : 'neg'}">${fmtUsd(s.avgPnl)}</td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>
+  `
+}
+
+function renderSymStats(elId, stats) {
+  const el = document.getElementById(elId)
+  if (!el || stats.length === 0) {
+    if (el) el.innerHTML = '<div class="dir-card-empty">데이터 없음</div>'
+    return
+  }
+  
+  const fmtUsd = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2)
+  const maxCount = Math.max(...stats.map(s => s.count))
+  
+  el.innerHTML = `
+    <table class="stat-table">
+      <thead>
+        <tr>
+          <th>심볼</th>
+          <th style="width:70px" class="r">거래수</th>
+          <th style="width:120px">분포</th>
+          <th style="width:70px" class="r">승률</th>
+          <th style="width:100px" class="r">누적 PnL</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${stats.map(s => {
+          const widthPct = (s.count / maxCount) * 100
+          const pnlClass = s.totalPnl >= 0 ? 'pos' : 'neg'
+          const winColor = s.winRate >= 50 ? 'pos' : 'neg'
+          return `<tr>
+            <td class="sym-cell">${s.symbol}</td>
+            <td class="r">${s.count}</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:${widthPct}%"></div></div></td>
+            <td class="r ${winColor}">${s.winRate.toFixed(1)}%</td>
+            <td class="r ${pnlClass}">${fmtUsd(s.totalPnl)}</td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>
+  `
+}
+
+function drawHoldChart(svgId, points) {
+  const svg = document.getElementById(svgId)
+  if (!svg) return
+
+  if (points.length === 0) {
+    svg.innerHTML = `<text x="400" y="160" fill="#555" font-size="12" text-anchor="middle">데이터 없음</text>`
+    return
+  }
+
+  const W = 800, H = 320
+  const PAD_L = 60, PAD_R = 30, PAD_T = 30, PAD_B = 50
+  const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
+
+  // X축: 보유시간 (log 스케일 — 1분 ~ 며칠까지 골고루)
+  const minMin = Math.max(1, Math.min(...points.map(p => p.holdMin)))
+  const maxMin = Math.max(...points.map(p => p.holdMin))
+  // 눈금 친화적으로 확장
+  const xMin = Math.pow(10, Math.floor(Math.log10(minMin)))
+  const xMax = Math.pow(10, Math.ceil(Math.log10(maxMin)))
+  const logMin = Math.log10(xMin), logMax = Math.log10(xMax)
+  const xRange = logMax - logMin || 1
+  const xScale = m => PAD_L + ((Math.log10(Math.max(1, m)) - logMin) / xRange) * cw
+
+  // Y축: PnL% (대칭, 0 중심)
+  const pnlValues = points.map(p => p.pnlPct)
+  const maxAbs = Math.max(...pnlValues.map(Math.abs), 1)
+  const yMax = Math.ceil(maxAbs * 1.2)
+  const yMin = -yMax
+  const yScale = v => PAD_T + ch * (1 - (v - yMin) / (yMax - yMin))
+  const yZero = yScale(0)
+
+  let html = ''
+
+  // X 격자 (1분, 10분, 60분, 6시간, 1일)
+  const xTicks = [
+    {val: 1,    label: '1m'},
+    {val: 10,   label: '10m'},
+    {val: 30,   label: '30m'},
+    {val: 60,   label: '1h'},
+    {val: 360,  label: '6h'},
+    {val: 1440, label: '1d'},
+    {val: 4320, label: '3d'},
+  ]
+  for (const tick of xTicks) {
+    if (tick.val < xMin * 0.9 || tick.val > xMax * 1.1) continue
+    const x = xScale(tick.val)
+    html += `<line x1="${x.toFixed(1)}" y1="${PAD_T}" x2="${x.toFixed(1)}" y2="${PAD_T + ch}" stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    html += `<text x="${x.toFixed(1)}" y="${PAD_T + ch + 16}" fill="#666" font-size="10" text-anchor="middle">${tick.label}</text>`
+  }
+  html += `<text x="${PAD_L + cw/2}" y="${H - 8}" fill="#888" font-size="10" text-anchor="middle">보유시간</text>`
+
+  // Y 격자 (대칭)
+  const yStep = yMax / 4
+  for (let i = -4; i <= 4; i++) {
+    const v = yStep * i
+    const y = yScale(v)
+    const isZero = v === 0
+    html += `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${PAD_L + cw}" y2="${y.toFixed(1)}" stroke="${isZero ? '#3a3a3a' : '#1a1a1a'}" stroke-width="${isZero ? 1 : 0.5}" stroke-dasharray="${isZero ? '3,3' : '2,4'}"/>`
+    const label = (v >= 0 ? '+' : '') + v.toFixed(0) + '%'
+    html += `<text x="${PAD_L - 8}" y="${y.toFixed(1) + 3}" fill="${isZero ? '#888' : '#666'}" font-size="10" text-anchor="end">${label}</text>`
+  }
+
+  // 4분면 라벨 (옅게)
+  html += `<text x="${PAD_L + 8}" y="${PAD_T + 14}" fill="#2ecc71" font-size="10" opacity="0.4">짧게 + 수익</text>`
+  html += `<text x="${PAD_L + cw - 8}" y="${PAD_T + 14}" fill="#2ecc71" font-size="10" opacity="0.4" text-anchor="end">길게 + 수익</text>`
+  html += `<text x="${PAD_L + 8}" y="${PAD_T + ch - 4}" fill="#e74c3c" font-size="10" opacity="0.4">짧게 + 손실</text>`
+  html += `<text x="${PAD_L + cw - 8}" y="${PAD_T + ch - 4}" fill="#e74c3c" font-size="10" opacity="0.4" text-anchor="end">길게 + 손실</text>`
+
+  // 평균 보유시간 + 평균 PnL% 십자선
+  const avgHold = points.reduce((s, p) => s + p.holdMin, 0) / points.length
+  const avgPnl = points.reduce((s, p) => s + p.pnlPct, 0) / points.length
+  const avgX = xScale(avgHold)
+  const avgY = yScale(avgPnl)
+  html += `<line x1="${avgX.toFixed(1)}" y1="${PAD_T}" x2="${avgX.toFixed(1)}" y2="${PAD_T + ch}" stroke="#9b7fd5" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.5"/>`
+  html += `<line x1="${PAD_L}" y1="${avgY.toFixed(1)}" x2="${PAD_L + cw}" y2="${avgY.toFixed(1)}" stroke="#9b7fd5" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.5"/>`
+  
+  // 평균 라벨
+  const avgHoldLabel = avgHold < 60 ? `${Math.round(avgHold)}분` 
+                     : avgHold < 1440 ? `${(avgHold/60).toFixed(1)}h` 
+                     : `${(avgHold/1440).toFixed(1)}d`
+  html += `<text x="${avgX.toFixed(1) + 4}" y="${PAD_T + 12}" fill="#9b7fd5" font-size="9" opacity="0.7">평균 ${avgHoldLabel}</text>`
+  html += `<text x="${PAD_L + cw - 4}" y="${avgY.toFixed(1) - 4}" fill="#9b7fd5" font-size="9" opacity="0.7" text-anchor="end">평균 ${avgPnl >= 0 ? '+' : ''}${avgPnl.toFixed(1)}%</text>`
+
+  // 점 그리기
+  for (const p of points) {
+    const x = xScale(p.holdMin)
+    const y = yScale(p.pnlPct)
+    const color = p.direction === 'LONG' ? '#2ecc71' : '#e74c3c'
+    
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="${color}" fill-opacity="0.25"/>`
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="#1a1a1a" stroke-width="1"><title>${p.symbol} ${p.direction} | 보유 ${formatHold(p.holdMin)} | ${p.pnlPct >= 0 ? '+' : ''}${p.pnlPct.toFixed(2)}%</title></circle>`
+  }
+
+  svg.innerHTML = html
+}
+
+function formatHold(min) {
+  if (min < 60) return `${Math.round(min)}분`
+  if (min < 1440) return `${(min/60).toFixed(1)}시간`
+  return `${(min/1440).toFixed(1)}일`
+}
+
+function drawRRWRChart(svgId, userRR, userWR) {function drawRRWRChart(svgId, userRR, userWR) {
+  const svg = document.getElementById(svgId)
+  if (!svg) return
+
+  const W = 800, H = 320
+  const PAD_L = 60, PAD_R = 30, PAD_T = 30, PAD_B = 40
+  const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
+
+  // X축: 손익비 (RR) 0.5 ~ 5
+  // Y축: 승률 (WR) 0% ~ 100%
+  const minRR = 0.3, maxRR = 5
+  const minWR = 0, maxWR = 100
+
+  const xScale = rr => PAD_L + ((rr - minRR) / (maxRR - minRR)) * cw
+  const yScale = wr => PAD_T + ch * (1 - (wr - minWR) / (maxWR - minWR))
+
+  let html = ''
+
+  // X 격자 (손익비 1, 2, 3, 4, 5)
+  for (const rr of [0.5, 1, 2, 3, 4, 5]) {
+    if (rr < minRR || rr > maxRR) continue
+    const x = xScale(rr)
+    html += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T + ch}" stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    html += `<text x="${x}" y="${PAD_T + ch + 16}" fill="#666" font-size="10" text-anchor="middle">${rr}</text>`
+  }
+  // X축 라벨
+  html += `<text x="${PAD_L + cw/2}" y="${H - 8}" fill="#888" font-size="10" text-anchor="middle">손익비 (R:R)</text>`
+
+  // Y 격자 (승률 20, 40, 60, 80)
+  for (const wr of [20, 40, 60, 80, 100]) {
+    const y = yScale(wr)
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${PAD_L + cw}" y2="${y}" stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    html += `<text x="${PAD_L - 8}" y="${y + 3}" fill="#666" font-size="10" text-anchor="end">${wr}%</text>`
+  }
+  // Y축 라벨 (회전)
+  html += `<text x="20" y="${PAD_T + ch/2}" fill="#888" font-size="10" text-anchor="middle" transform="rotate(-90 20 ${PAD_T + ch/2})">승률 (WR)</text>`
+
+  // 손익분기선: WR = 1 / (1 + RR) × 100
+  // 즉 평균손실:평균수익 = 1:RR 일 때 본전이 되는 승률
+  const curvePoints = []
+  for (let rr = minRR; rr <= maxRR; rr += 0.05) {
+    const wr = (1 / (1 + rr)) * 100
+    if (wr <= maxWR) {
+      curvePoints.push(`${xScale(rr).toFixed(1)},${yScale(wr).toFixed(1)}`)
+    }
+  }
+  
+  // 곡선 아래 영역 (손실권) - 옅은 빨강
+  const fillBelow = curvePoints.join(' L') + ` L${xScale(maxRR).toFixed(1)},${yScale(0).toFixed(1)} L${xScale(minRR).toFixed(1)},${yScale(0).toFixed(1)} Z`
+  html += `<path d="M${fillBelow}" fill="#e74c3c11"/>`
+  
+  // 곡선 위 영역 (수익권) - 옅은 녹색
+  const fillAbove = curvePoints.join(' L') + ` L${xScale(maxRR).toFixed(1)},${yScale(100).toFixed(1)} L${xScale(minRR).toFixed(1)},${yScale(100).toFixed(1)} Z`
+  html += `<path d="M${fillAbove}" fill="#2ecc7111"/>`
+
+  // 손익분기 곡선
+  html += `<polyline points="${curvePoints.join(' ')}" fill="none" stroke="#9b7fd5" stroke-width="2" stroke-linejoin="round"/>`
+
+  // 영역 라벨
+  html += `<text x="${xScale(3)}" y="${yScale(80)}" fill="#2ecc71" font-size="11" font-weight="500" opacity="0.6">수익권</text>`
+  html += `<text x="${xScale(0.7)}" y="${yScale(20)}" fill="#e74c3c" font-size="11" font-weight="500" opacity="0.6">손실권</text>`
+
+  // 사용자 위치 점
+  if (userRR > 0 && userRR >= minRR && userRR <= maxRR && !isNaN(userWR)) {
+    const x = xScale(Math.min(maxRR, Math.max(minRR, userRR)))
+    const y = yScale(Math.min(maxWR, Math.max(minWR, userWR)))
+    
+    // 손익분기선 위/아래 판정
+    const breakEvenWR = (1 / (1 + userRR)) * 100
+    const isProfit = userWR > breakEvenWR
+    const dotColor = isProfit ? '#2ecc71' : '#e74c3c'
+    
+    // 십자선 (얇게)
+    html += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${y}" stroke="${dotColor}" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.5"/>`
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${x}" y2="${y}" stroke="${dotColor}" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.5"/>`
+    
+    // 본인 점 (크게, 강조)
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${dotColor}" fill-opacity="0.3"/>`
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${dotColor}" stroke="#1a1a1a" stroke-width="1.5"/>`
+    
+    // 라벨
+    const labelText = `R:R=${userRR.toFixed(2)} · WR=${userWR.toFixed(1)}%`
+    const labelX = x + 12 < W - PAD_R - 100 ? x + 12 : x - 12
+    const labelAnchor = x + 12 < W - PAD_R - 100 ? 'start' : 'end'
+    html += `<text x="${labelX.toFixed(1)}" y="${(y - 8).toFixed(1)}" fill="${dotColor}" font-size="11" font-weight="600" text-anchor="${labelAnchor}">${labelText}</text>`
+    
+    // 본전 차이 표시
+    const diff = userWR - breakEvenWR
+    const diffText = diff >= 0 ? `+${diff.toFixed(1)}%p (수익권)` : `${diff.toFixed(1)}%p (손실권)`
+    html += `<text x="${labelX.toFixed(1)}" y="${(y + 18).toFixed(1)}" fill="${dotColor}" font-size="10" text-anchor="${labelAnchor}" opacity="0.8">본전선 ${diffText}</text>`
+  }
+
+  svg.innerHTML = html
 }
 
 function drawCumulativeChart(svgId, points) {
