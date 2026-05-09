@@ -163,15 +163,15 @@ def fetch_alt_24h_changes(end_ts):
     각 (exchange, symbol)별 최신 1건씩
     """
     try:
-        # end_ts 직전 1시간 이내의 15m 캔들들
-        cutoff = end_ts - 3600
+        # end_ts 직전 2시간 이내의 15m 캔들들 (모든 활성 심볼 커버)
+        cutoff = end_ts - 7200
         res = get_client().table("candle_data") \
             .select("exchange, symbol, ts, price_chg_24h, diagnosis, cvd_pct, oi_pct, vol_pct, price") \
             .eq("timeframe", "15m") \
             .gte("ts", cutoff) \
             .lt("ts", end_ts) \
             .order("ts", desc=True) \
-            .limit(2000) \
+            .limit(5000) \
             .execute()
         rows = res.data or []
         # (exchange, symbol)별 가장 최신 1건만
@@ -180,6 +180,13 @@ def fetch_alt_24h_changes(end_ts):
             key = (r["exchange"], r["symbol"])
             if key not in latest:
                 latest[key] = r
+        
+        # 디버깅: 양수/음수 분포 로깅
+        all_changes = [r["price_chg_24h"] for r in latest.values() if r.get("price_chg_24h") is not None]
+        pos_count = sum(1 for v in all_changes if v > 0)
+        neg_count = sum(1 for v in all_changes if v < 0)
+        logger.info(f"[Report] 알트 데이터: 총 {len(all_changes)}개 (상승 {pos_count} / 하락 {neg_count})")
+        
         return list(latest.values())
     except Exception as e:
         logger.error(f"[Report] fetch_alt 실패: {e}")
