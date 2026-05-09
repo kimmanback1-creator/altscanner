@@ -131,17 +131,14 @@ def _build_user_prompt(trade: dict, snapshot: dict, major_state: dict | None = N
     )
 
 
-async def generate_opinion(trade: dict, snapshot: dict) -> str | None:
+async def generate_opinion(trade: dict, snapshot: dict | None) -> str | None:
     """
     AI 의견 생성. 실패하면 None 반환 (시스템 동작에 영향 X)
+    snapshot이 None이어도 메이저 흐름 기반으로 진단 진행
     """
     client = _get_client()
     if not client:
         logger.warning("[AI] ANTHROPIC_API_KEY 없음 — AI 의견 생성 skip")
-        return None
-
-    if not snapshot:
-        logger.info(f"[AI] 스캐너 스냅샷 없음 — {trade.get('symbol')} skip")
         return None
 
     # 메이저 컨텍스트 추가 (실패해도 진단은 진행)
@@ -151,6 +148,14 @@ async def generate_opinion(trade: dict, snapshot: dict) -> str | None:
         major_state = await fetch_latest_major_state()
     except Exception as e:
         logger.warning(f"[AI] 메이저 상태 조회 실패: {e}")
+
+    # snapshot도 없고 major_state도 없으면 진단 불가
+    if not snapshot and not major_state:
+        logger.warning(f"[AI] 데이터 전무 — {trade.get('symbol')} skip")
+        return None
+
+    if not snapshot:
+        logger.info(f"[AI] 스캐너 스냅샷 없음, 메이저만으로 진단 — {trade.get('symbol')}")
 
     try:
         prompt = _build_user_prompt(trade, snapshot, major_state)
