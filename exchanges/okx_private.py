@@ -128,10 +128,31 @@ async def _handle_position_msg(positions: list):
 
             # ── 청산 (pos_size == 0) ──
             if abs(pos_size) < 1e-12:
-                # 1차: OKX push에서 가격 추출
-                close_px = float(pos.get("markPx") or pos.get("last") or 0)
+                close_px = 0.0
 
-                # 2차 폴백: candle_data에서 최신 가격
+                # 1차: OKX REST ticker (가장 정확 — 거래소 직접 조회)
+                if inst_id:
+                    try:
+                        import aiohttp
+                        url = f"https://www.okx.com/api/v5/market/ticker?instId={inst_id}"
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                                data = await resp.json()
+                                if data.get("code") == "0" and data.get("data"):
+                                    rest_price = float(data["data"][0].get("last") or 0)
+                                    if rest_price > 0:
+                                        close_px = rest_price
+                                        logger.info(f"[OKX-Private] 청산가 (REST ticker): {inst_id} → {close_px}")
+                    except Exception as e:
+                        logger.warning(f"[OKX-Private] REST ticker 실패: {e}")
+
+                # 2차 폴백: OKX push의 markPx/last
+                if close_px <= 0:
+                    close_px = float(pos.get("markPx") or pos.get("last") or 0)
+                    if close_px > 0:
+                        logger.info(f"[OKX-Private] 청산가 (push): {inst_id} → {close_px}")
+
+                # 3차 폴백: candle_data 최신 가격
                 if close_px <= 0 and inst_id:
                     try:
                         from db.supabase import get_client
@@ -145,12 +166,12 @@ async def _handle_position_msg(positions: list):
                             .execute()
                         if res.data and res.data[0].get("price"):
                             close_px = float(res.data[0]["price"])
-                            logger.info(f"[OKX-Private] 청산가 폴백 (candle_data): {inst_id} → {close_px}")
+                            logger.info(f"[OKX-Private] 청산가 (candle_data): {inst_id} → {close_px}")
                     except Exception as e:
-                        logger.warning(f"[OKX-Private] 청산가 폴백 실패: {e}")
+                        logger.warning(f"[OKX-Private] candle_data 폴백 실패: {e}")
 
                 if close_px <= 0:
-                    logger.warning(f"[OKX-Private] 청산 가격 없음 (폴백도 실패) — pos_id={pos_id}, inst_id={inst_id}")
+                    logger.warning(f"[OKX-Private] 청산 가격 없음 (모든 경로 실패) — pos_id={pos_id}, inst_id={inst_id}")
                     continue
 
                 await _close_position_from_db(pos_id, close_px)
