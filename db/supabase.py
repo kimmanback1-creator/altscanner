@@ -361,18 +361,41 @@ async def fetch_latest_major_state() -> dict | None:
     """
     BTC/ETH/SOL의 최신 1시간봉 진단 데이터 조회
     AI에게 "지금 메이저 흐름"을 알려주는 컨텍스트
+
+    symbol 형식이 거래소마다 다를 수 있어 startswith 매칭 사용
+    (예: "BTCUSDT", "BTC-USDT-SWAP", "BTC-USDT" 모두 BTC로 매칭)
     """
     try:
+        # 최근 24시간 메이저 데이터 한 번에 조회 (3번 따로 안 함)
+        cutoff_ts = int(datetime.now(timezone.utc).timestamp()) - 86400
+        res = get_client().table("major_hourly")\
+            .select("symbol, ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg")\
+            .gte("ts", cutoff_ts)\
+            .order("ts", desc=True)\
+            .limit(500)\
+            .execute()
+
+        if not res.data:
+            return None
+
+        # symbol prefix별로 가장 최신 1건씩 추출
         result = {}
-        for symbol_short in ("BTCUSDT", "ETHUSDT", "SOLUSDT"):
-            res = get_client().table("major_hourly")\
-                .select("ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg")\
-                .eq("symbol", symbol_short)\
-                .order("ts", desc=True)\
-                .limit(1)\
-                .execute()
-            if res.data:
-                result[symbol_short.replace("USDT", "")] = res.data[0]
+        for r in res.data:
+            sym = (r.get("symbol") or "").upper()
+            for base in ("BTC", "ETH", "SOL"):
+                if sym.startswith(base) and base not in result:
+                    result[base] = {
+                        "ts":         r.get("ts"),
+                        "diagnosis":  r.get("diagnosis"),
+                        "cvd_pct":    r.get("cvd_pct"),
+                        "oi_pct":     r.get("oi_pct"),
+                        "vol_pct":    r.get("vol_pct"),
+                        "price_chg":  r.get("price_chg"),
+                    }
+                    break
+            if len(result) == 3:  # 셋 다 채워졌으면 종료
+                break
+
         return result if result else None
     except Exception as e:
         logger.error(f"[DB] major state 조회 실패: {e}")
