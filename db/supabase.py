@@ -245,35 +245,59 @@ async def insert_trade_open(payload: dict):
     }
     """
     try:
-        # 같은 외부 포지션 ID + 같은 방향으로 이미 open이면 skip (중복 INSERT 방지)
-        # direction이 다르면 옛 row는 청산 처리하고 새 진입으로 인정
+        # 같은 외부 포지션 ID 처리
+        # - direction이 다르면: 옛 row 강제 마무리 + 새 진입
+        # - direction 같지만 leverage/entry_price가 의미있게 다르면:
+        #   청산 push 누락 또는 추가 진입 → 옛 row 강제 마무리 + 새 진입
+        # - 모든 게 같으면: 진짜 중복 (heartbeat) → skip
         ext_id = payload.get("ext_pos_id")
         new_direction = payload.get("direction")
         if ext_id:
             res = get_client().table("trade_journal")\
-                .select("id, direction")\
+                .select("id, direction, leverage, entry_price")\
                 .eq("ext_pos_id", ext_id)\
                 .eq("status", "open")\
                 .limit(1)\
                 .execute()
             if res.data:
                 old_row = res.data[0]
-                if old_row["direction"] == new_direction:
-                    logger.info(f"[DB] trade_journal 중복 skip — ext_pos_id={ext_id}, direction={new_direction}")
+                same_direction = old_row["direction"] == new_direction
+
+                # 변화 감지
+                old_lev = float(old_row.get("leverage") or 1)
+                old_entry = float(old_row.get("entry_price") or 0)
+                new_lev = float(payload["leverage"])
+                new_entry = float(payload["entry_price"])
+                lev_changed = abs(old_lev - new_lev) >= 0.01
+                # entry_price 0.1% 이상 차이면 변경으로 판단
+                entry_changed = (
+                    old_entry > 0 and
+                    abs(new_entry - old_entry) / old_entry >= 0.001
+                )
+
+                if same_direction and not lev_changed and not entry_changed:
+                    # 진짜 중복 (heartbeat)
+                    logger.info(f"[DB] trade_journal heartbeat skip — ext_pos_id={ext_id}")
                     return old_row["id"]
+
+                # 그 외 모든 케이스: 옛 row 강제 마무리 후 새 진입
+                if not same_direction:
+                    reason = f"방향 전환 ({old_row['direction']}→{new_direction})"
+                elif lev_changed:
+                    reason = f"레버리지 변경 ({old_lev}×→{new_lev}×)"
                 else:
-                    # 방향 전환 — 옛 row를 'closed' 상태로 강제 마무리
-                    # (청산가는 새 진입가로 임시 사용 — 더 정확한 건 별도 보정 필요)
-                    logger.warning(f"[DB] 방향 전환 감지 — 옛 {old_row['direction']} row 강제 마무리, 새 {new_direction} 진입")
-                    get_client().table("trade_journal")\
-                        .update({
-                            "status": "closed",
-                            "closed_at": datetime.now(timezone.utc).isoformat(),
-                            "exit_price": payload["entry_price"],  # 임시 — 사용자가 수정 가능
-                        })\
-                        .eq("id", old_row["id"])\
-                        .execute()
-                    # 그 후 새 row INSERT 진행
+                    reason = f"진입가 변경 ({old_entry}→{new_entry})"
+
+                logger.warning(f"[DB] 옛 row 강제 마무리 — {reason} (ext_pos_id={ext_id})")
+                get_client().table("trade_journal")\
+                    .update({
+                        "status": "closed",
+                        "closed_at": datetime.now(timezone.utc).isoformat(),
+                        "exit_price": new_entry,  # 임시 — 사용자가 수정 가능
+                    })\
+                    .eq("id", old_row["id"])\
+                    .execute()
+                # 그 후 새 row INSERT 진행
 
         row = {
             "symbol":    payload["symbol"],
