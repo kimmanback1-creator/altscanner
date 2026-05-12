@@ -1711,6 +1711,40 @@ tr.both-agree .ticker-name {
             </div>
           </div>
         </div>
+
+        <div class="detail-section" id="wl-detail-section">
+          <div class="empty-detail" id="wl-empty-detail">티커를 클릭하면 상세 정보가 표시됩니다</div>
+          <div class="detail-info" id="wl-detail-info" style="display:none"></div>
+          <div class="charts-area" id="wl-charts-area" style="display:none">
+            <div class="chart-col">
+              <div class="chart-top">
+                <span class="chart-name" style="color:#5b9bd5">CVD</span>
+                <span class="chart-val" id="wl-cvd-val"></span>
+              </div>
+              <div class="spark-wrap">
+                <svg class="spark" id="wl-spark-cvd" viewBox="0 0 200 100" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="chart-top">
+                <span class="chart-name" style="color:#9b7fd5">OI</span>
+                <span class="chart-val" id="wl-oi-val"></span>
+              </div>
+              <div class="spark-wrap">
+                <svg class="spark" id="wl-spark-oi" viewBox="0 0 200 100" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+            <div class="chart-col">
+              <div class="chart-top">
+                <span class="chart-name" style="color:#d5a55b">거래량</span>
+                <span class="chart-val" id="wl-vol-val"></span>
+              </div>
+              <div class="spark-wrap">
+                <svg class="spark" id="wl-spark-vol" viewBox="0 0 200 100" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2041,7 +2075,14 @@ async function selectRow(exchange, symbol) {
   selKey = exchange+':'+symbol
   const r = allData.find(x=>x.exchange===exchange&&x.symbol===symbol)
   if(!r) return
-  render()
+
+  // 현재 활성 view → element ID prefix 결정
+  const isWl = document.getElementById('view-watchlist').style.display === 'flex'
+  const px = isWl ? 'wl-' : ''
+  const $ = id => document.getElementById(px + id)
+
+  // 행 강조 갱신
+  if (isWl) renderWatchlist(); else render()
 
   const cvdC = r.cvd_pct>=0?'#2ecc71':'#e74c3c'
   const oiC  = r.oi_pct>=0 ?'#2ecc71':'#e74c3c'
@@ -2050,11 +2091,11 @@ async function selectRow(exchange, symbol) {
   const dc   = diagClass(r.diagnosis||'')
   const score = Math.round((Math.abs(r.cvd_pct)+Math.abs(r.oi_pct)+r.vol_pct)/3)
 
-  document.getElementById('empty-detail').style.display = 'none'
-  document.getElementById('detail-info').style.display = 'flex'
-  document.getElementById('charts-area').style.display = 'flex'
+  $('empty-detail').style.display = 'none'
+  $('detail-info').style.display = 'flex'
+  $('charts-area').style.display = 'flex'
 
-  document.getElementById('detail-info').innerHTML = `
+  $('detail-info').innerHTML = `
     <div>
       <div class="detail-title">${symbol}</div>
       <div class="detail-sub">${exchange.toUpperCase()} · 15분봉</div>
@@ -2069,19 +2110,19 @@ async function selectRow(exchange, symbol) {
     <div class="diag-detail ${dc}">${r.diagnosis||'—'}</div>
   `
 
-  // CVD delta: 절대 거래량 (음수/양수 가능)
-  document.getElementById('cvd-val').textContent = fmtRaw(r.cvd_delta, true)
-  document.getElementById('cvd-val').style.color = (r.cvd_delta||0) >= 0 ? '#2ecc71' : '#e74c3c'
-  
-  // OI chg: % 단위 (음수/양수 가능)
-  document.getElementById('oi-val').textContent  = fmtPctSigned(r.oi_chg)
-  document.getElementById('oi-val').style.color  = (r.oi_chg||0) >= 0 ? '#2ecc71' : '#e74c3c'
-  
-  // Vol candle: 절대 거래량 (항상 양수)
-  document.getElementById('vol-val').textContent = fmtRaw(r.vol_candle, false)
-  document.getElementById('vol-val').style.color = '#d5a55b'
+  // CVD delta
+  $('cvd-val').textContent = fmtRaw(r.cvd_delta, true)
+  $('cvd-val').style.color = (r.cvd_delta||0) >= 0 ? '#2ecc71' : '#e74c3c'
 
-  // 히스토리 조회 (진단 입력과 동일한 raw 데이터)
+  // OI chg
+  $('oi-val').textContent = fmtPctSigned(r.oi_chg)
+  $('oi-val').style.color = (r.oi_chg||0) >= 0 ? '#2ecc71' : '#e74c3c'
+
+  // Vol candle
+  $('vol-val').textContent = fmtRaw(r.vol_candle, false)
+  $('vol-val').style.color = '#d5a55b'
+
+  // 히스토리 조회
   const { data: hist } = await sb
     .from('candle_data')
     .select('cvd_delta, oi_chg, vol_candle')
@@ -2091,13 +2132,13 @@ async function selectRow(exchange, symbol) {
     .limit(20)
 
   if(hist && hist.length > 0) {
-    drawSparkReal('spark-cvd', hist.map(h => h.cvd_delta||0),  cvdC)
-    drawSparkReal('spark-oi',  hist.map(h => h.oi_chg||0),     oiC)
-    drawSparkReal('spark-vol', hist.map(h => h.vol_candle||0), '#d5a55b')
+    drawSparkReal(px+'spark-cvd', hist.map(h => h.cvd_delta||0),  cvdC)
+    drawSparkReal(px+'spark-oi',  hist.map(h => h.oi_chg||0),     oiC)
+    drawSparkReal(px+'spark-vol', hist.map(h => h.vol_candle||0), '#d5a55b')
   } else {
-    drawSpark('spark-cvd', r.cvd_pct||0, cvdC)
-    drawSpark('spark-oi',  r.oi_pct||0,  oiC)
-    drawSpark('spark-vol', r.vol_pct||0, '#d5a55b')
+    drawSpark(px+'spark-cvd', r.cvd_pct||0, cvdC)
+    drawSpark(px+'spark-oi',  r.oi_pct||0,  oiC)
+    drawSpark(px+'spark-vol', r.vol_pct||0, '#d5a55b')
   }
 }
 
