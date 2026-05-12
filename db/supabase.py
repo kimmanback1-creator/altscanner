@@ -357,51 +357,6 @@ async def update_ai_opinion(trade_id: str, ai_opinion: str):
         logger.error(f"[DB] AI 의견 저장 실패: {e}")
 
 
-async def fetch_latest_major_state() -> dict | None:
-    """
-    BTC/ETH/SOL의 최신 1시간봉 진단 데이터 조회
-    AI에게 "지금 메이저 흐름"을 알려주는 컨텍스트
-
-    symbol 형식이 거래소마다 다를 수 있어 startswith 매칭 사용
-    (예: "BTCUSDT", "BTC-USDT-SWAP", "BTC-USDT" 모두 BTC로 매칭)
-    """
-    try:
-        # 최근 24시간 메이저 데이터 한 번에 조회 (3번 따로 안 함)
-        cutoff_ts = int(datetime.now(timezone.utc).timestamp()) - 86400
-        res = get_client().table("major_hourly")\
-            .select("symbol, ts, diagnosis, cvd_pct, oi_pct, vol_pct, price_chg")\
-            .gte("ts", cutoff_ts)\
-            .order("ts", desc=True)\
-            .limit(500)\
-            .execute()
-
-        if not res.data:
-            return None
-
-        # symbol prefix별로 가장 최신 1건씩 추출
-        result = {}
-        for r in res.data:
-            sym = (r.get("symbol") or "").upper()
-            for base in ("BTC", "ETH", "SOL"):
-                if sym.startswith(base) and base not in result:
-                    result[base] = {
-                        "ts":         r.get("ts"),
-                        "diagnosis":  r.get("diagnosis"),
-                        "cvd_pct":    r.get("cvd_pct"),
-                        "oi_pct":     r.get("oi_pct"),
-                        "vol_pct":    r.get("vol_pct"),
-                        "price_chg":  r.get("price_chg"),
-                    }
-                    break
-            if len(result) == 3:  # 셋 다 채워졌으면 종료
-                break
-
-        return result if result else None
-    except Exception as e:
-        logger.error(f"[DB] major state 조회 실패: {e}")
-        return None
-
-
 async def fetch_latest_scanner_state(exchange: str, symbol: str) -> dict | None:
     """
     백엔드용 스캐너 스냅샷 — 최근 15m + 4h candle 조회해서 JSON 반환
@@ -445,27 +400,6 @@ async def fetch_latest_scanner_state(exchange: str, symbol: str) -> dict | None:
         logger.error(f"[DB] scanner snapshot 조회 실패: {e}")
         return None
         
-# ── major_hourly ──────────────────────────
-async def insert_major_hourly(snap: dict, ts: int):
-    """BTC/ETH/SOL 1시간 데이터 저장 (진단 포함)"""
-    try:
-        get_client().table("major_hourly").insert({
-            "ts":         ts,
-            "ts_kst":     now_kst().isoformat(),
-            "exchange":   snap["exchange"],
-            "symbol":     snap["symbol"],
-            "cvd_delta":  snap["cvd_delta"],
-            "oi_chg":     snap["oi_chg"],
-            "vol_candle": snap["vol_candle"],
-            "price":      snap["price"],
-            "price_chg":  snap["price_chg"],
-            "diagnosis":  snap.get("diagnosis"),
-            "cvd_pct":    snap.get("cvd_pct"),
-            "oi_pct":     snap.get("oi_pct"),
-            "vol_pct":    snap.get("vol_pct"),
-        }).execute()
-    except Exception as e:
-        logger.error(f"[DB] major_hourly insert 실패 {snap['symbol']}: {e}")
 # ── user_watchlist ────────────────────────
 def fetch_watchlist(exchange: str) -> list[str]:
     """사용자 등록 워치리스트 — 거래소별 raw 심볼 리스트 반환 (동기)"""
@@ -479,11 +413,3 @@ def fetch_watchlist(exchange: str) -> list[str]:
         logger.error(f"[DB] fetch_watchlist({exchange}) 실패: {e}")
         return []
 
-
-async def cleanup_major_hourly_db():
-    """7일 지난 메이저 데이터 삭제"""
-    try:
-        get_client().rpc("cleanup_major_hourly").execute()
-        logger.info("[DB] major_hourly cleanup 완료")
-    except Exception as e:
-        logger.error(f"[DB] major_hourly cleanup 실패: {e}")
