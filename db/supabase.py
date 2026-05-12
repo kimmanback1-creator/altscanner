@@ -482,3 +482,8 @@ def fetch_watchlist(exchange: str) -> list[str]:
 
 async def cleanup_major_hourly_db():
     """7일 지난 메이저 데이터 삭제"""
+    try:
+        get_client().rpc("cleanup_major_hourly").execute()
+        logger.info("[DB] major_hourly cleanup 완료")
+    except Exception as e:
+        logger.error(f"[DB] major_hourly cleanup 실패: {e}")
