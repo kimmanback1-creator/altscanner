@@ -542,7 +542,7 @@ tr.both-agree .ticker-name {
   overflow: hidden;
   min-width: 0;
 }
-#view-dashboard, #view-major, #view-journal {
+#view-dashboard, #view-major, #view-journal, #view-watchlist {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -786,6 +786,65 @@ tr.both-agree .ticker-name {
 .major-summary-overall .ms-overall-label {
   color: #888;
   margin-right: 6px;
+}
+
+/* ── 워치리스트 ──────────────────── */
+.watchlist-head {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.watchlist-head h2 {
+  font-size: 13px;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+.watchlist-info {
+  font-size: 10px;
+  color: #666;
+}
+.watchlist-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.watchlist-empty {
+  padding: 80px;
+  text-align: center;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.watchlist-empty .hint {
+  color: #444;
+  font-size: 10px;
+  margin-top: 8px;
+  display: block;
+}
+.wl-delete-btn {
+  background: transparent;
+  border: 0.5px solid #2a2a2a;
+  color: #555;
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  line-height: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  font-family: monospace;
+}
+.wl-delete-btn:hover {
+  color: #e74c3c;
+  border-color: #4a2828;
+}
+.wl-no-data {
+  color: #555;
+  font-style: italic;
+  font-size: 10px;
 }
 
 /* ── 매매일지 ───────────────────── */
@@ -1405,6 +1464,10 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📋</span>
         <span class="sidebar-label">매매일지</span>
       </div>
+      <div class="sidebar-item" data-view="watchlist" onclick="switchView('watchlist')">
+        <span class="sidebar-icon">📌</span>
+        <span class="sidebar-label">Watchlist</span>
+      </div>
     </div>
   </div>
 
@@ -1592,6 +1655,62 @@ tr.both-agree .ticker-name {
       </div>
       <div class="journal-content" id="journal-content">
         <div class="journal-empty">데이터 로딩 중...</div>
+      </div>
+    </div>
+
+    <div id="view-watchlist" style="display:none">
+      <div class="watchlist-head">
+        <h2>📌 Watchlist</h2>
+        <span class="watchlist-info" id="watchlist-info">— 등록 0건</span>
+        <div class="watchlist-actions">
+          <button class="journal-btn primary" onclick="openWatchlistAddModal()">+ 티커 추가</button>
+        </div>
+      </div>
+      <div class="main-area">
+        <div class="watchlist-empty" id="watchlist-empty" style="display:none">
+          등록된 티커가 없습니다.
+          <span class="hint">우측 상단 [+ 티커 추가] 버튼으로 시작</span>
+        </div>
+        <div class="main-split" id="watchlist-split">
+          <div class="table-pane long-pane">
+            <div class="pane-header"><span class="pane-title">▲ LONG</span></div>
+            <div class="table-scroll">
+              <table>
+                <thead><tr>
+                  <th style="width:110px">티커</th>
+                  <th style="width:60px" class="c">24h%</th>
+                  <th style="width:82px" class="c">CVD</th>
+                  <th style="width:82px" class="c">OI</th>
+                  <th style="width:82px" class="c">거래량</th>
+                  <th style="width:48px" class="r">종합</th>
+                  <th>15M</th>
+                  <th>4H</th>
+                  <th style="width:32px" class="c"></th>
+                </tr></thead>
+                <tbody id="wl-long-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="table-pane short-pane">
+            <div class="pane-header"><span class="pane-title">▼ SHORT</span></div>
+            <div class="table-scroll">
+              <table>
+                <thead><tr>
+                  <th style="width:110px">티커</th>
+                  <th style="width:60px" class="c">24h%</th>
+                  <th style="width:82px" class="c">CVD</th>
+                  <th style="width:82px" class="c">OI</th>
+                  <th style="width:82px" class="c">거래량</th>
+                  <th style="width:48px" class="r">종합</th>
+                  <th>15M</th>
+                  <th>4H</th>
+                  <th style="width:32px" class="c"></th>
+                </tr></thead>
+                <tbody id="wl-short-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2022,7 +2141,7 @@ function setSort(side, val) {
 //  사이드 패널 / View 전환 (Phase 1)
 // ══════════════════════════════════════
 function switchView(view) {
-  const views = ['dashboard', 'major', 'journal']
+  const views = ['dashboard', 'major', 'journal', 'watchlist']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -2041,6 +2160,11 @@ function switchView(view) {
   // 매매일지 뷰 활성화 시 데이터 로드
   if (view === 'journal') {
     loadJournal()
+  }
+
+  // 워치리스트 뷰 활성화 시 데이터 로드
+  if (view === 'watchlist') {
+    loadWatchlist()
   }
 }
 
@@ -2363,6 +2487,153 @@ function renderMajorSummary(grouped, hours) {
     </div>
   `
 }
+
+// ══════════════════════════════════════
+//  Watchlist (관심 티커 관리)
+// ══════════════════════════════════════
+let watchlistData = []  // [{exchange, symbol}, ...]
+
+async function loadWatchlist() {
+  const { data, error } = await sb.from('user_watchlist')
+    .select('exchange, symbol, created_at')
+    .order('created_at', { ascending: true })
+  if (error) {
+    console.error('[watchlist] fetch failed:', error)
+    return
+  }
+  watchlistData = data || []
+  renderWatchlist()
+}
+
+function renderWatchlist() {
+  const info = document.getElementById('watchlist-info')
+  const emptyEl = document.getElementById('watchlist-empty')
+  const split = document.getElementById('watchlist-split')
+  const longBody = document.getElementById('wl-long-tbody')
+  const shortBody = document.getElementById('wl-short-tbody')
+
+  info.textContent = `— 등록 ${watchlistData.length}건`
+
+  if (watchlistData.length === 0) {
+    emptyEl.style.display = 'block'
+    split.style.display = 'none'
+    return
+  }
+  emptyEl.style.display = 'none'
+  split.style.display = 'grid'
+
+  // watchlist (exchange, symbol)에 매칭되는 allData row 찾기
+  const longs = [], shorts = []
+  for (const w of watchlistData) {
+    const r = allData.find(d => d.exchange === w.exchange && d.symbol === w.symbol)
+    if (!r) {
+      // 데이터 아직 안 쌓임 — placeholder
+      longs.push({ exchange: w.exchange, symbol: w.symbol, _noData: true })
+      continue
+    }
+    if ((r.cvd_pct || 0) >= 0) longs.push(r); else shorts.push(r)
+  }
+
+  longBody.innerHTML = longs.length
+    ? longs.map(r => makeWatchlistRow(r, 'long-sig')).join('')
+    : '<tr><td colspan="9" class="h-empty">LONG 없음</td></tr>'
+  shortBody.innerHTML = shorts.length
+    ? shorts.map(r => makeWatchlistRow(r, 'short-sig')).join('')
+    : '<tr><td colspan="9" class="h-empty">SHORT 없음</td></tr>'
+}
+
+function makeWatchlistRow(r, sigCls) {
+  // 백엔드가 아직 데이터를 안 쌓은 신규 등록
+  if (r._noData) {
+    return `<tr>
+      <td><span class="ticker-name">${r.symbol}</span>${exTag(r.exchange)}</td>
+      <td colspan="7" class="wl-no-data">데이터 수집 중 (다음 사이클 ~15분)</td>
+      <td class="c"><button class="wl-delete-btn" onclick="event.stopPropagation(); removeWatchlistEntry('${r.exchange}','${r.symbol}')" title="삭제">×</button></td>
+    </tr>`
+  }
+
+  const k = r.exchange + ':' + r.symbol
+  const sel = selKey === k ? 'selected' : ''
+  const dc = diagClass(r.diagnosis || '')
+
+  const cnt = (window._counts && window._counts[k]) || 0
+  const cntText = cnt > 0 ? ` <span style="color:#555;font-size:9px">${cnt}</span>` : ''
+  const age15m = fmtAge(r.ts)
+  const age15mText = age15m ? ` <span style="color:#666;font-size:9px">(${age15m})</span>` : ''
+
+  const diag4h = get4hDiag(r)
+  const dc4h = diag4h ? diagClass(diag4h) : ''
+  const bothAgree = isBothAgree(r) ? 'both-agree' : ''
+  const age4h = get4hAge(r)
+  const age4hText = age4h ? ` <span style="color:#666;font-size:9px">(${age4h})</span>` : ''
+  const diag4hCell = diag4h
+    ? `<span class="diag ${dc4h}">${diag4h}</span>${age4hText}`
+    : `<span class="diag-4h-empty">—</span>`
+
+  return `<tr class="${sigCls} sig ${sel} ${bothAgree}" onclick="selectRow('${r.exchange}','${r.symbol}')">
+    <td><span class="ticker-name">${r.symbol}</span>${cntText}${exTag(r.exchange)}</td>
+    <td class="c">${priceBar(r.price_chg_24h ?? r.price_chg ?? 0)}</td>
+    <td class="c">${dualBar(r.cvd_pct||0, 60)}</td>
+    <td class="c">${dualBar(r.oi_pct||0, 50)}</td>
+    <td class="c">${volBar(r.vol_pct||0, 70)}</td>
+    <td class="r">${scorePill(r)}</td>
+    <td><span class="diag ${dc}">${r.diagnosis||'—'}</span>${age15mText}</td>
+    <td>${diag4hCell}</td>
+    <td class="c"><button class="wl-delete-btn" onclick="event.stopPropagation(); removeWatchlistEntry('${r.exchange}','${r.symbol}')" title="삭제">×</button></td>
+  </tr>`
+}
+
+function openWatchlistAddModal() {
+  document.getElementById('wl-add-exchange').value = 'okx'
+  document.getElementById('wl-add-symbol').value = ''
+  document.getElementById('watchlist-add-modal-bg').classList.add('show')
+  setTimeout(() => document.getElementById('wl-add-symbol').focus(), 50)
+}
+
+function closeWatchlistAddModal() {
+  document.getElementById('watchlist-add-modal-bg').classList.remove('show')
+}
+
+async function addWatchlistEntry() {
+  const exchange = document.getElementById('wl-add-exchange').value
+  const rawSymbol = document.getElementById('wl-add-symbol').value.trim().toUpperCase()
+  if (!rawSymbol) {
+    alert('심볼 입력')
+    return
+  }
+  const symbol = normalizeSymbolForExchange(rawSymbol, exchange)
+
+  const { error } = await sb.from('user_watchlist').insert({ exchange, symbol })
+
+  if (error) {
+    if (error.code === '23505' || (error.message || '').includes('duplicate')) {
+      alert('이미 등록된 티커')
+    } else {
+      alert('저장 실패: ' + error.message)
+      console.error(error)
+    }
+    return
+  }
+
+  closeWatchlistAddModal()
+  await loadWatchlist()
+}
+
+async function removeWatchlistEntry(exchange, symbol) {
+  if (!confirm(`${symbol} (${exchange.toUpperCase()}) 워치리스트에서 삭제?`)) return
+
+  const { error } = await sb.from('user_watchlist')
+    .delete()
+    .eq('exchange', exchange)
+    .eq('symbol', symbol)
+
+  if (error) {
+    alert('삭제 실패: ' + error.message)
+    return
+  }
+  await loadWatchlist()
+}
+
 // ══════════════════════════════════════
 //  매매일지
 // ══════════════════════════════════════
@@ -4502,6 +4773,38 @@ init()
     </div>
   </div>
 </div>
+
+<!-- ── 워치리스트 추가 모달 ─────────── -->
+<div class="journal-modal-bg" id="watchlist-add-modal-bg">
+  <div class="journal-modal" style="width:380px">
+    <h3>
+      <span>📌 워치리스트에 티커 추가</span>
+      <button class="journal-modal-close" onclick="closeWatchlistAddModal()">✕</button>
+    </h3>
+    <div class="jm-row">
+      <span class="jm-label">거래소</span>
+      <select class="jm-select" id="wl-add-exchange">
+        <option value="okx">OKX</option>
+        <option value="binance">Binance</option>
+        <option value="bybit">Bybit</option>
+      </select>
+    </div>
+    <div class="jm-row">
+      <span class="jm-label">심볼</span>
+      <input type="text" class="jm-input" id="wl-add-symbol" placeholder="BTCUSDT">
+    </div>
+    <div style="font-size:10px;color:#666;margin:4px 0 0 90px;line-height:1.5">
+      "BTCUSDT" 형식으로 입력 — OKX는 자동으로 BTC-USDT-SWAP 변환<br>
+      등록 후 다음 사이클(~15분)부터 데이터 수집
+    </div>
+    <div class="jm-actions">
+      <button class="jm-cancel" onclick="closeWatchlistAddModal()">취소</button>
+      <button class="jm-save" onclick="addWatchlistEntry()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 다이아 시그널 오버레이 ─────────── -->
 
 <!-- ── 다이아 시그널 오버레이 ─────────── -->
 <div class="diamond-overlay" id="diamond-overlay">
