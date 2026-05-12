@@ -466,10 +466,19 @@ async def insert_major_hourly(snap: dict, ts: int):
         }).execute()
     except Exception as e:
         logger.error(f"[DB] major_hourly insert 실패 {snap['symbol']}: {e}")
+# ── user_watchlist ────────────────────────
+def fetch_watchlist(exchange: str) -> list[str]:
+    """사용자 등록 워치리스트 — 거래소별 raw 심볼 리스트 반환 (동기)"""
+    try:
+        res = get_client().table("user_watchlist") \
+            .select("symbol") \
+            .eq("exchange", exchange) \
+            .execute()
+        return [r["symbol"] for r in (res.data or [])]
+    except Exception as e:
+        logger.error(f"[DB] fetch_watchlist({exchange}) 실패: {e}")
+        return []
+
+
 async def cleanup_major_hourly_db():
     """7일 지난 메이저 데이터 삭제"""
-    try:
-        get_client().rpc("cleanup_major_hourly").execute()
-        logger.info("[DB] major_hourly cleanup 완료")
-    except Exception as e:
-        logger.error(f"[DB] major_hourly cleanup 실패: {e}")
