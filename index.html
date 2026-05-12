@@ -1825,6 +1825,11 @@ async function loadLatestCandles() {
   
   updateBadges()
   render()
+  // watchlist view가 활성화돼 있으면 매칭 다시 시도
+  const wlView = document.getElementById('view-watchlist')
+  if (wlView && wlView.style.display === 'flex') {
+    renderWatchlist()
+  }
 }
 
 function updateBadges() {
@@ -4035,12 +4040,12 @@ function drawMajorChart(svgId, byEx, key, hasZero) {
 }
 
 async function init() {
-  initSidebar()
   loadParams()
-  await loadLatestCandles()
+  await loadLatestCandles()   // ← 데이터 먼저 채우고
+  initSidebar()                // ← 그 다음에 view 복원 (watchlist면 이제 매칭 가능)
   subscribeRealtime()
   setInterval(loadLatestCandles, 15*60*1000)
-  setInterval(render, 5*60*1000)  // 1분마다 시간 표시 갱신
+  setInterval(render, 5*60*1000)
   document.addEventListener('paste', handleScreenshotPaste)
 }
 // ══════════════════════════════════════
