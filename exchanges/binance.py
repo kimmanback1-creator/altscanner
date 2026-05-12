@@ -50,6 +50,15 @@ async def fetch_top_symbols() -> list[str]:
             pass
 
     symbols = [t["symbol"] for t in top]
+
+    # 워치리스트 강제 포함 (TOP N 밖이어도)
+    from db.supabase import fetch_watchlist
+    watchlist = fetch_watchlist(EXCHANGE)
+    extra = [s for s in watchlist if s not in symbols]
+    if extra:
+        symbols.extend(extra)
+        logger.info(f"[Binance] 워치리스트 추가 {len(extra)}개: {extra}")
+
     logger.info(f"[Binance] 심볼 {len(symbols)}개 선정")
     return symbols
 
