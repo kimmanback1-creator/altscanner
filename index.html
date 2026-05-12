@@ -653,6 +653,69 @@ tr.both-agree .ticker-name {
   font-size: 12px;
 }
 
+/* ── 메이저: 시계열 진단 스트립 ───── */
+.major-timeline {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.major-timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #666;
+}
+.major-timeline-head .now { color: #888; }
+.major-timeline-strip {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  background: #0e0e0e;
+  border-radius: 2px;
+  overflow: hidden;
+  gap: 1px;
+}
+.major-timeline-cell {
+  flex: 1;
+  height: 100%;
+  cursor: help;
+  transition: filter 0.12s;
+  min-width: 2px;
+}
+.major-timeline-cell:hover { filter: brightness(1.6); }
+.mtc-empty       { background: #1a1a1a; }
+.mtc-healthy-up  { background: #2ecc71; }
+.mtc-squeeze     { background: #5b9bd5; }
+.mtc-div-bear    { background: #f0b90b; }
+.mtc-div-bull    { background: #9b7fd5; }
+.mtc-healthy-dn  { background: #e74c3c; }
+.mtc-exhaust     { background: #d5a55b; }
+.mtc-accum       { background: #5bd5c8; }
+.mtc-weak        { background: #333; }
+.major-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #0e0e0e;
+  border-radius: 3px;
+  font-size: 10px;
+}
+.major-legend-key {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #888;
+}
+.major-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 /* ── 매매일지 ───────────────────── */
 .journal-head {
   padding: 10px 18px;
@@ -2020,6 +2083,13 @@ function renderMajor() {
             <svg class="major-chart" id="major-chart-${base}-vol" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
           </div>
         </div>
+        <div class="major-timeline">
+          <div class="major-timeline-head">
+            <span>1시간 단위 진단 흐름 (${majorHours}h)</span>
+            <span class="now">▸ 현재</span>
+          </div>
+          <div class="major-timeline-strip" id="major-strip-${base}"></div>
+        </div>
       </div>
     `
   }
@@ -2039,7 +2109,69 @@ function renderMajor() {
     drawMajorChart(`major-chart-${base}-cvd`, byEx, 'cvd_delta',  true)
     drawMajorChart(`major-chart-${base}-oi`,  byEx, 'oi_chg',     true)
     drawMajorChart(`major-chart-${base}-vol`, byEx, 'vol_candle', false)
+    drawMajorStrip(`major-strip-${base}`, byEx)
   }
+
+  // 마지막 카드 뒤에 범례
+  wrap.insertAdjacentHTML('beforeend', renderMajorLegend())
+}
+
+// 진단명 → 셀 클래스
+function diagToStripClass(diag) {
+  if (!diag) return 'mtc-empty'
+  const cls = diagClass(diag)  // dg-xxx
+  return 'mtc-' + cls.replace('dg-', '')
+}
+
+// 1시간 단위 진단 스트립
+function drawMajorStrip(id, byEx) {
+  const el = document.getElementById(id)
+  if (!el) return
+
+  // OKX 우선, 없으면 bybit, binance 순
+  const priority = ['okx', 'bybit', 'binance']
+  let rows = []
+  for (const ex of priority) {
+    if (byEx[ex] && byEx[ex].length) { rows = byEx[ex]; break }
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div style="color:#444;font-size:10px;padding:2px 4px">데이터 없음</div>'
+    return
+  }
+
+  // ts 오름차순 (왼쪽=과거, 오른쪽=현재)
+  rows = [...rows].sort((a, b) => (a.ts || 0) - (b.ts || 0))
+
+  el.innerHTML = rows.map(r => {
+    const diag = r.diagnosis || ''
+    const cls = diagToStripClass(diag)
+    const t = new Date((r.ts || 0) * 1000)
+    const tStr = t.toLocaleString('ko-KR', {
+      month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    })
+    const label = diag || '진단 없음'
+    return `<div class="major-timeline-cell ${cls}" title="${tStr} · ${label}"></div>`
+  }).join('')
+}
+
+// 범례
+function renderMajorLegend() {
+  const items = [
+    ['mtc-healthy-up', '신규 롱 진입'],
+    ['mtc-squeeze',    '숏스퀴즈'],
+    ['mtc-accum',      '매집 가능성'],
+    ['mtc-div-bull',   '상승 다이버전스'],
+    ['mtc-healthy-dn', '신규 숏/투매'],
+    ['mtc-div-bear',   '하락 다이버전스'],
+    ['mtc-exhaust',    '매수 소진'],
+    ['mtc-weak',       '약신호/횡보'],
+    ['mtc-empty',      '데이터 없음'],
+  ]
+  const html = items.map(([cls, name]) =>
+    `<div class="major-legend-key"><span class="major-legend-swatch ${cls}"></span>${name}</div>`
+  ).join('')
+  return `<div class="major-timeline-legend">${html}</div>`
 }
 
 // ══════════════════════════════════════
