@@ -3118,6 +3118,11 @@ function drawRRWRChart(svgId, userRR, userWR) {
   const svg = document.getElementById(svgId)
   if (!svg) return
 
+  // userRR이 0 (손실 거래 0건 또는 수익 거래 0건) → 곡선만 그리고 안내
+  if (userRR === 0 || !isFinite(userRR)) {
+    // 그냥 곡선만 그리고 안내 메시지
+  }
+
   const W = 800, H = 320
   const PAD_L = 60, PAD_R = 30, PAD_T = 30, PAD_B = 40
   const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
@@ -3176,15 +3181,22 @@ function drawRRWRChart(svgId, userRR, userWR) {
   html += `<text x="${xScale(3)}" y="${yScale(80)}" fill="#2ecc71" font-size="11" font-weight="500" opacity="0.6">수익권</text>`
   html += `<text x="${xScale(0.7)}" y="${yScale(20)}" fill="#e74c3c" font-size="11" font-weight="500" opacity="0.6">손실권</text>`
 
-  // 사용자 위치 점
-  if (userRR > 0 && userRR >= minRR && userRR <= maxRR && !isNaN(userWR)) {
-    const x = xScale(Math.min(maxRR, Math.max(minRR, userRR)))
-    const y = yScale(Math.min(maxWR, Math.max(minWR, userWR)))
+  // 사용자 위치 점 (범위 밖이면 가장자리에 클램핑)
+  if (userRR > 0 && !isNaN(userWR) && isFinite(userRR)) {
+    const clampedRR = Math.min(maxRR, Math.max(minRR, userRR))
+    const clampedWR = Math.min(maxWR, Math.max(minWR, userWR))
+    const x = xScale(clampedRR)
+    const y = yScale(clampedWR)
+    const outOfRange = userRR < minRR || userRR > maxRR
     
     // 손익분기선 위/아래 판정
     const breakEvenWR = (1 / (1 + userRR)) * 100
     const isProfit = userWR > breakEvenWR
     const dotColor = isProfit ? '#2ecc71' : '#e74c3c'
+    
+    if (outOfRange) {
+      html += `<text x="${x.toFixed(1)}" y="${(y - 22).toFixed(1)}" fill="#f0b90b" font-size="9" text-anchor="middle">⚠ RR ${userRR.toFixed(2)} (범위밖)</text>`
+    }
     
     // 십자선 (얇게)
     html += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${y}" stroke="${dotColor}" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.5"/>`
