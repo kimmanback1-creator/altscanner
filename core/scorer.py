@@ -62,10 +62,13 @@ def diagnose_4h(price_t: str, oi_t: str, cvd_t: str) -> str | None:
 
     return None
 
-def calc_score(snap: dict) -> dict | None:
+def calc_score(snap: dict, force: bool = False) -> dict | None:
     """
     스냅샷 → 추세 분석 → 진단
     추세 판정 불가(flat) 시 None
+    
+    force=True: watchlist 심볼용 — 분석 결과 무관하게 항상 dict 반환
+                (diagnosis가 None이면 "횡보"로 채움)
     """
     cvd_h   = snap["cvd_history"]
     oi_h    = snap["oi_history"]
@@ -74,9 +77,10 @@ def calc_score(snap: dict) -> dict | None:
 
     # 워밍업 체크 (현재는 항상 True 반환하도록 수정해놨음)
     if not is_warmed_up(vol_h, oi_h, cvd_h):
-        return None
+        if not force:
+            return None
 
-    # 거래 없으면 스킵
+    # 거래 없으면 스킵 (force라도 거래 0이면 의미 없음)
     if snap["vol_candle"] == 0:
         return None
 
@@ -88,7 +92,9 @@ def calc_score(snap: dict) -> dict | None:
     # ── 진단 (flat 끼면 None) ──
     diagnosis = diagnose_15m(price_t, oi_t, cvd_t)
     if diagnosis is None:
-        return None  # 횡보 또는 데이터 부족
+        if not force:
+            return None  # 횡보 또는 데이터 부족
+        diagnosis = "횡보"  # watchlist는 그래도 채워서 반환
 
     # ── 백분위 (참고용으로 유지, 알림 조건엔 사용) ──
     cvd_pct = cvd_percentile(cvd_h)
@@ -114,11 +120,13 @@ def calc_score(snap: dict) -> dict | None:
         "oi_trend":    oi_t,
     }
 
-def calc_score_4h(snap: dict) -> dict | None:
+def calc_score_4h(snap: dict, force: bool = False) -> dict | None:
     """
     4시간봉 스냅샷 → 추세 분석 → 진단
     - 15분과 같은 알고리즘
     - 진단 함수만 diagnose_4h (8가지 모두 사용)
+    
+    force=True: watchlist 심볼용
     """
     cvd_h   = snap["cvd_history"]
     oi_h    = snap["oi_history"]
@@ -127,7 +135,8 @@ def calc_score_4h(snap: dict) -> dict | None:
 
     # 워밍업 체크 (현재는 항상 True)
     if not is_warmed_up(vol_h, oi_h, cvd_h):
-        return None
+        if not force:
+            return None
 
     # 거래 없으면 스킵
     if snap["vol_candle"] == 0:
@@ -141,7 +150,9 @@ def calc_score_4h(snap: dict) -> dict | None:
     # ── 진단 (4H 전용 — 8개 모두 사용) ──
     diagnosis = diagnose_4h(price_t, oi_t, cvd_t)
     if diagnosis is None:
-        return None
+        if not force:
+            return None
+        diagnosis = "횡보"
 
     # ── 백분위 (참고용) ──
     cvd_pct = cvd_percentile(cvd_h)
