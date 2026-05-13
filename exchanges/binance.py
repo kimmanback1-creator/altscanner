@@ -102,10 +102,12 @@ async def oi_poller(symbols_ref: list):
 
 
 async def trades_ws_chunk(symbols: list, chunk_id: int):
-    """심볼 청크 단위 WS 연결"""
+    """심볼 청크 단위 WS 연결 + stale timeout (60초 무응답 시 재연결)"""
     streams = "/".join([f"{s.lower()}@aggTrade" for s in symbols])
     url = f"{BINANCE['ws']}{streams}"
     logger.info(f"[Binance] WS청크{chunk_id} 연결 중... ({len(symbols)}개)")
+
+    STALE_TIMEOUT = 60  # 60초 무응답이면 강제 재연결
 
     while True:
         try:
@@ -117,7 +119,14 @@ async def trades_ws_chunk(symbols: list, chunk_id: int):
             ) as ws:
                 logger.info(f"[Binance] WS청크{chunk_id} 연결 완료")
                 msg_count = 0
-                async for raw in ws:
+                while True:
+                    try:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=STALE_TIMEOUT)
+                    except asyncio.TimeoutError:
+                        logger.warning(f"[Binance] WS청크{chunk_id} {STALE_TIMEOUT}초 무응답 — 강제 재연결")
+                        await ws.close()
+                        break  # while True 빠져나가 outer except로 → 재연결
+                    
                     msg_count += 1
                     if msg_count <= 3:
                         logger.info(f"[Binance] 청크{chunk_id} RAW: {str(raw)[:150]}")
