@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from config import CANDLE_MIN, CLEANUP_HOUR
 import core.state as state
 from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
-from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations
+from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations, fetch_watchlist
 from notify.telegram import send_message
 from exchanges import binance as ex_binance, okx as ex_okx, bybit as ex_bybit
 
@@ -81,9 +81,12 @@ async def candle_loop():
         for exchange in EXCHANGES:
             symbols = state.get_all_symbols(exchange)
             logger.info(f"[캔들] {exchange} 심볼 수: {len(symbols)}")
+            # watchlist 심볼은 force=True (분석 통과 못해도 DB 저장)
+            watchlist_set = set(fetch_watchlist(exchange))
             for symbol in symbols:
                 snap = state.snapshot_and_reset(exchange, symbol)
-                result = calc_score(snap)
+                is_watch = symbol in watchlist_set
+                result = calc_score(snap, force=is_watch)
                 if result is None:
                     continue
                 result["timeframe"] = "15m"
@@ -93,7 +96,6 @@ async def candle_loop():
                 await insert_candle(result, ts)
 
         logger.info(f"[캔들] 15분 분석 완료 — {len(results)}개 심볼")
-
         # ── 4시간 분석 (4H 마감 시점만) ──
         is_4h = _is_4h_close()
         results_4h = []
@@ -102,9 +104,11 @@ async def candle_loop():
             logger.info(f"[캔들] ★ 4시간봉 마감 — KST {now_kst}")
             for exchange in EXCHANGES:
                 symbols = state.get_all_symbols(exchange)
+                watchlist_set = set(fetch_watchlist(exchange))
                 for symbol in symbols:
                     snap_4h = state.snapshot_and_reset_4h(exchange, symbol)
-                    result_4h = calc_score_4h(snap_4h)
+                    is_watch = symbol in watchlist_set
+                    result_4h = calc_score_4h(snap_4h, force=is_watch)
                     if result_4h is None:
                         continue
                     results_4h.append(result_4h)
