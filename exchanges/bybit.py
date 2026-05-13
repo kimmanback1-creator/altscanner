@@ -80,13 +80,14 @@ async def oi_poller(symbols_ref: list):
             await asyncio.sleep(OI_POLL_SEC)
 
 
-async def trades_ws(symbols_ref: list):
+async def trades_ws(symbols_ref: list, ws_holder: dict):
     while True:
         try:
             args = [f"publicTrade.{s}" for s in symbols_ref]
             logger.info(f"[Bybit] WS 연결 중... ({len(symbols_ref)}개)")
 
             async with websockets.connect(BYBIT["ws"], ping_interval=20) as ws:
+                ws_holder["trades"] = ws  # refresher가 종료 가능하도록 보관
                 await ws.send(json.dumps({
                     "op": "subscribe",
                     "args": args
@@ -112,6 +113,7 @@ async def trades_ws(symbols_ref: list):
 
         except Exception as e:
             logger.error(f"[Bybit] WS 끊김: {e} — 5초 후 재연결")
+            ws_holder["trades"] = None
             await asyncio.sleep(5)
 
 async def liquidations_ws(symbols_ref: list):
@@ -167,14 +169,23 @@ async def liquidations_ws(symbols_ref: list):
             logger.error(f"[Bybit] 청산 WS 끊김: {e} — 5초 후 재연결")
             await asyncio.sleep(5)
 
-async def symbol_refresher(symbols_ref: list):
+async def symbol_refresher(symbols_ref: list, ws_holder: dict):
     while True:
         await asyncio.sleep(SYMBOL_REFRESH_MIN * 60)
         try:
             new_symbols = await fetch_top_symbols()
+            old_set = set(symbols_ref)
+            new_set = set(new_symbols)
             symbols_ref.clear()
             symbols_ref.extend(new_symbols)
-            logger.info(f"[Bybit] 심볼 갱신 완료: {len(new_symbols)}개")
+            if old_set != new_set:
+                added = new_set - old_set
+                removed = old_set - new_set
+                logger.info(f"[Bybit] 심볼 변화 — 추가:{len(added)} 제거:{len(removed)} → WS 재연결 트리거")
+                if ws_holder.get("trades"):
+                    await ws_holder["trades"].close()
+            else:
+                logger.info(f"[Bybit] 심볼 갱신 완료: {len(new_symbols)}개 (변화 없음)")
         except Exception as e:
             logger.error(f"[Bybit] 심볼 갱신 실패: {e}")
 
@@ -182,9 +193,10 @@ async def symbol_refresher(symbols_ref: list):
 async def run():
     symbols = await fetch_top_symbols()
     symbols_ref = list(symbols)
+    ws_holder = {"trades": None}  # WS 객체 공유 (refresher가 강제 종료용)
     await asyncio.gather(
-        trades_ws(symbols_ref),
+        trades_ws(symbols_ref, ws_holder),
         oi_poller(symbols_ref),
         liquidations_ws(symbols_ref),
-        symbol_refresher(symbols_ref),
+        symbol_refresher(symbols_ref, ws_holder),
     )
