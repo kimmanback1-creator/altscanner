@@ -121,7 +121,7 @@ async def trades_ws_chunk(symbols: list, chunk_id: int):
                 max_size=10 * 1024 * 1024,
             ) as ws:
                 connect_elapsed = _time.time() - connect_start
-                logger.info(f"[Binance] WS청크{chunk_id} 연결 완료 ({connect_elapsed:.2f}초)")
+                logger.debug(f"[Binance] WS청크{chunk_id} 연결 완료 ({connect_elapsed:.2f}초)")
                 msg_count = 0
                 last_msg_time = _time.time()
                 heartbeat_count = 0  # 핸드셰이크/keepalive 메시지
@@ -130,8 +130,8 @@ async def trades_ws_chunk(symbols: list, chunk_id: int):
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=STALE_TIMEOUT)
                     except asyncio.TimeoutError:
-                        elapsed = _time.time() - last_msg_time
-                        logger.warning(f"[Binance] WS청크{chunk_id} {STALE_TIMEOUT}초 무응답 (총 msg={msg_count}, trade={trade_count}, 마지막 메시지 {elapsed:.0f}초 전) — 강제 재연결")
+                        # Binance Singapore IP throttle로 인한 silent drop — 디버그 로그만
+                        logger.debug(f"[Binance] WS청크{chunk_id} {STALE_TIMEOUT}초 무응답 — 재연결")
                         await ws.close()
                         break
                     
