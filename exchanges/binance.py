@@ -102,14 +102,17 @@ async def oi_poller(symbols_ref: list):
 
 
 async def trades_ws_chunk(symbols: list, chunk_id: int):
-    """심볼 청크 단위 WS 연결 + stale timeout (60초 무응답 시 재연결)"""
+    """심볼 청크 단위 WS 연결 + stale timeout + 진단 로그"""
+    import time as _time
     streams = "/".join([f"{s.lower()}@aggTrade" for s in symbols])
     url = f"{BINANCE['ws']}{streams}"
-    logger.info(f"[Binance] WS청크{chunk_id} 연결 중... ({len(symbols)}개)")
+    logger.info(f"[Binance] WS청크{chunk_id} 연결 중... ({len(symbols)}개) URL앞80자={url[:80]}")
+    logger.info(f"[Binance] 청크{chunk_id} 심볼샘플: {symbols[:3]}")
 
     STALE_TIMEOUT = 60  # 60초 무응답이면 강제 재연결
 
     while True:
+        connect_start = _time.time()
         try:
             async with websockets.connect(
                 url,
@@ -117,43 +120,58 @@ async def trades_ws_chunk(symbols: list, chunk_id: int):
                 close_timeout=10,
                 max_size=10 * 1024 * 1024,
             ) as ws:
-                logger.info(f"[Binance] WS청크{chunk_id} 연결 완료")
+                connect_elapsed = _time.time() - connect_start
+                logger.info(f"[Binance] WS청크{chunk_id} 연결 완료 ({connect_elapsed:.2f}초)")
                 msg_count = 0
+                last_msg_time = _time.time()
+                heartbeat_count = 0  # 핸드셰이크/keepalive 메시지
+                trade_count = 0      # 실제 trade 메시지
                 while True:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=STALE_TIMEOUT)
                     except asyncio.TimeoutError:
-                        logger.warning(f"[Binance] WS청크{chunk_id} {STALE_TIMEOUT}초 무응답 — 강제 재연결")
+                        elapsed = _time.time() - last_msg_time
+                        logger.warning(f"[Binance] WS청크{chunk_id} {STALE_TIMEOUT}초 무응답 (총 msg={msg_count}, trade={trade_count}, 마지막 메시지 {elapsed:.0f}초 전) — 강제 재연결")
                         await ws.close()
-                        break  # while True 빠져나가 outer except로 → 재연결
+                        break
                     
+                    last_msg_time = _time.time()
                     msg_count += 1
-                    if msg_count <= 3:
-                        logger.info(f"[Binance] 청크{chunk_id} RAW: {str(raw)[:150]}")
+                    if msg_count <= 5:
+                        logger.info(f"[Binance] 청크{chunk_id} RAW #{msg_count} ({len(raw)}B): {str(raw)[:200]}")
+                    
                     try:
                         msg  = json.loads(raw)
                         data = msg.get("data", msg)
+                        if "s" not in data:
+                            heartbeat_count += 1
+                            if heartbeat_count <= 3:
+                                logger.info(f"[Binance] 청크{chunk_id} non-trade msg: {str(msg)[:150]}")
+                            continue
                         symbol = data["s"]
                         price  = float(data["p"])
                         qty    = float(data["q"])
                         is_buy = not data["m"]
                         state.update_trade(EXCHANGE, symbol, price, qty, is_buy)
+                        trade_count += 1
+                        if trade_count == 1:
+                            logger.info(f"[Binance] ✅ 청크{chunk_id} 첫 trade 수신: {symbol} {price} {qty}")
                     except Exception as e:
-                        logger.error(f"[Binance] 청크{chunk_id} 파싱 오류: {e}")
+                        logger.error(f"[Binance] 청크{chunk_id} 파싱 오류: {e} raw={str(raw)[:200]}")
 
         except Exception as e:
-            logger.error(f"[Binance] WS청크{chunk_id} 끊김: {e} — 5초 후 재연결")
+            logger.error(f"[Binance] WS청크{chunk_id} 끊김: {type(e).__name__}: {e} — 5초 후 재연결")
             await asyncio.sleep(5)
 
 
 async def trades_ws(symbols_ref: list):
-    """심볼을 50개씩 나눠서 병렬 WS 연결"""
-    chunk_size = 50
+    """심볼을 10개씩 나눠서 병렬 WS 연결 (Binance throttle 회피용)"""
+    chunk_size = 10
     chunks = [
         symbols_ref[i:i+chunk_size]
         for i in range(0, len(symbols_ref), chunk_size)
     ]
-    logger.info(f"[Binance] 총 {len(chunks)}개 청크로 WS 연결")
+    logger.info(f"[Binance] 총 {len(chunks)}개 청크로 WS 연결 (chunk_size={chunk_size})")
     await asyncio.gather(*[
         trades_ws_chunk(chunk, i)
         for i, chunk in enumerate(chunks)
