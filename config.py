@@ -40,7 +40,7 @@ CLEANUP_HOUR   = 1        # 롤링 딜리트 주기 (시간)
 # ── 심볼 선정 ─────────────────────────────
 TOP_N_SYMBOLS      = 100           # 거래소별 상위 N개
 MIN_QUOTE_VOL      = 10_000_000    # 최소 24시간 거래량 ($10M)
-SYMBOL_REFRESH_MIN = 60            # 심볼 리스트 갱신 주기 (분)
+SYMBOL_REFRESH_MIN = 15            # 심볼 리스트 갱신 주기 (분)
 
 # ── 텔레그램 알림 조건 ────────────────────
 # 하루 1번 제한은 Python 메모리 + signal_log DB 병행
