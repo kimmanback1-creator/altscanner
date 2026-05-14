@@ -1201,7 +1201,7 @@ tr.both-agree .ticker-name {
     <button class="btn-history" id="btn-history" onclick="toggleHistory()">📋 히스토리</button>
     <button class="btn-history" id="btn-liqmap" onclick="toggleLiqMap()">💥 청산 맵</button>
     <button class="btn-history" id="btn-diamond" onclick="toggleDiamond()">🔷 다이아</button>
-    <span class="badge on" id="badge-bnc">BNC —</span>
+   
     <span class="badge on" id="badge-okx">OKX —</span>
     <span class="badge on" id="badge-byb">BYB —</span>
     <span class="badge">15분봉</span>
@@ -1573,7 +1573,6 @@ async function loadLatestCandles() {
 }
 
 function updateBadges() {
-  document.getElementById('badge-bnc').textContent = `BNC ${allData.filter(r=>r.exchange==='binance').length}`
   document.getElementById('badge-okx').textContent = `OKX ${allData.filter(r=>r.exchange==='okx').length}`
   document.getElementById('badge-byb').textContent = `BYB ${allData.filter(r=>r.exchange==='bybit').length}`
   document.getElementById('last-update').textContent = '업데이트: '+new Date().toLocaleTimeString('ko-KR')
