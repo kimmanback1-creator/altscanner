@@ -6,8 +6,8 @@
 import asyncio
 import logging
 import uvicorn
-
-import exchanges.binance as binance
+# Binance는 Render Singapore IP throttle로 인해 비활성화
+# import exchanges.binance as binance
 import exchanges.okx     as okx
 import exchanges.bybit   as bybit
 import exchanges.okx_private as okx_private
@@ -39,7 +39,7 @@ async def run_webhook():
 async def main():
     logger.info("=" * 50)
     logger.info("  ALTSCANNER 시작")
-    logger.info("  거래소: Binance / OKX / Bybit")
+    logger.info("  거래소: OKX / Bybit (Binance 비활성화)")
     logger.info("  기준: CVD + OI + 거래량 (15분봉)")
     logger.info("=" * 50)
 
@@ -47,7 +47,6 @@ async def main():
     await preload_history()
 
     await asyncio.gather(
-        binance.run(),       # Binance WS + OI
         okx.run(),           # OKX WS + OI
         bybit.run(),         # Bybit WS + OI
         okx_private.run(),   # OKX private WS — 자동 매매 기록
