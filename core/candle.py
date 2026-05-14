@@ -13,12 +13,12 @@ import core.state as state
 from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
 from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations, fetch_watchlist
 from notify.telegram import send_message
-from exchanges import binance as ex_binance, okx as ex_okx, bybit as ex_bybit
+from exchanges import okx as ex_okx, bybit as ex_bybit  # binance 제외
 
 logger = logging.getLogger(__name__)
 
 KST = timezone(timedelta(hours=9))
-EXCHANGES = ["binance", "okx", "bybit"]
+EXCHANGES = ["okx", "bybit"]  # Binance는 Render Singapore IP throttle로 제외
 
 # 기본 임계값 (페이지 슬라이더로 변경 가능 → 추후 Supabase config 테이블로 연동)
 LONG_PARAMS  = {"cvd": 60.0, "oi": 50.0, "vol": 70.0}
@@ -65,10 +65,9 @@ async def candle_loop():
         now_kst = datetime.now(KST).strftime("%H:%M")
         logger.info(f"[캔들] {CANDLE_MIN}분봉 마감 — KST {now_kst}")
 
-        # ── 24h 변화율 갱신 (3거래소 병렬, 분석 전에) ──
+        # ── 24h 변화율 갱신 (OKX/Bybit 병렬, 분석 전에) ──
         try:
             await asyncio.gather(
-                ex_binance.fetch_24h_only(),
                 ex_okx.fetch_24h_only(),
                 ex_bybit.fetch_24h_only(),
             )
