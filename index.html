@@ -615,6 +615,12 @@ tr.sig .ex-byb { color: #f7a600; }
   height: 200px;
   display: block;
 }
+.index-dia {
+  width: 100%;
+  height: 22px;
+  display: block;
+  margin-top: 2px;
+}
 .index-band {
   width: 100%;
   height: 28px;
@@ -2165,12 +2171,15 @@ const idxState = {
 
 // 인덱스별 원본 데이터 캐시 — { TOTAL: { '1H': [...rows], '4H': [...], '1D': [...] } }
 let idxRawData = {}
+// 다이아 이력 캐시 — { TOTAL: [{timeframe, direction, received_at}, ...], ... }
+let idxDiamonds = {}
 
 async function loadIndexView() {
   const body = document.getElementById('index-body')
   body.innerHTML = '<div class="index-loading">데이터 로딩 중...</div>'
 
   idxRawData = {}
+  idxDiamonds = {}
   try {
     for (const sym of IDX_SYMBOLS) {
       idxRawData[sym] = {}
@@ -2185,6 +2194,14 @@ async function loadIndexView() {
         if (error) throw error
         idxRawData[sym][tf] = (data || []).reverse()  // 오름차순
       }
+      // 다이아 이력 (활성/만료 무관, 발생 시점 기준 — 최근 200개)
+      const { data: dia } = await sb
+        .from('diamond_signals')
+        .select('timeframe, direction, received_at')
+        .eq('symbol', sym)
+        .order('received_at', { ascending: false })
+        .limit(200)
+      idxDiamonds[sym] = dia || []
     }
   } catch (e) {
     console.error('[index] 데이터 조회 실패:', e)
@@ -2287,6 +2304,7 @@ function renderIndexBlock(sym) {
       </div>
       <div class="index-chart-wrap">
         <svg class="index-chart" id="idx-chart-${sym}" viewBox="0 0 900 200" preserveAspectRatio="none"></svg>
+        <svg class="index-dia" id="idx-dia-band-${sym}" viewBox="0 0 900 22" preserveAspectRatio="none"></svg>
         <svg class="index-band" id="idx-band-${sym}" viewBox="0 0 900 28" preserveAspectRatio="none"></svg>
       </div>
       <div class="index-diag" id="idx-diag-${sym}">
@@ -2382,23 +2400,54 @@ function drawIndexChart(sym) {
   svg.innerHTML = html
 
   // ── score 띠 (봉마다 색칸 + 값) ──
-  if (!st.show.score) { band.innerHTML = ''; return }
-
-  // score 색: 50↑ 라임 / 45↓ 분홍 / 사이 회색
-  const scoreColor = v => v >= 50 ? '#2ecc71' : v <= 45 ? '#e84393' : '#666'
-  const BW = 900, BH = 28
-  const cellW = (BW - PAD_L - PAD_R) / n
-  let bhtml = `<text x="${PAD_L - 6}" y="${BH/2 + 3}" fill="#888" font-size="9" text-anchor="end">score</text>`
-  for (let i = 0; i < n; i++) {
-    const v = Number(rows[i].score)
-    const x = PAD_L + i * cellW
-    bhtml += `<rect x="${x.toFixed(1)}" y="2" width="${(cellW + 0.5).toFixed(1)}" height="${BH - 4}" fill="${scoreColor(v)}" fill-opacity="0.75"/>`
-    // 칸이 너무 좁으면 숫자 생략
-    if (cellW >= 22) {
-      bhtml += `<text x="${(x + cellW/2).toFixed(1)}" y="${BH/2 + 3}" fill="#0e0e0e" font-size="9" font-weight="600" text-anchor="middle">${v.toFixed(0)}</text>`
+  if (st.show.score) {
+    // score 색: 50↑ 라임 / 45↓ 분홍 / 사이 회색
+    const scoreColor = v => v >= 50 ? '#2ecc71' : v <= 45 ? '#e84393' : '#666'
+    const BW = 900, BH = 28
+    const cellW = (BW - PAD_L - PAD_R) / n
+    let bhtml = `<text x="${PAD_L - 6}" y="${BH/2 + 3}" fill="#888" font-size="9" text-anchor="end">score</text>`
+    for (let i = 0; i < n; i++) {
+      const v = Number(rows[i].score)
+      const x = PAD_L + i * cellW
+      bhtml += `<rect x="${x.toFixed(1)}" y="2" width="${(cellW + 0.5).toFixed(1)}" height="${BH - 4}" fill="${scoreColor(v)}" fill-opacity="0.75"/>`
+      if (cellW >= 22) {
+        bhtml += `<text x="${(x + cellW/2).toFixed(1)}" y="${BH/2 + 3}" fill="#0e0e0e" font-size="9" font-weight="600" text-anchor="middle">${v.toFixed(0)}</text>`
+      }
     }
+    band.innerHTML = bhtml
+  } else {
+    band.innerHTML = ''
   }
-  band.innerHTML = bhtml
+
+  // ── 다이아 ◆ (차트 TF와 같은 TF의 다이아만, 시간축 매칭) ──
+  const diaBand = document.getElementById('idx-dia-band-' + sym)
+  if (diaBand) {
+    const DW = 900, DH = 22
+    const t0 = new Date(rows[0].ts).getTime()
+    const t1 = new Date(rows[n-1].ts).getTime()
+    const tRange = t1 - t0 || 1
+    const tToX = t => PAD_L + ((t - t0) / tRange) * (DW - PAD_L - PAD_R)
+
+    // 라벨 — 작은 ◆ 아이콘
+    const lx = PAD_L / 2, ly = DH / 2
+    let dhtml = `<rect x="${(lx-4).toFixed(1)}" y="${(ly-4).toFixed(1)}" width="8" height="8" fill="none" stroke="#888" stroke-width="1" transform="rotate(45 ${lx} ${ly})"/>`
+
+    const dias = (idxDiamonds[sym] || []).filter(d => d.timeframe === st.tf)
+    let drawn = 0
+    for (const d of dias) {
+      const t = new Date(d.received_at).getTime()
+      if (t < t0 || t > t1) continue   // 차트 시간 범위 밖
+      const x = tToX(t)
+      const isUp = d.direction === 'up'
+      const col = isUp ? '#2ecc71' : '#e84393'
+      dhtml += `<rect x="${(x-5).toFixed(1)}" y="${(DH/2-5).toFixed(1)}" width="10" height="10" fill="${col}" transform="rotate(45 ${x.toFixed(1)} ${DH/2})"/>`
+      drawn++
+    }
+    if (drawn === 0) {
+      dhtml += `<text x="${(PAD_L + 8).toFixed(1)}" y="${DH/2 + 3}" fill="#3a3a3a" font-size="9" text-anchor="start">${st.tf} 다이아 없음</text>`
+    }
+    diaBand.innerHTML = dhtml
+  }
 }
 
 // ══════════════════════════════════════
