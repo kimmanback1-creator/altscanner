@@ -445,6 +445,210 @@ tr.sig .ex-byb { color: #f7a600; }
   font-size: 12px;
 }
 
+/* ── 인덱스 매크로 뷰 ───────────────── */
+.index-head {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.index-head h2 { font-size: 13px; color: #e0e0e0; font-weight: 500; }
+.index-info { font-size: 10px; color: #666; }
+.index-actions { display: flex; gap: 6px; margin-left: auto; }
+.index-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+.index-loading, .index-empty {
+  padding: 60px; text-align: center; color: #555; font-size: 12px;
+}
+
+/* 9셀 매트릭스 */
+.index-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-bottom: 16px;
+}
+.index-matrix th {
+  padding: 10px 14px;
+  background: #181818;
+  color: #888;
+  font-weight: 500;
+  border-bottom: 0.5px solid #2a2a2a;
+  border-right: 0.5px solid #1a1a1a;
+  text-align: center;
+}
+.index-matrix th.sym-col { text-align: left; color: #aaa; width: 100px; }
+.index-matrix td {
+  padding: 0;
+  border-bottom: 0.5px solid #1a1a1a;
+  border-right: 0.5px solid #1a1a1a;
+  height: 72px;
+  vertical-align: middle;
+}
+.index-matrix td.sym-cell {
+  background: #181818;
+  color: #f0b90b;
+  font-weight: 500;
+  text-align: center;
+  font-size: 12px;
+}
+.idx-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.idx-cell:hover { background: #1c1c1c; }
+.idx-cell.selected { background: #1a2030; }
+.idx-cell.nodata { cursor: default; color: #444; }
+.idx-cell.nodata:hover { background: transparent; }
+.idx-flow { font-size: 14px; font-weight: 500; }
+.idx-flow.up   { color: #2ecc71; }
+.idx-flow.down { color: #e74c3c; }
+.idx-flow.flat { color: #888; }
+.idx-score { font-size: 11px; color: #aaa; }
+.idx-dia { font-size: 11px; line-height: 1; }
+
+/* 셀 상세 */
+.index-detail {
+  background: #181818;
+  border: 0.5px solid #1a1a1a;
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.index-detail-title {
+  font-size: 12px; color: #f0b90b; font-weight: 500; margin-bottom: 10px;
+}
+.idx-detail-row {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 0.5px solid #141414;
+  font-size: 11px;
+}
+.idx-detail-row:last-child { border-bottom: none; }
+.idx-detail-label { color: #888; width: 90px; flex-shrink: 0; }
+.idx-detail-val { color: #ccc; }
+
+/* AI 의견 박스 */
+.index-ai-box {
+  background: #0e0e0e;
+  border: 0.5px solid #1a1a1a;
+  border-left: 2px solid #5b9bd5;
+  border-radius: 4px;
+  padding: 14px 16px;
+  font-size: 12px;
+  color: #ccc;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  margin-bottom: 16px;
+}
+
+/* 인덱스 시계열 차트 블록 */
+.index-block {
+  background: #181818;
+  border: 0.5px solid #1a1a1a;
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
+.index-block-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-bottom: 0.5px solid #1a1a1a;
+}
+.index-block-title {
+  font-size: 12px;
+  color: #f0b90b;
+  font-weight: 500;
+  width: 60px;
+}
+.idx-tf-tabs { display: flex; gap: 3px; }
+.idx-tf-btn {
+  background: transparent;
+  color: #666;
+  border: 0.5px solid #222;
+  padding: 2px 9px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+.idx-tf-btn:hover { color: #aaa; }
+.idx-tf-btn.active {
+  background: #1a1a1a;
+  color: #f0b90b;
+  border-color: #3a3a1a;
+}
+.idx-toggles { display: flex; gap: 4px; margin-left: auto; }
+.idx-toggle {
+  background: transparent;
+  color: #555;
+  border: 0.5px solid #222;
+  padding: 2px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.idx-toggle.on { color: #ccc; border-color: #3a3a3a; }
+.idx-toggle-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  opacity: 0.3;
+}
+.idx-toggle.on .idx-toggle-dot { opacity: 1; }
+.index-chart-wrap {
+  padding: 8px 6px;
+}
+.index-chart {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+.index-band {
+  width: 100%;
+  height: 28px;
+  display: block;
+  margin-top: 2px;
+}
+.index-diag {
+  border-top: 0.5px solid #1a1a1a;
+  padding: 10px 14px;
+}
+.idx-diag-row {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.idx-diag-k {
+  color: #888;
+  width: 80px;
+  flex-shrink: 0;
+}
+.idx-diag-v { color: #ccc; }
+.idx-diag-foot {
+  margin-top: 6px;
+  font-size: 9px;
+  color: #555;
+}
+.idx-diag-nodata {
+  font-size: 11px;
+  color: #555;
+  font-style: italic;
+}
+/* ── 4H + 15M 동의 강조 (베이지) ───── */
+  
   
 /* ── 4H + 15M 동의 강조 (베이지) ───── */
 tr.both-agree {
@@ -542,7 +746,7 @@ tr.both-agree .ticker-name {
   overflow: hidden;
   min-width: 0;
 }
-#view-dashboard, #view-journal, #view-watchlist {
+#view-dashboard, #view-journal, #view-watchlist, #view-index {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1225,6 +1429,10 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📋</span>
         <span class="sidebar-label">매매일지</span>
       </div>
+      <div class="sidebar-item" data-view="index" onclick="switchView('index')">
+        <span class="sidebar-icon">📊</span>
+        <span class="sidebar-label">인덱스</span>
+      </div>
     </div>
   </div>
 
@@ -1485,6 +1693,20 @@ tr.both-agree .ticker-name {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="view-index" style="display:none">
+      <div class="index-head">
+        <h2>📊 인덱스 매크로</h2>
+        <span class="index-info" id="index-info">TOTAL · TOTAL2 · TOTAL3</span>
+        <div class="index-actions">
+          <button class="journal-btn" id="index-refresh-btn" onclick="loadIndexView()">↻ 새로고침</button>
+          <button class="journal-btn primary" id="index-ai-btn" onclick="requestIndexOpinion()">🤖 AI 의견</button>
+        </div>
+      </div>
+      <div class="index-body" id="index-body">
+        <div class="index-loading">데이터 로딩 중...</div>
       </div>
     </div>
   </div>
@@ -1925,8 +2147,465 @@ function setSort(side, val) {
 // ══════════════════════════════════════
 //  사이드 패널 / View 전환 (Phase 1)
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+//  인덱스 매크로 뷰
+// ══════════════════════════════════════
+const IDX_SYMBOLS = ['TOTAL', 'TOTAL2', 'TOTAL3']
+const IDX_TFS = ['1H', '4H', '1D']
+
+let indexDiagnosis = null   // diagnoseIndex() 결과 캐시
+let idxSelectedCell = null  // 'TOTAL:4H' 형태
+
+// 인덱스별 상태 — 선택된 TF + 토글
+const idxState = {
+  TOTAL:  { tf: '1H', show: { close: true, score: true, obv: true } },
+  TOTAL2: { tf: '1H', show: { close: true, score: true, obv: true } },
+  TOTAL3: { tf: '1H', show: { close: true, score: true, obv: true } },
+}
+
+// 인덱스별 원본 데이터 캐시 — { TOTAL: { '1H': [...rows], '4H': [...], '1D': [...] } }
+let idxRawData = {}
+
+async function loadIndexView() {
+  const body = document.getElementById('index-body')
+  body.innerHTML = '<div class="index-loading">데이터 로딩 중...</div>'
+
+  idxRawData = {}
+  try {
+    for (const sym of IDX_SYMBOLS) {
+      idxRawData[sym] = {}
+      for (const tf of IDX_TFS) {
+        const { data, error } = await sb
+          .from('index_signals')
+          .select('score, gap_pct, obv, price, ts')
+          .eq('symbol', sym)
+          .eq('timeframe', tf)
+          .order('ts', { ascending: false })
+          .limit(80)
+        if (error) throw error
+        idxRawData[sym][tf] = (data || []).reverse()  // 오름차순
+      }
+    }
+  } catch (e) {
+    console.error('[index] 데이터 조회 실패:', e)
+    body.innerHTML = `<div class="index-empty">데이터 로딩 실패: ${e.message}</div>`
+    return
+  }
+
+  renderIndexView()
+}
+
+async function renderIndexView() {
+  const body = document.getElementById('index-body')
+  let html = ''
+  for (const sym of IDX_SYMBOLS) {
+    html += renderIndexBlock(sym)
+  }
+  body.innerHTML = html
+
+  for (const sym of IDX_SYMBOLS) {
+    drawIndexChart(sym)
+  }
+
+  // 진단 계산 후 요약 텍스트 채우기
+  const diag = await diagnoseIndex()
+  indexDiagnosis = diag
+  for (const sym of IDX_SYMBOLS) {
+    const cell = diag[sym][idxState[sym].tf]
+    const el = document.getElementById('idx-diag-' + sym)
+    if (el) el.innerHTML = renderDiagText(cell)
+  }
+}
+
+// ── 진단 셀 → 요약 텍스트 HTML ──
+function renderDiagText(cell) {
+  if (!cell || !cell.hasData) {
+    return '<span class="idx-diag-nodata">데이터 없음</span>'
+  }
+
+  // 흐름 3창 요약
+  const flowTxt = w => {
+    if (!w || !w.ok) return '데이터 부족'
+    return `${w.direction} (${w.momentum})`
+  }
+  const f = cell.flow
+  const flowLine = `단기 ${flowTxt(f.short)} · 중기 ${flowTxt(f.mid)} · 장기 ${flowTxt(f.long)}`
+  const posTxt = f.position != null ? `최근범위 ${f.position}%` : '위치 데이터 부족'
+  const extTxt = f.extreme ? ` · ${f.extreme}` : ''
+
+  // 다이버전스 3창
+  const divTxt = w => {
+    if (!w || !w.ok) return '데이터 부족'
+    return w.type === 'bear' ? '약세' : w.type === 'bull' ? '강세' : '없음'
+  }
+  const d = cell.div
+  const divLine = `단기 ${divTxt(d.short)} · 중기 ${divTxt(d.mid)} · 장기 ${divTxt(d.long)}`
+
+  // 이격
+  const g = cell.gap
+  const gapLine = g.ok
+    ? `${g.side}, 백분위 ${g.pct}% (${g.label})`
+    : '데이터 부족 (60봉 필요)'
+
+  // 다이아
+  const dia = cell.dia
+  const diaLine = dia.has ? `${dia.verdict} — ${dia.note}` : '활성 다이아 없음'
+
+  return `
+    <div class="idx-diag-row"><span class="idx-diag-k">현재 score</span><span class="idx-diag-v">${f.current.toFixed(1)}${extTxt}</span></div>
+    <div class="idx-diag-row"><span class="idx-diag-k">흐름</span><span class="idx-diag-v">${flowLine}</span></div>
+    <div class="idx-diag-row"><span class="idx-diag-k">위치</span><span class="idx-diag-v">${posTxt}</span></div>
+    <div class="idx-diag-row"><span class="idx-diag-k">다이버전스</span><span class="idx-diag-v">${divLine}</span></div>
+    <div class="idx-diag-row"><span class="idx-diag-k">이격</span><span class="idx-diag-v">${gapLine}</span></div>
+    <div class="idx-diag-row"><span class="idx-diag-k">다이아</span><span class="idx-diag-v">${diaLine}</span></div>
+    <div class="idx-diag-foot">${cell.barCount}봉 기준 · 흐름창 25/40/60</div>
+  `
+}
+
+function renderIndexBlock(sym) {
+  const st = idxState[sym]
+  const tfTabs = IDX_TFS.map(tf =>
+    `<button class="idx-tf-btn ${st.tf === tf ? 'active' : ''}" onclick="setIdxTF('${sym}','${tf}')">${tf}</button>`
+  ).join('')
+
+  const toggles = [
+    { key: 'close', label: 'Close', color: '#e0e0e0' },
+    { key: 'obv',   label: 'OBV',   color: '#5b9bd5' },
+    { key: 'score', label: 'Score', color: '#2ecc71' },
+  ].map(t =>
+    `<button class="idx-toggle ${st.show[t.key] ? 'on' : ''}" onclick="toggleIdxLine('${sym}','${t.key}')">
+      <span class="idx-toggle-dot" style="background:${t.color}"></span>${t.label}
+    </button>`
+  ).join('')
+
+  return `
+    <div class="index-block">
+      <div class="index-block-head">
+        <span class="index-block-title">${sym}</span>
+        <div class="idx-tf-tabs">${tfTabs}</div>
+        <div class="idx-toggles">${toggles}</div>
+      </div>
+      <div class="index-chart-wrap">
+        <svg class="index-chart" id="idx-chart-${sym}" viewBox="0 0 900 200" preserveAspectRatio="none"></svg>
+        <svg class="index-band" id="idx-band-${sym}" viewBox="0 0 900 28" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="index-diag" id="idx-diag-${sym}">
+        <span class="idx-diag-nodata">진단 계산 중...</span>
+      </div>
+    </div>
+  `
+}
+
+function setIdxTF(sym, tf) {
+  idxState[sym].tf = tf
+  renderIndexView()
+}
+
+function toggleIdxLine(sym, key) {
+  idxState[sym].show[key] = !idxState[sym].show[key]
+  renderIndexView()
+}
+
+// ── 시계열 차트 그리기 (close·obv 라인 + score 띠) ──
+function drawIndexChart(sym) {
+  const svg = document.getElementById('idx-chart-' + sym)
+  const band = document.getElementById('idx-band-' + sym)
+  if (!svg || !band) return
+
+  const st = idxState[sym]
+  const rows = (idxRawData[sym] && idxRawData[sym][st.tf]) || []
+
+  if (rows.length < 2) {
+    svg.innerHTML = `<text x="450" y="100" fill="#555" font-size="12" text-anchor="middle">데이터 부족 (${rows.length}봉) — 쌓이는 중</text>`
+    band.innerHTML = ''
+    return
+  }
+
+  const W = 900, H = 200
+  const PAD_L = 40, PAD_R = 20, PAD_T = 16, PAD_B = 24
+  const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
+  const n = rows.length
+
+  const xScale = i => PAD_L + (n === 1 ? cw / 2 : (i / (n - 1)) * cw)
+  const yScale = v => PAD_T + ch * (1 - v / 100)
+
+  // ── 정규화 ──
+  const closes = rows.map(r => Number(r.price))
+  const cMin = Math.min(...closes), cMax = Math.max(...closes)
+  const cRange = cMax - cMin || 1
+  const normClose = v => ((v - cMin) / cRange) * 100   // close → 0~100 (보이는 구간 min~max)
+  // obv는 이미 0~100 → 그대로
+
+  let html = ''
+
+  // ── Y 격자 (25/50/75) ──
+  for (const gv of [0, 25, 50, 75, 100]) {
+    const y = yScale(gv)
+    const isMid = gv === 50
+    html += `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${W - PAD_R}" y2="${y.toFixed(1)}" stroke="${isMid ? '#2a2a2a' : '#1a1a1a'}" stroke-width="0.5" stroke-dasharray="${isMid ? '4,4' : '2,4'}"/>`
+  }
+
+  // ── X축 시간 라벨 ──
+  const fmtTs = ts => {
+    const d = new Date(ts)
+    const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+    return kst.toISOString().slice(5, 16).replace('T', ' ')
+  }
+  html += `<text x="${PAD_L}" y="${H - 6}" fill="#555" font-size="9">${fmtTs(rows[0].ts)}</text>`
+  html += `<text x="${W - PAD_R}" y="${H - 6}" fill="#555" font-size="9" text-anchor="end">${fmtTs(rows[n-1].ts)}</text>`
+
+  // ── 단색 라인 헬퍼 ──
+  const drawLine = (vals, color, width) => {
+    const pts = vals.map((v, i) => `${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(' ')
+    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round"/>`
+  }
+  // 구간별 색 변하는 라인 (obv용)
+  const drawColorLine = (vals, colorFn, width) => {
+    let segs = ''
+    for (let i = 0; i < vals.length - 1; i++) {
+      const x1 = xScale(i).toFixed(1), y1 = yScale(vals[i]).toFixed(1)
+      const x2 = xScale(i+1).toFixed(1), y2 = yScale(vals[i+1]).toFixed(1)
+      segs += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${colorFn(vals[i])}" stroke-width="${width}" stroke-linecap="round"/>`
+    }
+    return segs
+  }
+  // obv 색: 95↑ 빨강(과매수) / 3↓ 라임(과매도) / 중간 파랑
+  const obvColor = v => v >= 95 ? '#e74c3c' : v <= 3 ? '#2ecc71' : '#5b9bd5'
+
+  // ── 라인 (토글 ON일 때만) ──
+  if (st.show.obv) {
+    html += drawColorLine(rows.map(r => Number(r.obv)), obvColor, 1.5)
+  }
+  if (st.show.close) {
+    html += drawLine(closes.map(normClose), '#e0e0e0', 1.8)
+  }
+  svg.innerHTML = html
+
+  // ── score 띠 (봉마다 색칸 + 값) ──
+  if (!st.show.score) { band.innerHTML = ''; return }
+
+  // score 색: 50↑ 라임 / 45↓ 분홍 / 사이 회색
+  const scoreColor = v => v >= 50 ? '#2ecc71' : v <= 45 ? '#e84393' : '#666'
+  const BW = 900, BH = 28
+  const cellW = (BW - PAD_L - PAD_R) / n
+  let bhtml = `<text x="${PAD_L - 6}" y="${BH/2 + 3}" fill="#888" font-size="9" text-anchor="end">score</text>`
+  for (let i = 0; i < n; i++) {
+    const v = Number(rows[i].score)
+    const x = PAD_L + i * cellW
+    bhtml += `<rect x="${x.toFixed(1)}" y="2" width="${(cellW + 0.5).toFixed(1)}" height="${BH - 4}" fill="${scoreColor(v)}" fill-opacity="0.75"/>`
+    // 칸이 너무 좁으면 숫자 생략
+    if (cellW >= 22) {
+      bhtml += `<text x="${(x + cellW/2).toFixed(1)}" y="${BH/2 + 3}" fill="#0e0e0e" font-size="9" font-weight="600" text-anchor="middle">${v.toFixed(0)}</text>`
+    }
+  }
+  band.innerHTML = bhtml
+}
+
+// ══════════════════════════════════════
+//  인덱스 진단 로직
+// ══════════════════════════════════════
+
+// 시간 창 (3구간 공통)
+const IDX_WINDOWS = { short: 25, mid: 40, long: 60 }
+// 흐름 방향 임계값 — 봉당 score 변화가 이보다 크면 추세로 인정
+const IDX_SLOPE_TH = 0.15
+// 다이버전스 임계값
+const IDX_DIV_PRICE_TH = 1.0   // price 1% 미만 변화는 무시
+const IDX_DIV_OBV_TH   = 3.0   // obv 3p 미만 변화는 무시
+// 다이아 매트릭스에서 흐름 비교에 쓸 창
+const IDX_DIA_FLOW_WINDOW = 'mid'
+
+// ── score 흐름 ──────────────────────────
+function scoreFlowOne(scores, n) {
+  if (scores.length < n) return { ok: false }
+  const seg = scores.slice(-n)
+  const half = Math.floor(n / 2)
+  const older = seg.slice(0, half)
+  const newer = seg.slice(half)
+
+  const slope = (seg[seg.length - 1] - seg[0]) / n
+  let direction
+  if (slope > IDX_SLOPE_TH) direction = '상승'
+  else if (slope < -IDX_SLOPE_TH) direction = '하락'
+  else direction = '횡보'
+
+  const slopeOld = (older[older.length - 1] - older[0]) / half
+  const slopeNew = (newer[newer.length - 1] - newer[0]) / half
+  const absOld = Math.abs(slopeOld), absNew = Math.abs(slopeNew)
+  let momentum
+  if (absNew > absOld * 1.3)      momentum = '가속'
+  else if (absNew < absOld * 0.7) momentum = '둔화'
+  else                           momentum = '유지'
+
+  return { ok: true, direction, momentum }
+}
+
+function scoreFlow(scores) {
+  const cur = scores[scores.length - 1]
+  const short = scoreFlowOne(scores, IDX_WINDOWS.short)
+  const mid   = scoreFlowOne(scores, IDX_WINDOWS.mid)
+  const long  = scoreFlowOne(scores, IDX_WINDOWS.long)
+
+  let position = null
+  if (scores.length >= IDX_WINDOWS.short) {
+    const ref = scores.slice(-IDX_WINDOWS.long)
+    const below = ref.filter(s => s < cur).length
+    position = Math.round((below / ref.length) * 100)
+  }
+
+  let extreme = null
+  if (cur >= 60) extreme = '극단 강세권 (60+)'
+  else if (cur <= 30) extreme = '극단 약세권 (30-)'
+
+  return { current: cur, short, mid, long, position, extreme }
+}
+
+// ── 다이버전스 ──────────────────────────
+function divergenceOne(prices, obvs, n) {
+  if (prices.length < n || obvs.length < n) return { ok: false }
+  const p = prices.slice(-n)
+  const o = obvs.slice(-n)
+
+  const pStart = p[0]
+  const priceChg = pStart !== 0 ? ((p[p.length - 1] - pStart) / pStart) * 100 : 0
+  const obvChg = o[o.length - 1] - o[0]
+
+  const priceDir = Math.abs(priceChg) < IDX_DIV_PRICE_TH ? 0 : Math.sign(priceChg)
+  const obvDir   = Math.abs(obvChg)   < IDX_DIV_OBV_TH   ? 0 : Math.sign(obvChg)
+
+  if (priceDir === 0 || obvDir === 0) {
+    return { ok: true, type: 'none', priceChg, obvChg }
+  }
+  let type
+  if (priceDir === obvDir) type = 'none'
+  else if (priceDir > 0 && obvDir < 0) type = 'bear'
+  else type = 'bull'
+
+  return { ok: true, type, priceChg, obvChg }
+}
+
+function divergence(prices, obvs) {
+  return {
+    short: divergenceOne(prices, obvs, IDX_WINDOWS.short),
+    mid:   divergenceOne(prices, obvs, IDX_WINDOWS.mid),
+    long:  divergenceOne(prices, obvs, IDX_WINDOWS.long),
+  }
+}
+
+// ── 이격 ────────────────────────────────
+function gapAnalysis(gaps) {
+  if (gaps.length < IDX_WINDOWS.long) return { ok: false }
+  const cur = gaps[gaps.length - 1]
+
+  let side
+  if (cur > 0)      side = '상단'
+  else if (cur < 0) side = '하단'
+  else              side = '중앙'
+
+  const ref = gaps.slice(-IDX_WINDOWS.long).map(g => Math.abs(g))
+  const absCur = Math.abs(cur)
+  const below = ref.filter(g => g < absCur).length
+  const pct = Math.round((below / ref.length) * 100)
+
+  let label
+  if (pct >= 85)      label = '매우 큼'
+  else if (pct >= 60) label = '큼'
+  else if (pct >= 35) label = '보통'
+  else                label = '작음'
+
+  return { ok: true, side, pct, label, value: cur }
+}
+
+// ── 다이아 신뢰도 ───────────────────────
+function diamondVerdict(diamond, flowDir, gap) {
+  if (!diamond) return { has: false }
+  const dir = diamond.direction
+  const dUp = dir === 'up'
+
+  let base
+  if (flowDir === '횡보' || !flowDir) base = 'neutral'
+  else if ((flowDir === '상승' && dUp) || (flowDir === '하락' && !dUp)) base = 'aligned'
+  else base = 'against'
+
+  const gapBig = gap && gap.ok && gap.label === '매우 큼'
+  const diaTxt = dUp ? '상승 다이아' : '하락 다이아'
+  let verdict, note
+
+  if (base === 'aligned') {
+    if (gapBig) {
+      verdict = '🟡 순방향(과열)'
+      note = `${diaTxt}가 score 흐름과 순방향이나, 이격 ${gap.side} 매우 큼 — 추격 주의`
+    } else {
+      verdict = '🟢 순방향'
+      note = `${diaTxt}가 score 흐름과 순방향 — 신뢰 높음`
+    }
+  } else if (base === 'against') {
+    if (gapBig) {
+      verdict = '🟠 역행(되돌림 여지)'
+      note = `${diaTxt}가 score 흐름과 역행이나, 이격 ${gap.side} 매우 큼 — 되돌림 가능`
+    } else {
+      verdict = '🔴 역행'
+      note = `${diaTxt}가 score 흐름과 역행 — 신뢰 낮음`
+    }
+  } else {
+    verdict = '🟡 중립'
+    note = `${diaTxt} 발생, score 흐름은 횡보 — 다이아 단독 신호`
+  }
+  return { has: true, direction: dir, verdict, note }
+}
+
+// ── 종합 ────────────────────────────────
+function diagnoseCell(rows, diamond) {
+  if (!rows || rows.length === 0) return { hasData: false }
+
+  const scores = rows.map(r => Number(r.score))
+  const gaps   = rows.map(r => Number(r.gap_pct))
+  const obvs   = rows.map(r => Number(r.obv))
+  const prices = rows.map(r => Number(r.price))
+
+  const flow = scoreFlow(scores)
+  const div  = divergence(prices, obvs)
+  const gap  = gapAnalysis(gaps)
+
+  const flowMid = flow[IDX_DIA_FLOW_WINDOW]
+  const flowDir = (flowMid && flowMid.ok) ? flowMid.direction : null
+  const dia = diamondVerdict(diamond, flowDir, gap)
+
+  return { hasData: true, barCount: rows.length, flow, div, gap, dia }
+}
+
+// idxRawData(차트 캐시) 재활용 + 다이아 조회 → 9셀 진단
+async function diagnoseIndex() {
+  // 다이아 한 번에 조회
+  let diamonds = {}
+  try {
+    const { data } = await sb.rpc('get_active_diamonds')
+    for (const d of (data || [])) {
+      diamonds[d.symbol + ':' + d.timeframe] = { direction: d.direction }
+    }
+  } catch (e) {
+    console.error('[index] 다이아 조회 실패:', e)
+  }
+
+  const result = {}
+  for (const sym of IDX_SYMBOLS) {
+    result[sym] = {}
+    for (const tf of IDX_TFS) {
+      const rows = (idxRawData[sym] && idxRawData[sym][tf]) || []
+      const diamond = diamonds[sym + ':' + tf] || null
+      result[sym][tf] = diagnoseCell(rows, diamond)
+    }
+  }
+  return result
+}
+
+// AI 의견 — 5단계에서 구현
+function requestIndexOpinion() {
+  alert('AI 의견 기능은 5단계에서 구현됩니다')
+}
+
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist']
+  const views = ['dashboard', 'journal', 'watchlist', 'index']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -1944,6 +2623,11 @@ function switchView(view) {
   // 워치리스트 뷰 활성화 시 데이터 로드
   if (view === 'watchlist') {
     loadWatchlist()
+  }
+
+  // 인덱스 뷰 활성화 시 데이터 로드
+  if (view === 'index') {
+    loadIndexView()
   }
 }
 function toggleSidebar() {
