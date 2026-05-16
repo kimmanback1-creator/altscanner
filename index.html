@@ -2599,9 +2599,82 @@ async function diagnoseIndex() {
   return result
 }
 
-// AI 의견 — 5단계에서 구현
-function requestIndexOpinion() {
-  alert('AI 의견 기능은 5단계에서 구현됩니다')
+// ── AI 의견 ─────────────────────────────
+
+// 진단 셀 → AI용 요약 텍스트 (한 셀)
+function diagCellToText(sym, tf, cell) {
+  if (!cell || !cell.hasData) return `[${sym} ${tf}] 데이터 없음`
+
+  const f = cell.flow
+  const flowOne = w => (w && w.ok) ? `${w.direction}(${w.momentum})` : '부족'
+  const flowLine = `흐름 단기 ${flowOne(f.short)}/중기 ${flowOne(f.mid)}/장기 ${flowOne(f.long)}`
+  const posLine = f.position != null ? `위치 ${f.position}%` : '위치 부족'
+  const extLine = f.extreme ? `, ${f.extreme}` : ''
+
+  const d = cell.div
+  const divOne = w => (w && w.ok) ? (w.type === 'bear' ? '약세' : w.type === 'bull' ? '강세' : '없음') : '부족'
+  const divLine = `다이버전스 단기 ${divOne(d.short)}/중기 ${divOne(d.mid)}/장기 ${divOne(d.long)}`
+
+  const g = cell.gap
+  const gapLine = g.ok ? `이격 ${g.side} ${g.label}(${g.pct}%)` : '이격 부족'
+
+  const dia = cell.dia
+  const diaLine = dia.has ? `다이아 ${dia.verdict}` : '다이아 없음'
+
+  return `[${sym} ${tf}] score ${f.current.toFixed(1)}${extLine} | ${flowLine} | ${posLine} | ${divLine} | ${gapLine} | ${diaLine} (${cell.barCount}봉)`
+}
+
+// 9셀 진단 → index_summary 텍스트
+function buildIndexSummary(diag) {
+  let txt = '=== 인덱스 매크로 진단 ===\n'
+  for (const sym of IDX_SYMBOLS) {
+    for (const tf of IDX_TFS) {
+      txt += diagCellToText(sym, tf, diag[sym][tf]) + '\n'
+    }
+  }
+  return txt
+}
+
+async function requestIndexOpinion() {
+  const btn = document.getElementById('index-ai-btn')
+  const body = document.getElementById('index-body')
+
+  // 진단 최신화
+  let diag = indexDiagnosis
+  if (!diag) {
+    diag = await diagnoseIndex()
+    indexDiagnosis = diag
+  }
+  const summary = buildIndexSummary(diag)
+
+  // AI 의견 박스 (맨 위에 삽입 or 갱신)
+  let aiBox = document.getElementById('index-ai-result')
+  if (!aiBox) {
+    aiBox = document.createElement('div')
+    aiBox.id = 'index-ai-result'
+    aiBox.className = 'index-ai-box'
+    body.insertBefore(aiBox, body.firstChild)
+  }
+  aiBox.textContent = '🤖 AI 분석 중...'
+
+  const oldLabel = btn.textContent
+  btn.textContent = '분석 중...'
+  btn.disabled = true
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('index-opinion', {
+      body: { index_summary: summary },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    aiBox.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[index-opinion]', e)
+  } finally {
+    btn.textContent = oldLabel
+    btn.disabled = false
+  }
 }
 
 function switchView(view) {
