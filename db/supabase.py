@@ -254,7 +254,7 @@ async def insert_trade_open(payload: dict):
         new_direction = payload.get("direction")
         if ext_id:
             res = get_client().table("trade_journal")\
-                .select("id, direction, leverage, entry_price")\
+                .select("id, direction, leverage, entry_price, entry_amount_usd")\
                 .eq("ext_pos_id", ext_id)\
                 .eq("status", "open")\
                 .limit(1)\
@@ -266,29 +266,52 @@ async def insert_trade_open(payload: dict):
                 # 변화 감지
                 old_lev = float(old_row.get("leverage") or 1)
                 old_entry = float(old_row.get("entry_price") or 0)
+                old_amt = float(old_row.get("entry_amount_usd") or 0)
                 new_lev = float(payload["leverage"])
                 new_entry = float(payload["entry_price"])
+                new_amt = float(payload.get("entry_amount_usd") or 0)
+
                 lev_changed = abs(old_lev - new_lev) >= 0.01
                 # entry_price 0.1% 이상 차이면 변경으로 판단
                 entry_changed = (
                     old_entry > 0 and
                     abs(new_entry - old_entry) / old_entry >= 0.001
                 )
+                # 포지션 크기(마진) 0.5% 이상 차이면 변경으로 판단
+                # — 분할 체결(거래소가 한 주문을 여러 fill로 쪼갬) 감지의 핵심
+                amt_changed = (
+                    old_amt > 0 and
+                    abs(new_amt - old_amt) / old_amt >= 0.005
+                )
 
-                if same_direction and not lev_changed and not entry_changed:
-                    # 진짜 중복 (heartbeat)
+                if same_direction and not lev_changed and not entry_changed and not amt_changed:
+                    # 진짜 중복 (heartbeat) — 포지션이 전혀 안 변함
                     logger.info(f"[DB] trade_journal heartbeat skip — ext_pos_id={ext_id}")
                     return old_row["id"]
 
-                # 그 외 모든 케이스: 옛 row 강제 마무리 후 새 진입
-                if not same_direction:
-                    reason = f"방향 전환 ({old_row['direction']}→{new_direction})"
-                elif lev_changed:
-                    reason = f"레버리지 변경 ({old_lev}×→{new_lev}×)"
-                else:
-                    reason = f"진입가 변경 ({old_entry}→{new_entry})"
+                # ── 같은 방향 + 변화 있음 = 같은 포지션이 갱신됨 ──
+                #   분할 체결 / 추가 진입 / 레버리지 조정 등.
+                #   OKX push의 avg_px·margin은 항상 '포지션 전체 평균/합계'이므로
+                #   옛 row를 닫지 말고 최신 전체값으로 UPDATE한다.
+                if same_direction:
+                    changes = []
+                    if entry_changed: changes.append(f"진입가 {old_entry}→{new_entry}")
+                    if amt_changed:   changes.append(f"마진 {old_amt:.2f}→{new_amt:.2f}")
+                    if lev_changed:   changes.append(f"레버리지 {old_lev}→{new_lev}")
+                    logger.info(f"[DB] 포지션 갱신 (같은 매매) — {', '.join(changes)} (ext_pos_id={ext_id})")
+                    get_client().table("trade_journal")\
+                        .update({
+                            "entry_price":      new_entry,
+                            "entry_amount_usd": new_amt,
+                            "leverage":         new_lev,
+                        })\
+                        .eq("id", old_row["id"])\
+                        .execute()
+                    return old_row["id"]
 
-                logger.warning(f"[DB] 옛 row 강제 마무리 — {reason} (ext_pos_id={ext_id})")
+                # ── 방향 전환 = 진짜 새 매매 ──
+                #   옛 row 강제 마무리 후 새 row INSERT
+                logger.warning(f"[DB] 옛 row 강제 마무리 — 방향 전환 ({old_row['direction']}→{new_direction}) (ext_pos_id={ext_id})")
                 get_client().table("trade_journal")\
                     .update({
                         "status": "closed",
