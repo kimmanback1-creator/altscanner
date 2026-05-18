@@ -818,6 +818,79 @@ tr.both-agree .ticker-name {
   font-size: 10px;
 }
 
+/* ── 셋업기록 ───────────────────── */
+#view-setup { flex-direction: column; }
+.setup-card {
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.setup-card:hover { border-color: #333; }
+.setup-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.setup-tf {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: #1a1a2e;
+  color: #7a9bd5;
+  font-family: 'Consolas', monospace;
+}
+.setup-symbol { font-size: 12px; color: #f0b90b; font-weight: 600; }
+.setup-date { font-size: 10px; color: #555; margin-left: auto; }
+.setup-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.setup-sig-chip {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #1e1e1e;
+  border: 0.5px solid #2a2a2a;
+  color: #aaa;
+}
+.setup-sig-chip b { color: #ddd; font-weight: 600; }
+.setup-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setup-result-label { font-size: 10px; color: #666; }
+.setup-result-select {
+  background: #1a1a1a;
+  border: 0.5px solid #333;
+  color: #ddd;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.setup-result-pending { color: #d5954b; }
+.setup-result-강한상승, .setup-result-상승 { color: #2ecc71; }
+.setup-result-횡보 { color: #888; }
+.setup-result-하락, .setup-result-강한하락 { color: #e84393; }
+.setup-thumb {
+  width: 28px; height: 28px;
+  border-radius: 3px;
+  object-fit: cover;
+  margin-left: auto;
+  cursor: pointer;
+  border: 0.5px solid #2a2a2a;
+}
+
 /* ── 매매일지 ───────────────────── */
 .journal-head {
   padding: 10px 18px;
@@ -933,6 +1006,92 @@ tr.both-agree .ticker-name {
 }
 .jr-meta-item { display: inline-flex; align-items: center; gap: 2px; }
 .jr-meta-filled { color: #888; }
+
+/* ── 셋업 모달 ────────────────── */
+.setup-modal { width: 560px; }
+.sm-section { margin-bottom: 14px; }
+.sm-section-label {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+  display: block;
+}
+.sm-top-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.sm-symbol-input {
+  flex: 1;
+  background: #0e0e0e;
+  border: 0.5px solid #2a2a2a;
+  color: #e0e0e0;
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.sm-tf-group { display: flex; gap: 4px; }
+.sm-btn {
+  background: #1a1a1a;
+  border: 0.5px solid #2a2a2a;
+  color: #888;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .12s;
+}
+.sm-btn:hover { color: #ccc; border-color: #3a3a3a; }
+.sm-btn.on {
+  background: #1a2e1a;
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+.sm-tf-btn.on {
+  background: #1a1a2e;
+  border-color: #7a9bd5;
+  color: #7a9bd5;
+}
+.sm-sig-block {
+  border-top: 0.5px solid #1f1f1f;
+  padding-top: 10px;
+  margin-bottom: 10px;
+}
+.sm-sig-name {
+  font-size: 11px;
+  color: #d0d0d0;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.sm-sig-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sm-img-area {
+  border: 0.5px dashed #2a2a2a;
+  border-radius: 4px;
+  padding: 14px;
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+}
+.sm-img-area img {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 3px;
+  display: block;
+  margin: 0 auto 6px;
+}
+.sm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
 
 /* ── 매매일지 모달 ────────────────── */
 .journal-modal-bg {
@@ -1439,6 +1598,10 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📊</span>
         <span class="sidebar-label">인덱스</span>
       </div>
+      <div class="sidebar-item" data-view="setup" onclick="switchView('setup')">
+        <span class="sidebar-icon">🎯</span>
+        <span class="sidebar-label">셋업기록</span>
+      </div>
     </div>
   </div>
 
@@ -1713,6 +1876,31 @@ tr.both-agree .ticker-name {
       </div>
       <div class="index-body" id="index-body">
         <div class="index-loading">데이터 로딩 중...</div>
+      </div>
+    </div>
+
+    <div id="view-setup" style="display:none">
+      <div class="journal-head">
+        <h2>🎯 셋업기록</h2>
+        <div class="journal-actions">
+          <button class="journal-btn" onclick="requestSetupAnalysis()">🤖 AI 분석</button>
+          <button class="journal-btn primary" onclick="openSetupModal()">+ 새 셋업</button>
+        </div>
+      </div>
+      <div class="journal-filters">
+        <div class="journal-filter-group">
+          <button class="journal-filter-btn active" data-sresult="all" onclick="setSetupFilter('all')">전체</button>
+          <button class="journal-filter-btn" data-sresult="pending" onclick="setSetupFilter('pending')">결과 미입력</button>
+          <button class="journal-filter-btn" data-sresult="done" onclick="setSetupFilter('done')">결과 입력됨</button>
+        </div>
+        <div class="journal-filter-group">
+          <button class="journal-filter-btn active" data-stf="all" onclick="setSetupTfFilter('all')">TF 전체</button>
+          <button class="journal-filter-btn" data-stf="4H" onclick="setSetupTfFilter('4H')">4H</button>
+          <button class="journal-filter-btn" data-stf="1D" onclick="setSetupTfFilter('1D')">1D</button>
+        </div>
+      </div>
+      <div class="journal-content" id="setup-content">
+        <div class="journal-empty">데이터 로딩 중...</div>
       </div>
     </div>
   </div>
@@ -2727,7 +2915,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -2750,6 +2938,11 @@ function switchView(view) {
   // 인덱스 뷰 활성화 시 데이터 로드
   if (view === 'index') {
     loadIndexView()
+  }
+
+  // 셋업기록 뷰 활성화 시 데이터 로드
+  if (view === 'setup') {
+    loadSetups()
   }
 }
 function toggleSidebar() {
@@ -2916,6 +3109,268 @@ async function removeWatchlistEntry(exchange, symbol) {
 }
 
 // ══════════════════════════════════════
+//  셋업기록
+// ════════════════════════════════════════
+
+// 시그널 정의 — 순서 고정 (combo_key 생성에 사용)
+const SETUP_SIGNALS = [
+  { key: 'trendline',  label: '트렌드라인',
+    states: ['강세','약세','강한 강세','강한 약세','약세→강세 전환','강세→약세 전환'] },
+  { key: 'diamond',    label: '다이아',
+    states: ['상승','하락'] },
+  { key: 'fvg',        label: 'FVG',
+    states: ['상승 FVG 위','상승 FVG 중단','상승 FVG 아래','하락 FVG 위','하락 FVG 중단','하락 FVG 아래','IFVG 상승→하락','IFVG 하락→상승'] },
+  { key: 'obv',        label: 'OBV',
+    states: ['우상향','우하향','과매수','과매수 해제','과매도','과매도 해제','상승 다이버전스','하락 다이버전스'] },
+  { key: 'imbalance',  label: '임밸런스',
+    states: ['상승 임밸런스','하락 임밸런스','상승 임밸런스 흡수','하락 임밸런스 흡수','상승 임밸런스 인버전','하락 임밸런스 인버전'] },
+  { key: 'london_box', label: '런던세션박스',
+    states: ['박스 하단 저항','박스 중단 저항','박스 상단 저항','박스 상단 지지','박스 중단 지지','박스 하단 지지','박스 상향 돌파','박스 하향 이탈'] },
+  { key: 'va',         label: 'VA',
+    states: ['VAH 저항','POC 저항','VAL 저항','VAH 지지','POC 지지','VAL 지지','VA 상향 돌파','VA 하향 이탈'] },
+]
+const SETUP_RESULTS = ['강한상승','상승','횡보','하락','강한하락']
+// 툴팁 — 헷갈리는 상태만
+const SETUP_TOOLTIPS = {
+  '상승 임밸런스 흡수': '하단에 떠 있던 매수 임밸런스를 가격이 도달해 소화',
+  '하락 임밸런스 흡수': '상단에 떠 있던 매도 임밸런스를 가격이 도달해 소화',
+  '상승 임밸런스 인버전': '직전 캔들에 상승 임밸런스가 생겼으나 다음 캔들이 무시하고 하락',
+  '하락 임밸런스 인버전': '직전 캔들에 하락 임밸런스가 생겼으나 다음 캔들이 무시하고 상승',
+}
+
+let setupData = []
+let setupFilter = { result: 'all', tf: 'all' }
+
+async function loadSetups() {
+  const box = document.getElementById('setup-content')
+  box.innerHTML = '<div class="journal-empty">데이터 로딩 중...</div>'
+  try {
+    const { data, error } = await sb
+      .from('setup_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    setupData = data || []
+  } catch (e) {
+    box.innerHTML = `<div class="journal-empty">로딩 실패: ${e.message}</div>`
+    return
+  }
+  renderSetups()
+}
+
+function renderSetups() {
+  const box = document.getElementById('setup-content')
+  let rows = setupData
+
+  if (setupFilter.result === 'pending') rows = rows.filter(r => !r.result)
+  if (setupFilter.result === 'done')    rows = rows.filter(r => r.result)
+  if (setupFilter.tf !== 'all')         rows = rows.filter(r => r.timeframe === setupFilter.tf)
+
+  if (rows.length === 0) {
+    box.innerHTML = '<div class="journal-empty">셋업 기록이 없습니다.</div>'
+    return
+  }
+
+  box.innerHTML = rows.map(r => {
+    const chips = SETUP_SIGNALS
+      .filter(s => r[s.key])
+      .map(s => `<span class="setup-sig-chip">${s.label} <b>${r[s.key]}</b></span>`)
+      .join('')
+
+    const resOptions = ['<option value="">미입력</option>']
+      .concat(SETUP_RESULTS.map(rs =>
+        `<option value="${rs}" ${r.result === rs ? 'selected' : ''}>${rs}</option>`))
+      .join('')
+    const resClass = r.result ? `setup-result-${r.result}` : 'setup-result-pending'
+
+    const thumb = r.image_url
+      ? `<img class="setup-thumb" src="${r.image_url}" onclick="event.stopPropagation();window.open('${r.image_url}','_blank')">`
+      : ''
+
+    const dateStr = new Date(r.created_at).toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' })
+
+    return `
+      <div class="setup-card">
+        <div class="setup-card-top">
+          <span class="setup-tf">${r.timeframe}</span>
+          <span class="setup-symbol">${r.symbol || '—'}</span>
+          <span class="setup-date">${dateStr}</span>
+        </div>
+        <div class="setup-signals">${chips || '<span class="setup-sig-chip">시그널 없음</span>'}</div>
+        <div class="setup-card-bottom">
+          <span class="setup-result-label">결과</span>
+          <select class="setup-result-select ${resClass}"
+                  onchange="updateSetupResult('${r.id}', this.value)">
+            ${resOptions}
+          </select>
+          ${thumb}
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+function setSetupFilter(val) {
+  setupFilter.result = val
+  document.querySelectorAll('[data-sresult]').forEach(b =>
+    b.classList.toggle('active', b.dataset.sresult === val))
+  renderSetups()
+}
+function setSetupTfFilter(val) {
+  setupFilter.tf = val
+  document.querySelectorAll('[data-stf]').forEach(b =>
+    b.classList.toggle('active', b.dataset.stf === val))
+  renderSetups()
+}
+
+async function updateSetupResult(id, result) {
+  try {
+    const patch = result
+      ? { result, result_at: new Date().toISOString() }
+      : { result: null, result_at: null }
+    const { error } = await sb.from('setup_log').update(patch).eq('id', id)
+    if (error) throw error
+    const row = setupData.find(s => s.id === id)
+    if (row) { row.result = result || null; row.result_at = patch.result_at }
+    renderSetups()
+  } catch (e) {
+    alert('결과 저장 실패: ' + e.message)
+  }
+}
+
+// ── 새 셋업 입력 모달 ───────────────────
+let setupDraft = { tf: null, signals: {}, imageFile: null, imageDataUrl: null }
+
+function openSetupModal() {
+  setupDraft = { tf: null, signals: {}, imageFile: null, imageDataUrl: null }
+  document.getElementById('sm-symbol').value = ''
+  document.getElementById('sm-memo').value = ''
+  document.getElementById('sm-img-area').innerHTML = '이미지 없음'
+  document.querySelectorAll('.sm-tf-btn').forEach(b => b.classList.remove('on'))
+  renderSetupSignalButtons()
+  document.getElementById('setup-modal-bg').classList.add('show')
+}
+
+function closeSetupModal() {
+  document.getElementById('setup-modal-bg').classList.remove('show')
+}
+
+function selectSetupTf(tf) {
+  setupDraft.tf = tf
+  document.querySelectorAll('.sm-tf-btn').forEach(b =>
+    b.classList.toggle('on', b.dataset.tf === tf))
+}
+
+function renderSetupSignalButtons() {
+  const box = document.getElementById('sm-signals')
+  box.innerHTML = SETUP_SIGNALS.map(sig => {
+    const btns = sig.states.map(st => {
+      const on = setupDraft.signals[sig.key] === st
+      const tip = SETUP_TOOLTIPS[st] ? ` title="${SETUP_TOOLTIPS[st]}"` : ''
+      return `<button class="sm-btn ${on ? 'on' : ''}"${tip}
+                onclick="toggleSetupSignal('${sig.key}','${st}')">${st}</button>`
+    }).join('')
+    return `
+      <div class="sm-sig-block">
+        <div class="sm-sig-name">${sig.label}</div>
+        <div class="sm-sig-btns">${btns}</div>
+      </div>
+    `
+  }).join('')
+}
+
+function toggleSetupSignal(key, state) {
+  // 같은 버튼 다시 누르면 해제 (= 없음), 다른 버튼 누르면 교체 (택1)
+  if (setupDraft.signals[key] === state) {
+    delete setupDraft.signals[key]
+  } else {
+    setupDraft.signals[key] = state
+  }
+  renderSetupSignalButtons()
+}
+
+// combo_key 생성 — TF + 값있는 시그널만, 고정순서, | 구분
+function buildComboKey() {
+  const parts = [setupDraft.tf]
+  for (const sig of SETUP_SIGNALS) {
+    const v = setupDraft.signals[sig.key]
+    if (v) parts.push(`${sig.key}=${v}`)
+  }
+  return parts.join('|')
+}
+
+async function saveSetup() {
+  if (!setupDraft.tf) { alert('타임프레임을 선택하세요'); return }
+  const symbol = document.getElementById('sm-symbol').value.trim()
+  if (!symbol) { alert('종목을 입력하세요'); return }
+  if (Object.keys(setupDraft.signals).length === 0) {
+    if (!confirm('시그널을 하나도 선택하지 않았습니다. 그래도 저장할까요?')) return
+  }
+
+  const memo = document.getElementById('sm-memo').value.trim()
+  const row = {
+    timeframe: setupDraft.tf,
+    symbol,
+    combo_key: buildComboKey(),
+    memo: memo || null,
+  }
+  for (const sig of SETUP_SIGNALS) {
+    row[sig.key] = setupDraft.signals[sig.key] || null
+  }
+
+  try {
+    const { data, error } = await sb.from('setup_log').insert(row).select().single()
+    if (error) throw error
+
+    // 이미지가 있으면 — 생성된 행 id로 업로드 후 image_url UPDATE
+    if (setupDraft.imageFile && data) {
+      const f = setupDraft.imageFile
+      let ext = (f.type.split('/')[1] || 'png').toLowerCase()
+      const path = `setup/${data.id}/${Date.now()}.${ext}`
+      const { error: upErr } = await sb.storage
+        .from('trade-screenshots')
+        .upload(path, f, { upsert: true })
+      if (!upErr) {
+        const { data: urlData } = sb.storage.from('trade-screenshots').getPublicUrl(path)
+        await sb.from('setup_log').update({ image_url: urlData.publicUrl }).eq('id', data.id)
+      } else {
+        console.error('[setup] 이미지 업로드 실패:', upErr)
+      }
+    }
+
+    closeSetupModal()
+    await loadSetups()
+  } catch (e) {
+    alert('저장 실패: ' + e.message)
+    console.error('[setup] 저장 실패:', e)
+  }
+}
+
+// 모달 열린 상태에서 Ctrl+V — 이미지 붙여넣기
+function handleSetupPaste(e) {
+  if (!document.getElementById('setup-modal-bg').classList.contains('show')) return
+  const items = e.clipboardData?.items || []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        e.preventDefault()
+        setupDraft.imageFile = file
+        const reader = new FileReader()
+        reader.onload = ev => {
+          document.getElementById('sm-img-area').innerHTML =
+            `<img src="${ev.target.result}"><div>붙여넣기 완료 — 저장 시 업로드됩니다</div>`
+        }
+        reader.readAsDataURL(file)
+        return
+      }
+    }
+  }
+}
+
+function requestSetupAnalysis() { alert('AI 분석은 5-4에서 구현됩니다') }
+
+// ════════════════════════════════════════
 //  매매일지
 // ══════════════════════════════════════
 let journalData = []
@@ -4228,6 +4683,7 @@ async function init() {
   setInterval(loadLatestCandles, 15*60*1000)
   setInterval(render, 5*60*1000)
   document.addEventListener('paste', handleScreenshotPaste)
+  document.addEventListener('paste', handleSetupPaste)
 }
 // ══════════════════════════════════════
 //  검색
@@ -4976,6 +5432,42 @@ init()
     <div class="jd-actions-right">
       <button class="jd-btn jd-btn-close-pos" id="jd-close-pos-btn" onclick="openExitModal()">청산하기</button>
       <button class="jd-btn jd-btn-save" onclick="saveTradeDetail()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 셋업 입력 모달 ───────────────── -->
+<div class="journal-modal-bg" id="setup-modal-bg">
+  <div class="journal-modal setup-modal">
+    <h3>
+      <span>새 셋업 기록</span>
+      <button class="journal-modal-close" onclick="closeSetupModal()">✕</button>
+    </h3>
+    <div class="sm-top-row">
+      <div style="flex:1">
+        <span class="sm-section-label">종목</span>
+        <input class="sm-symbol-input" id="sm-symbol" placeholder="예: BTC, ETH...">
+      </div>
+      <div>
+        <span class="sm-section-label">타임프레임</span>
+        <div class="sm-tf-group" id="sm-tf-group">
+          <button class="sm-btn sm-tf-btn" data-tf="4H" onclick="selectSetupTf('4H')">4H</button>
+          <button class="sm-btn sm-tf-btn" data-tf="1D" onclick="selectSetupTf('1D')">1D</button>
+        </div>
+      </div>
+    </div>
+    <div id="sm-signals"></div>
+    <div class="sm-section">
+      <span class="sm-section-label">차트 이미지 (선택 — 모달 열린 채 Ctrl+V로 붙여넣기)</span>
+      <div class="sm-img-area" id="sm-img-area">이미지 없음</div>
+    </div>
+    <div class="sm-section">
+      <span class="sm-section-label">메모 (선택)</span>
+      <input class="sm-symbol-input" id="sm-memo" placeholder="자유 메모" style="width:100%">
+    </div>
+    <div class="sm-actions">
+      <button class="sm-btn" onclick="closeSetupModal()">취소</button>
+      <button class="sm-btn on" onclick="saveSetup()">저장</button>
     </div>
   </div>
 </div>
