@@ -3183,6 +3183,8 @@ const SETUP_SIGNALS = [
     states: ['박스 하단 저항','박스 중단 저항','박스 상단 저항','박스 상단 지지','박스 중단 지지','박스 하단 지지','박스 상향 돌파','박스 하향 이탈'] },
   { key: 'va',         label: 'VA',
     states: ['VAH 저항','POC 저항','VAL 저항','VAH 지지','POC 지지','VAL 지지','VA 상향 돌파','VA 하향 이탈'] },
+  { key: 'level_test', label: '레벨 테스트',
+    states: ['저항 1차','저항 2차','저항 3차+','지지 1차','지지 2차','지지 3차+'] },
 ]
 const SETUP_RESULTS = ['강한상승','상승','횡보','하락','강한하락']
 // 툴팁 — 헷갈리는 상태만
@@ -3278,10 +3280,13 @@ function toggleSetupExpand(id) {
 }
 
 // ── 통계 계산 ───────────────────────────
-// 결과 → 색
+// 결과 → 색 (5단계 — 청록 → 라임 → 회색 → 주황 → 빨강, hue를 충분히 벌림)
 const RESULT_COLORS = {
-  '강한상승': '#1e9e57', '상승': '#2ecc71', '횡보': '#888',
-  '하락': '#e84393', '강한하락': '#b52b6f',
+  '강한상승': '#0fcf8f',  // 밝은 청록 — 가장 강한 상승
+  '상승':     '#7bd938',  // 라임/연두
+  '횡보':     '#9a9a9a',  // 회색
+  '하락':     '#f0883e',  // 주황
+  '강한하락': '#e23b3b',  // 빨강 — 가장 강한 하락
 }
 
 // 결과 분포 막대 HTML
@@ -3291,7 +3296,7 @@ function resultBar(counts, total) {
     const c = counts[rs] || 0
     if (c === 0) return ''
     const pct = (c / total * 100).toFixed(1)
-    return `<div class="setup-stat-seg" style="width:${pct}%;background:${RESULT_COLORS[rs]}"
+    return `<div class="setup-stat-seg" style="width:${pct}%;background:${RESULT_COLORS[rs]};box-shadow:inset -1px 0 0 #141414"
               title="${rs} ${c}건 (${pct}%)"></div>`
   }).join('')
   return `<div class="setup-stat-bar">${segs}</div>`
