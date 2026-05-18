@@ -3517,7 +3517,91 @@ function handleSetupPaste(e) {
   }
 }
 
-function requestSetupAnalysis() { alert('AI 분석은 5-4에서 구현됩니다') }
+// ── AI 분석 ─────────────────────────────
+
+// 결과 카운트 → 짧은 텍스트 (예: "상승 7 / 횡보 2 / 하락 1")
+function resultCountText(counts) {
+  return SETUP_RESULTS
+    .filter(rs => counts[rs])
+    .map(rs => `${rs} ${counts[rs]}`)
+    .join(' / ')
+}
+
+// 누적 셋업 → AI용 통계 요약 텍스트
+function buildSetupSummary() {
+  const labeled = setupData.filter(s => s.result)
+  let txt = `=== 셋업 누적 통계 ===\n결과 입력된 셋업: ${labeled.length}건 (전체 ${setupData.length}건)\n`
+
+  for (const tf of ['4H', '1D']) {
+    const tfRows = labeled.filter(s => s.timeframe === tf)
+    txt += `\n--- ${tf} (${tfRows.length}건) ---\n`
+    if (tfRows.length === 0) { txt += '데이터 없음\n'; continue }
+
+    // ① 시그널별 단독 통계
+    txt += '[시그널별 단독]\n'
+    for (const sig of SETUP_SIGNALS) {
+      // 이 TF에서 이 시그널이 가진 값들 수집
+      const valueSet = {}
+      for (const r of tfRows) {
+        const v = r[sig.key]
+        if (!v) continue
+        if (!valueSet[v]) valueSet[v] = []
+        valueSet[v].push(r)
+      }
+      for (const v of Object.keys(valueSet)) {
+        const { counts, labeled: n } = countResults(valueSet[v])
+        if (n === 0) continue
+        txt += `${sig.label}=${v}: n=${n} → ${resultCountText(counts)}\n`
+      }
+    }
+
+    // ② 완전 일치 조합 통계 (combo_key별)
+    txt += '[조합별 (완전 일치)]\n'
+    const comboMap = {}
+    for (const r of tfRows) {
+      if (!comboMap[r.combo_key]) comboMap[r.combo_key] = []
+      comboMap[r.combo_key].push(r)
+    }
+    for (const ck of Object.keys(comboMap)) {
+      const { counts, labeled: n } = countResults(comboMap[ck])
+      if (n < 2) continue   // 표본 1개 조합은 생략 (너무 많아짐)
+      txt += `${ck}: n=${n} → ${resultCountText(counts)}\n`
+    }
+  }
+  return txt
+}
+
+async function requestSetupAnalysis() {
+  const labeled = setupData.filter(s => s.result)
+  if (labeled.length === 0) {
+    alert('결과가 입력된 셋업이 없습니다. 셋업의 결과 라벨을 먼저 채워주세요.')
+    return
+  }
+
+  const box = document.getElementById('setup-content')
+  let aiBox = document.getElementById('setup-ai-result')
+  if (!aiBox) {
+    aiBox = document.createElement('div')
+    aiBox.id = 'setup-ai-result'
+    aiBox.className = 'index-ai-box'
+    box.insertBefore(aiBox, box.firstChild)
+  }
+  aiBox.textContent = '🤖 AI 분석 중...'
+
+  const summary = buildSetupSummary()
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: summary },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    aiBox.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[setup-analysis]', e)
+  }
+}
 
 // ════════════════════════════════════════
 //  매매일지
