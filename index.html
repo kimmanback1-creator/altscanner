@@ -3191,9 +3191,9 @@ const SETUP_SIGNALS = [
     states: ['상승 임밸런스','하락 임밸런스','상승 임밸런스 흡수','하락 임밸런스 흡수','상승 임밸런스 인버전','하락 임밸런스 인버전'] },
   { key: 'london_box', label: '런던세션박스',
     states: ['박스 하단 저항','박스 중단 저항','박스 상단 저항','박스 상단 지지','박스 중단 지지','박스 하단 지지','박스 상향 돌파','박스 하향 이탈'] },
-  { key: 'va',         label: 'VA',
+  { key: 'va',         label: 'VA', note: '꼬리 반응 기준으로 판단',
     states: ['VAH 저항','POC 저항','VAL 저항','VAH 지지','POC 지지','VAL 지지','VA 상향 돌파','VA 하향 이탈'] },
-  { key: 'level_test', label: '레벨 테스트',
+  { key: 'level_test', label { key: '런던세션박스 레벨 테스트',
     states: ['저항 1차','저항 2차','저항 3차+','지지 1차','지지 2차','지지 3차+'] },
 ]
 const SETUP_RESULTS = ['강한상승','상승','횡보','하락','강한하락']
@@ -3254,7 +3254,9 @@ function renderSetups() {
       ? `<img class="setup-thumb" src="${r.image_url}" onclick="event.stopPropagation();window.open('${r.image_url}','_blank')">`
       : ''
 
-    const dateStr = new Date(r.created_at).toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' })
+    const d = new Date(r.created_at)
+    const dateStr = d.toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' })
+      + ' ' + d.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:false })
 
     const statsHtml = (setupExpanded === r.id)
       ? `<div class="setup-stats">${renderSetupStats(r)}</div>`
@@ -3434,9 +3436,12 @@ function renderSetupSignalButtons() {
       return `<button class="sm-btn ${on ? 'on' : ''}"${tip}
                 onclick="toggleSetupSignal('${sig.key}','${st}')">${st}</button>`
     }).join('')
+    const noteHtml = sig.note
+      ? ` <span style="color:#666;font-size:10px;font-weight:400">— ${sig.note}</span>`
+      : ''
     return `
       <div class="sm-sig-block">
-        <div class="sm-sig-name">${sig.label}</div>
+        <div class="sm-sig-name">${sig.label}${noteHtml}</div>
         <div class="sm-sig-btns">${btns}</div>
       </div>
     `
