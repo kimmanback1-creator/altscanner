@@ -819,7 +819,17 @@ tr.both-agree .ticker-name {
 }
 
 /* ── 셋업기록 ───────────────────── */
-#view-setup { flex-direction: column; }
+#view-setup {
+  flex-direction: column;
+  overflow: hidden;
+}
+#view-setup .journal-head,
+#view-setup .journal-filters { flex-shrink: 0; }
+#setup-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
 .setup-card {
   background: #181818;
   border: 0.5px solid #1f1f1f;
