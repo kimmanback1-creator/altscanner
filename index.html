@@ -3776,29 +3776,46 @@ function renderSetupStatsBody() {
         `<span><span class="setup-stat-dot" style="background:${RESULT_COLORS[rs]}"></span>${rs}</span>`).join('')
     + '</div>'
 
-  // 트렌드라인 제외한 나머지 시그널들 — 배열 순서 그대로
+  // 트렌드라인 제외한 나머지 시그널들 — 배열 순서 그대로, 값도 전부 표시
   for (const sig of SETUP_SIGNALS) {
     if (sig.key === 'trendline') continue   // 기준 축이라 제외
 
-    // 이 시그널이 가진 값들이 실제로 나타난 것만 (sig.states 순서로)
-    const valueRowsHtml = []
-    for (const v of sig.states) {
+    const valueRowsHtml = sig.states.map(v => {
       const rows = filtered.filter(s => s[sig.key] === v)
-      if (rows.length === 0) continue   // 빈 셀은 표시 안 함
-      valueRowsHtml.push(statRow(`${sig.label} = <b>${v}</b>`, rows))
-    }
-
-    if (valueRowsHtml.length === 0) continue   // 이 시그널 값이 전혀 안 나타났으면 섹션 자체 생략
+      return countRow(`${sig.label} = <b>${v}</b>`, rows)
+    }).join('')
 
     html += `<div class="ss-section">
       <div class="ss-section-head">${sig.label}</div>
-      ${valueRowsHtml.join('')}
+      ${valueRowsHtml}
     </div>`
   }
 
   body.innerHTML = html
 }
 
+// 카운트 형식 한 줄 — 결과 5개 모두 표시 (0이면 회색)
+function countRow(name, rows) {
+  const { counts, labeled } = countResults(rows)
+  const lowData = labeled > 0 && labeled < 5
+  const nClass = labeled === 0 ? 'setup-stat-n' : (lowData ? 'setup-stat-n setup-stat-lowdata' : 'setup-stat-n')
+  const nameStyle = labeled === 0 ? 'color:#555' : ''
+
+  const cells = SETUP_RESULTS.map(rs => {
+    const c = counts[rs] || 0
+    const color = c > 0 ? RESULT_COLORS[rs] : '#3a3a3a'
+    const weight = c > 0 ? '600' : '400'
+    return `<span style="color:${color};font-weight:${weight};font-size:10px;min-width:62px;display:inline-block">${rs} ${c}</span>`
+  }).join('')
+
+  return `
+    <div class="setup-stat-row" style="font-size:10px">
+      <span class="setup-stat-name" style="width:220px;${nameStyle}">${name}</span>
+      <div style="flex:1;display:flex;gap:4px;flex-wrap:wrap">${cells}</div>
+      <span class="${nClass}">n=${labeled}</span>
+    </div>
+  `
+}
 async function requestSetupAnalysis() {
   const labeled = setupData.filter(s => s.result)
   if (labeled.length === 0) {
