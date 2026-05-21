@@ -3232,6 +3232,7 @@ function renderSetups() {
   if (setupFilter.result === 'pending') rows = rows.filter(r => !r.result)
   if (setupFilter.result === 'done')    rows = rows.filter(r => r.result)
   if (setupFilter.tf !== 'all')         rows = rows.filter(r => r.timeframe === setupFilter.tf)
+  rows = rows.filter(matchSearchSetup)
 
   if (rows.length === 0) {
     box.innerHTML = '<div class="journal-empty">셋업 기록이 없습니다.</div>'
@@ -3258,6 +3259,10 @@ function renderSetups() {
     const dateStr = d.toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' })
       + ' ' + d.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:false })
 
+    const sameCount = setupData.filter(s => s.combo_key === r.combo_key && s.result).length
+    const sameTag = sameCount > 0 ? ` <span style="color:#888;font-size:10px">(n=${sameCount})</span>` : ''
+    const seqTag = r.seq != null ? `<span style="color:#888;font-size:10px;margin-right:6px">#${r.seq}</span>` : ''
+
     const statsHtml = (setupExpanded === r.id)
       ? `<div class="setup-stats">${renderSetupStats(r)}</div>`
       : ''
@@ -3266,7 +3271,8 @@ function renderSetups() {
       <div class="setup-card" onclick="toggleSetupExpand('${r.id}')">
         <div class="setup-card-top">
           <span class="setup-tf">${r.timeframe}</span>
-          <span class="setup-symbol">${r.symbol || '—'}</span>
+          ${seqTag}
+          <span class="setup-symbol">${r.symbol || '—'}${sameTag}</span>
           <span class="setup-date">${dateStr}</span>
         </div>
         <div class="setup-signals">${chips || '<span class="setup-sig-chip">시그널 없음</span>'}</div>
@@ -3357,6 +3363,23 @@ function renderSetupStats(r) {
   const exact = setupData.filter(s => s.combo_key === r.combo_key)
   html += '<div class="setup-stats-title">① 완전 일치 조합</div>'
   html += statRow('이 조합과 정확히 동일', exact)
+
+  // 완전 일치 셋업들의 #번호·티커·날짜 목록 (결과 입력된 것만)
+  const exactLabeled = exact.filter(s => s.result)
+  if (exactLabeled.length > 0) {
+    const list = exactLabeled
+      .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(s => {
+        const dt = new Date(s.created_at)
+        const dateLabel = dt.toLocaleDateString('ko-KR', { month:'2-digit', day:'2-digit' })
+        const color = RESULT_COLORS[s.result] || '#888'
+        const seqLabel = s.seq != null ? `#${s.seq} ` : ''
+        const self = (s.id === r.id) ? ' <span style="color:#666">(이 셋업)</span>' : ''
+        return `<span style="font-size:10px;color:#aaa">${seqLabel}${s.symbol} ${dateLabel} <span style="color:${color}">${s.result}</span>${self}</span>`
+      })
+      .join('<span style="color:#444;margin:0 6px">·</span>')
+    html += `<div style="font-size:10px;color:#888;margin:4px 0 8px 12px;line-height:1.6">${list}</div>`
+  }
 
   // ② 시그널별 단독 통계 — 이 셋업이 가진 각 시그널 값
   html += '<div class="setup-stats-title" style="margin-top:10px">② 시그널별 단독 (이 셋업의 각 시그널)</div>'
@@ -4947,11 +4970,12 @@ function onSearchChange(v) {
   searchQuery = v.trim().toUpperCase()
   document.getElementById('search-clear').classList.toggle('show', searchQuery.length > 0)
   const historyOpen = document.getElementById('history-overlay').classList.contains('show')
-  if (historyOpen) {
-    renderHistory()
-  } else {
-    render()
-  }
+  const setupOpen = document.getElementById('view-setup').style.display === 'flex'
+  const journalOpen = document.getElementById('view-journal').style.display === 'flex'
+  if (historyOpen) renderHistory()
+  else if (setupOpen) renderSetups()
+  else if (journalOpen) renderJournal()
+  else render()
 }
 
 function clearSearch() {
@@ -4959,12 +4983,24 @@ function clearSearch() {
   searchQuery = ''
   document.getElementById('search-clear').classList.remove('show')
   const historyOpen = document.getElementById('history-overlay').classList.contains('show')
-  if (historyOpen) renderHistory(); else render()
+  const setupOpen = document.getElementById('view-setup').style.display === 'flex'
+  const journalOpen = document.getElementById('view-journal').style.display === 'flex'
+  if (historyOpen) renderHistory()
+  else if (setupOpen) renderSetups()
+  else if (journalOpen) renderJournal()
+  else render()
 }
-
 function matchSearch(symbol) {
   if (!searchQuery) return true
   return symbol.toUpperCase().includes(searchQuery)
+}
+
+// 셋업 전용 — 티커 OR #번호 (12, #12 둘 다 허용)
+function matchSearchSetup(r) {
+  if (!searchQuery) return true
+  const q = searchQuery.replace(/^#/, '')
+  if (/^\d+$/.test(q)) return String(r.seq) === q
+  return (r.symbol || '').toUpperCase().includes(searchQuery)
 }
 
 // ══════════════════════════════════════
