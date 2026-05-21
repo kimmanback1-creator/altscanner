@@ -1593,6 +1593,74 @@ tr.both-agree .ticker-name {
   border-radius: 3px;
 }
 
+/* ── 셋업 통계 모달 ── */
+.setup-stats-modal-tf,
+.setup-stats-modal-tl {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ss-tl-btn, .ss-tf-btn {
+  background: #1a1a1a;
+  border: 0.5px solid #2a2a2a;
+  color: #888;
+  font-size: 11px;
+  padding: 5px 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Consolas', monospace;
+  transition: all .12s;
+}
+.ss-tl-btn:hover, .ss-tf-btn:hover { color: #ccc; border-color: #3a3a3a; }
+.ss-tl-btn.on {
+  background: #1a2030;
+  border-color: #5b9bd5;
+  color: #a8d0f0;
+}
+.ss-tf-btn.on {
+  background: #2a2418;
+  border-color: #c9a85c;
+  color: #f0d690;
+}
+.ss-axis-label {
+  font-size: 10px;
+  color: #666;
+  margin-right: 6px;
+}
+.ss-controls-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 22px;
+  gap: 14px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-wrap: wrap;
+}
+.ss-section {
+  margin-bottom: 14px;
+}
+.ss-section-head {
+  font-size: 11px;
+  color: #f0b90b;
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid #1f1f1f;
+}
+.ss-empty {
+  text-align: center;
+  color: #555;
+  font-size: 12px;
+  padding: 60px 20px;
+  line-height: 1.7;
+}
+.ss-hint {
+  color: #444;
+  font-size: 10px;
+  display: block;
+  margin-top: 6px;
+}
+
 /* ── 전역 스크롤바 (다크 테마 통일) ── */
 * {
   scrollbar-width: thin;
@@ -1948,6 +2016,7 @@ tr.both-agree .ticker-name {
       <div class="journal-head">
         <h2>🎯 셋업기록</h2>
         <div class="journal-actions">
+          <button class="journal-btn" onclick="openSetupStatsModal()">📊 통계</button>
           <button class="journal-btn" onclick="requestSetupAnalysis()">🤖 AI 분석</button>
           <button class="journal-btn primary" onclick="openSetupModal()">+ 새 셋업</button>
         </div>
@@ -3612,6 +3681,122 @@ function buildSetupSummary() {
     }
   }
   return txt
+}
+
+// ── 셋업 통계 모달 (트렌드라인 환경별) ──
+let setupStatsState = { tl: '강세', tf: '4H' }
+
+function openSetupStatsModal() {
+  const old = document.getElementById('setupStatsOverlay')
+  if (old) old.remove()
+
+  const trendlineStates = SETUP_SIGNALS.find(s => s.key === 'trendline').states
+
+  const overlay = document.createElement('div')
+  overlay.id = 'setupStatsOverlay'
+  overlay.className = 'meta-check-overlay'
+  overlay.innerHTML = `
+    <div class="meta-check-modal" style="width:min(720px, 92vw)">
+      <div class="meta-check-header">
+        <h2>📊 시그널 통계 — 트렌드라인 환경별</h2>
+        <button class="meta-check-close" onclick="document.getElementById('setupStatsOverlay').remove()">✕</button>
+      </div>
+      <div class="ss-controls-row">
+        <span class="ss-axis-label">TF</span>
+        <div class="setup-stats-modal-tf">
+          ${['4H','1D'].map(tf => `<button class="ss-tf-btn ${setupStatsState.tf===tf?'on':''}" data-tf="${tf}">${tf}</button>`).join('')}
+        </div>
+      </div>
+      <div class="ss-controls-row" style="padding-top:8px">
+        <span class="ss-axis-label">트렌드라인</span>
+        <div class="setup-stats-modal-tl">
+          ${trendlineStates.map(s => `<button class="ss-tl-btn ${setupStatsState.tl===s?'on':''}" data-tl="${s}">${s}</button>`).join('')}
+        </div>
+      </div>
+      <div class="meta-check-body" id="setupStatsBody">
+        <div class="meta-check-loading">계산 중...</div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove()
+  })
+  overlay.querySelectorAll('.ss-tl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setupStatsState.tl = btn.dataset.tl
+      overlay.querySelectorAll('.ss-tl-btn').forEach(b => b.classList.remove('on'))
+      btn.classList.add('on')
+      renderSetupStatsBody()
+    })
+  })
+  overlay.querySelectorAll('.ss-tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setupStatsState.tf = btn.dataset.tf
+      overlay.querySelectorAll('.ss-tf-btn').forEach(b => b.classList.remove('on'))
+      btn.classList.add('on')
+      renderSetupStatsBody()
+    })
+  })
+
+  renderSetupStatsBody()
+}
+
+function renderSetupStatsBody() {
+  const body = document.getElementById('setupStatsBody')
+  if (!body) return
+
+  const { tl, tf } = setupStatsState
+
+  // 결과 입력 + 같은 TF + 같은 트렌드라인 값
+  const filtered = setupData.filter(s =>
+    s.result && s.timeframe === tf && s.trendline === tl
+  )
+
+  if (filtered.length === 0) {
+    body.innerHTML = `
+      <div class="ss-empty">
+        <b>${tf} · 트렌드라인 ${tl}</b> 환경의 결과 입력 셋업이 없습니다.
+        <span class="ss-hint">다른 트렌드라인 값을 선택하거나, 셋업 결과를 입력해주세요.</span>
+      </div>
+    `
+    return
+  }
+
+  let html = `
+    <div style="font-size:11px;color:#888;margin-bottom:12px">
+      ${tf} · 트렌드라인 <b style="color:#a8d0f0">${tl}</b> 환경 — 결과 입력 셋업 <b style="color:#ddd">${filtered.length}건</b>
+    </div>
+  `
+
+  // 범례
+  html += '<div class="setup-stat-legend" style="margin-bottom:10px">'
+    + SETUP_RESULTS.map(rs =>
+        `<span><span class="setup-stat-dot" style="background:${RESULT_COLORS[rs]}"></span>${rs}</span>`).join('')
+    + '</div>'
+
+  // 트렌드라인 제외한 나머지 시그널들 — 배열 순서 그대로
+  for (const sig of SETUP_SIGNALS) {
+    if (sig.key === 'trendline') continue   // 기준 축이라 제외
+
+    // 이 시그널이 가진 값들이 실제로 나타난 것만 (sig.states 순서로)
+    const valueRowsHtml = []
+    for (const v of sig.states) {
+      const rows = filtered.filter(s => s[sig.key] === v)
+      if (rows.length === 0) continue   // 빈 셀은 표시 안 함
+      valueRowsHtml.push(statRow(`${sig.label} = <b>${v}</b>`, rows))
+    }
+
+    if (valueRowsHtml.length === 0) continue   // 이 시그널 값이 전혀 안 나타났으면 섹션 자체 생략
+
+    html += `<div class="ss-section">
+      <div class="ss-section-head">${sig.label}</div>
+      ${valueRowsHtml.join('')}
+    </div>`
+  }
+
+  body.innerHTML = html
 }
 
 async function requestSetupAnalysis() {
