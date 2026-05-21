@@ -3699,7 +3699,13 @@ function openSetupStatsModal() {
     <div class="meta-check-modal" style="width:min(720px, 92vw)">
       <div class="meta-check-header">
         <h2>📊 시그널 통계 — 트렌드라인 환경별</h2>
-        <button class="meta-check-close" onclick="document.getElementById('setupStatsOverlay').remove()">✕</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="journal-btn" id="ss-ai-btn" onclick="requestTrendlineAnalysis()">🤖 환경별 AI 분석</button>
+          <button class="meta-check-close" onclick="document.getElementById('setupStatsOverlay').remove()">✕</button>
+        </div>
+      </div>
+      <div id="ss-ai-result" style="display:none;padding:14px 22px;border-bottom:1px solid #2a2a2a">
+        <div class="index-ai-box" id="ss-ai-box" style="margin-bottom:0">분석 대기 중...</div>
       </div>
       <div class="ss-controls-row">
         <span class="ss-axis-label">TF</span>
@@ -3770,11 +3776,7 @@ function renderSetupStatsBody() {
     </div>
   `
 
-  // 범례
-  html += '<div class="setup-stat-legend" style="margin-bottom:10px">'
-    + SETUP_RESULTS.map(rs =>
-        `<span><span class="setup-stat-dot" style="background:${RESULT_COLORS[rs]}"></span>${rs}</span>`).join('')
-    + '</div>'
+  // (범례 삭제 — 각 줄의 카운트가 색으로 표시되어 중복)
 
   // 트렌드라인 제외한 나머지 시그널들 — 배열 순서 그대로, 값도 전부 표시
   for (const sig of SETUP_SIGNALS) {
@@ -3792,6 +3794,110 @@ function renderSetupStatsBody() {
   }
 
   body.innerHTML = html
+}
+
+// 트렌드라인 환경별 통계 요약 텍스트 — AI에게 보낼 데이터 (n>=5만 포함)
+function buildTrendlineSummary() {
+  const trendlineStates = SETUP_SIGNALS.find(s => s.key === 'trendline').states
+  const MIN_N = 5
+
+  let txt = '=== 트렌드라인 환경별 시그널 신뢰도 분석 ===\n'
+  txt += `(표본 n≥${MIN_N}인 시그널-값 조합만 포함 — 노이즈 제거)\n`
+
+  let totalIncluded = 0
+
+  for (const tf of ['4H', '1D']) {
+    for (const tl of trendlineStates) {
+      // 이 환경의 결과 입력 셋업
+      const envRows = setupData.filter(s =>
+        s.result && s.timeframe === tf && s.trendline === tl
+      )
+      if (envRows.length === 0) continue
+
+      // 이 환경에서 n>=5인 시그널-값 조합 찾기
+      const lines = []
+      for (const sig of SETUP_SIGNALS) {
+        if (sig.key === 'trendline') continue
+        for (const v of sig.states) {
+          const rows = envRows.filter(s => s[sig.key] === v)
+          if (rows.length < MIN_N) continue   // 표본 부족
+          const { counts, labeled } = countResults(rows)
+          const distText = SETUP_RESULTS
+            .filter(rs => counts[rs])
+            .map(rs => `${rs}=${counts[rs]}`)
+            .join(', ')
+          lines.push(`  ${sig.label}=${v}: n=${labeled} (${distText})`)
+          totalIncluded++
+        }
+      }
+
+      if (lines.length === 0) continue
+
+      txt += `\n[${tf} · 트렌드라인 ${tl}] 전체 ${envRows.length}건 중 표본 충분 시그널:\n`
+      txt += lines.join('\n') + '\n'
+    }
+  }
+
+  if (totalIncluded === 0) {
+    txt += '\n→ 모든 환경에서 표본 n≥5인 시그널-값 조합이 없습니다.\n데이터가 더 쌓여야 분석 가능합니다.'
+  }
+
+  return { text: txt, totalIncluded }
+}
+
+async function requestTrendlineAnalysis() {
+  const btn = document.getElementById('ss-ai-btn')
+  const resultEl = document.getElementById('ss-ai-result')
+  const boxEl = document.getElementById('ss-ai-box')
+  if (!btn || !boxEl) return
+
+  const { text: summary, totalIncluded } = buildTrendlineSummary()
+
+  // 표본 충분한 조합이 하나도 없으면 — AI 호출 안 함
+  if (totalIncluded === 0) {
+    resultEl.style.display = 'block'
+    boxEl.textContent = '⚠️ 표본 부족 — 모든 환경에서 n≥5인 시그널 조합이 없습니다. 셋업 결과를 더 쌓아주세요.'
+    return
+  }
+
+  resultEl.style.display = 'block'
+  boxEl.textContent = '🤖 AI 분석 중...'
+
+  const oldLabel = btn.textContent
+  btn.textContent = '분석 중...'
+  btn.disabled = true
+
+  // 분석 지시 — 트렌드라인 환경별 시각
+  const prompt = `다음은 트렌드라인 환경별로 갈라본 셋업 통계입니다. (표본 n>=5만 포함됨)
+
+각 트렌드라인 환경(강세/약세/강한 강세/강한 약세/약→강 전환/강→약 전환)에서:
+- 어떤 시그널-값 조합이 상승(강한상승+상승) 적중률이 높은가
+- 어떤 시그널-값 조합이 하락(강한하락+하락) 적중률이 높은가
+- 어떤 조합은 횡보/혼합 분포라 신뢰도가 낮은가
+
+환경 사이의 차이점도 짚어주세요 (예: "OBV 우상향은 강세에서는 X, 약세에서는 Y").
+
+규칙:
+- 표본 n이 5~10이면 "초기 경향" 정도로만 언급, 단정 표현 금지
+- n이 너무 적은 환경은 "분석 보류" 명시
+- 정확한 숫자 인용 (n=N, 분포 X건/Y건)
+
+${summary}`
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: prompt },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    boxEl.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    boxEl.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[setup-tl-analysis]', e)
+  } finally {
+    btn.textContent = oldLabel
+    btn.disabled = false
+  }
 }
 
 // 카운트 형식 한 줄 — 결과 5개 모두 표시 (0이면 회색)
