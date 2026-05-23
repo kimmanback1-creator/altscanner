@@ -889,9 +889,13 @@ tr.both-agree .ticker-name {
   font-family: inherit;
 }
 .setup-result-pending { color: #d5954b; }
-.setup-result-강한상승, .setup-result-상승 { color: #2ecc71; }
-.setup-result-횡보 { color: #888; }
-.setup-result-하락, .setup-result-강한하락 { color: #e84393; }
+.setup-result-상승 { color: #7bd938; }
+.setup-result-하락-후-상승 { color: #0fcf8f; }
+.setup-result-매수-임밸런스-흡수-후-상승 { color: #a8a838; }
+.setup-result-횡보 { color: #9a9a9a; }
+.setup-result-매도-임밸런스-흡수-후-하락 { color: #e84393; }
+.setup-result-상승-후-하락 { color: #f39c12; }
+.setup-result-하락 { color: #e23b3b; }
 .setup-thumb {
   width: 28px; height: 28px;
   border-radius: 3px;
@@ -3265,7 +3269,7 @@ const SETUP_SIGNALS = [
   { key: 'level_test', label: '런던세션박스 레벨 테스트',
     states: ['저항 1차','저항 2차','저항 3차+','지지 1차','지지 2차','지지 3차+'] },
 ]
-const SETUP_RESULTS = ['강한상승','상승','횡보','하락','강한하락']
+const SETUP_RESULTS = ['상승','하락 후 상승','매수 임밸런스 흡수 후 상승','횡보','매도 임밸런스 흡수 후 하락','상승 후 하락','하락']
 // 툴팁 — 헷갈리는 상태만
 const SETUP_TOOLTIPS = {
   '상승 임밸런스 흡수': '하단에 떠 있던 매수 임밸런스를 가격이 도달해 소화',
@@ -3318,7 +3322,7 @@ function renderSetups() {
       .concat(SETUP_RESULTS.map(rs =>
         `<option value="${rs}" ${r.result === rs ? 'selected' : ''}>${rs}</option>`))
       .join('')
-    const resClass = r.result ? `setup-result-${r.result}` : 'setup-result-pending'
+    const resClass = r.result ? `setup-result-${r.result.replace(/\s+/g, '-')}` : 'setup-result-pending'
 
     const thumb = r.image_url
       ? `<img class="setup-thumb" src="${r.image_url}" onclick="event.stopPropagation();window.open('${r.image_url}','_blank')">`
@@ -3367,13 +3371,15 @@ function toggleSetupExpand(id) {
 }
 
 // ── 통계 계산 ───────────────────────────
-// 결과 → 색 (5단계 — 청록 → 라임 → 회색 → 주황 → 빨강, hue를 충분히 벌림)
+// 결과 → 색 (7단계 — 라임/청록/올리브 상승군, 회색 횡보, 분홍/호박/빨강 하락군)
 const RESULT_COLORS = {
-  '강한상승': '#0fcf8f',  // 밝은 청록 — 가장 강한 상승
-  '상승':     '#7bd938',  // 라임/연두
-  '횡보':     '#9a9a9a',  // 회색
-  '하락':     '#f0883e',  // 주황
-  '강한하락': '#e23b3b',  // 빨강 — 가장 강한 하락
+  '상승':                       '#7bd938',  // 라임
+  '하락 후 상승':               '#0fcf8f',  // 청록
+  '매수 임밸런스 흡수 후 상승': '#a8a838',  // 올리브
+  '횡보':                       '#9a9a9a',  // 회색
+  '매도 임밸런스 흡수 후 하락': '#e84393',  // 분홍
+  '상승 후 하락':               '#f39c12',  // 호박
+  '하락':                       '#e23b3b',  // 빨강
 }
 
 // 결과 분포 막대 HTML
@@ -3871,8 +3877,8 @@ async function requestTrendlineAnalysis() {
   const prompt = `다음은 트렌드라인 환경별로 갈라본 셋업 통계입니다. (표본 n>=5만 포함됨)
 
 각 트렌드라인 환경(강세/약세/강한 강세/강한 약세/약→강 전환/강→약 전환)에서:
-- 어떤 시그널-값 조합이 상승(강한상승+상승) 적중률이 높은가
-- 어떤 시그널-값 조합이 하락(강한하락+하락) 적중률이 높은가
+- 어떤 시그널-값 조합이 상승군(상승+하락 후 상승+매수 임밸런스 흡수 후 상승) 적중률이 높은가
+- 어떤 시그널-값 조합이 하락군(하락+상승 후 하락+매도 임밸런스 흡수 후 하락) 적중률이 높은가
 - 어떤 조합은 횡보/혼합 분포라 신뢰도가 낮은가
 
 환경 사이의 차이점도 짚어주세요 (예: "OBV 우상향은 강세에서는 X, 약세에서는 Y").
