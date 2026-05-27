@@ -1007,6 +1007,81 @@ tr.both-agree .ticker-name {
   display: block;
 }
 
+/* ── 양 TF 일치 배너 ─────────── */
+.autosetup-tf-agree {
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.autosetup-tf-agree.strong-long {
+  background: linear-gradient(90deg, #0d2014 0%, #143020 100%);
+  border-color: #2ecc71;
+  box-shadow: 0 0 16px rgba(46, 204, 113, 0.15);
+}
+.autosetup-tf-agree.strong-short {
+  background: linear-gradient(90deg, #200d0d 0%, #301414 100%);
+  border-color: #e74c3c;
+  box-shadow: 0 0 16px rgba(231, 76, 60, 0.15);
+}
+.autosetup-tf-agree.partial-long {
+  background: #14201a;
+  border-color: #4a6a3a;
+}
+.autosetup-tf-agree.partial-short {
+  background: #201414;
+  border-color: #6a3a3a;
+}
+
+.agree-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agree-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.agree-title.long  { color: #2ecc71; }
+.agree-title.short { color: #e74c3c; }
+.agree-subtitle {
+  font-size: 11px;
+  color: #aaa;
+}
+.agree-right {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: #ccc;
+}
+.agree-tf-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  min-width: 70px;
+}
+.agree-tf-label {
+  font-size: 9px;
+  color: #888;
+  text-transform: uppercase;
+}
+.agree-tf-conf {
+  font-size: 14px;
+  font-weight: 700;
+}
+.agree-tf-conf.long  { color: #2ecc71; }
+.agree-tf-conf.short { color: #e74c3c; }
+.agree-tf-conf.weak  { color: #d5a55b; }
+
 .rec-evidences {
   margin-top: 8px;
   border-top: 0.5px solid #1f1f1f;
@@ -3571,11 +3646,17 @@ async function loadAutoSetup() {
     info.textContent = `— 마지막 갱신: ${now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`
     
     // 그리드 렌더 (카드가 async이므로 병렬 await)
+    // 양 TF 추천 미리 계산 → 일치 배너 + 카드 렌더에 재사용
+    const [d1Rec, h4Rec] = await Promise.all([
+      computeRecommendation(d1, '1D'),
+      computeRecommendation(h4, '4H'),
+    ])
     const [d1Card, h4Card] = await Promise.all([
-      renderAutoSetupCard(d1, '1D'),
-      renderAutoSetupCard(h4, '4H'),
+      renderAutoSetupCard(d1, '1D', d1Rec),
+      renderAutoSetupCard(h4, '4H', h4Rec),
     ])
     body.innerHTML = `
+      ${renderTfAgreeBanner(d1Rec, h4Rec)}
       <div class="autosetup-tf-grid">
         ${d1Card}
         ${h4Card}
@@ -3603,8 +3684,8 @@ async function loadAutoSetup() {
   }, 30000)
 }
 
-// TF 카드 렌더링
-async function renderAutoSetupCard(row, tfLabel) {
+// TF 카드 렌더링 (precomputedRec: 이미 계산된 추천 결과 재사용 — 중복 호출 방지)
+async function renderAutoSetupCard(row, tfLabel, precomputedRec) {
   if (!row) {
     return `<div class="autosetup-tf-card">
       <div class="autosetup-tf-head">
@@ -3639,13 +3720,70 @@ async function renderAutoSetupCard(row, tfLabel) {
     ${renderSignalRow('FVG', renderFvg(signals.fvg))}
     ${renderSignalRow('런던박스', renderLondonBox(signals.london_box))}
     ${renderSignalRow('임밸런스', renderImbalance(signals.imbalance))}
-    ${await renderRecommendationBox(row, tfLabel)}
+    ${await renderRecommendationBox(row, tfLabel, precomputedRec)}
   </div>`
 }
 
-// 추천 박스 렌더링
-async function renderRecommendationBox(row, tfLabel) {
-  const rec = await computeRecommendation(row, tfLabel)
+// 양 TF 일치 배너 렌더링
+function renderTfAgreeBanner(d1Rec, h4Rec) {
+  // 둘 다 방향 있어야 함
+  if (!d1Rec?.direction || !h4Rec?.direction) return ''
+  // 방향 일치해야 함
+  if (d1Rec.direction !== h4Rec.direction) return ''
+  
+  const dir = d1Rec.direction  // LONG or SHORT
+  const isLong = dir === 'LONG'
+  
+  // 강도 판정
+  const d1Strong = d1Rec.verdict.startsWith('STRONG')
+  const h4Strong = h4Rec.verdict.startsWith('STRONG')
+  const bothStrong = d1Strong && h4Strong
+  
+  // 양쪽 다 WEAK면 배너 안 띄움 (노이즈 줄이기)
+  if (!d1Strong && !h4Strong) return ''
+  
+  const dirText = isLong ? 'LONG' : 'SHORT'
+  const dirCls = isLong ? 'long' : 'short'
+  const arrow = isLong ? '▲' : '▼'
+  
+  let bannerCls, titleText, subtitleText
+  
+  if (bothStrong) {
+    bannerCls = 'strong-' + dirCls
+    titleText = `🔥 양 TF 강한 일치 — ${arrow} ${dirText}`
+    subtitleText = '1D + 4H 두 시간대 모두 강한 추천 (신뢰도 65%+) — 매우 강한 신호'
+  } else {
+    bannerCls = 'partial-' + dirCls
+    const strongTf = d1Strong ? '1D' : '4H'
+    const weakTf = d1Strong ? '4H' : '1D'
+    titleText = `⚡ 부분 일치 — ${arrow} ${dirText}`
+    subtitleText = `${strongTf} 강한 추천 + ${weakTf} 약한 추천 — 같은 방향이지만 강도 차이 있음`
+  }
+  
+  const d1ConfCls = d1Strong ? dirCls : 'weak'
+  const h4ConfCls = h4Strong ? dirCls : 'weak'
+  
+  return `<div class="autosetup-tf-agree ${bannerCls}">
+    <div class="agree-left">
+      <span class="agree-title ${dirCls}">${titleText}</span>
+      <span class="agree-subtitle">${subtitleText}</span>
+    </div>
+    <div class="agree-right">
+      <div class="agree-tf-pill">
+        <span class="agree-tf-label">1D</span>
+        <span class="agree-tf-conf ${d1ConfCls}">${d1Rec.confidencePct}%</span>
+      </div>
+      <div class="agree-tf-pill">
+        <span class="agree-tf-label">4H</span>
+        <span class="agree-tf-conf ${h4ConfCls}">${h4Rec.confidencePct}%</span>
+      </div>
+    </div>
+  </div>`
+}
+
+// 추천 박스 렌더링 (precomputedRec 있으면 재사용)
+async function renderRecommendationBox(row, tfLabel, precomputedRec) {
+  const rec = precomputedRec || await computeRecommendation(row, tfLabel)
   return renderRecBox(rec)
 }
 
