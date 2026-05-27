@@ -994,6 +994,19 @@ tr.both-agree .ticker-name {
 }
 .rec-rr b { color: #f0b90b; }
 
+/* ── 가격 레벨 미니 차트 ─────────── */
+.rec-price-chart {
+  margin-top: 8px;
+  background: #0a0a0a;
+  border-radius: 4px;
+  padding: 6px 4px;
+}
+.rec-price-svg {
+  width: 100%;
+  height: 110px;
+  display: block;
+}
+
 .rec-evidences {
   margin-top: 8px;
   border-top: 0.5px solid #1f1f1f;
@@ -3692,7 +3705,85 @@ function renderRecBox(rec) {
       </div>
     </div>
     <div class="rec-rr">R:R <b>${lv.rr}</b>${lv.takeProfit2 ? ` · 2차 익절 $${lv.takeProfit2.toLocaleString()}` : ''}</div>
+    ${renderPriceChart(rec, isLong)}
     ${renderEvidences(rec.evidences)}
+  </div>`
+}
+
+// 가격 레벨 미니 차트 (수평선)
+function renderPriceChart(rec, isLong) {
+  const lv = rec.levels
+  if (!lv || !lv.entry) return ''
+  
+  const W = 600, H = 110
+  const PAD_L = 60, PAD_R = 80, PAD_T = 12, PAD_B = 12
+  const cw = W - PAD_L - PAD_R
+  const ch = H - PAD_T - PAD_B
+  
+  // Y축 범위 계산 — 진입가 기준 ±10% 또는 SL/TP 둘 다 포함
+  const prices = [lv.entry, lv.stopLoss, lv.takeProfit]
+  if (lv.takeProfit2) prices.push(lv.takeProfit2)
+  let minP = Math.min(...prices)
+  let maxP = Math.max(...prices)
+  // 위아래로 약간 여유 추가
+  const pad = (maxP - minP) * 0.15
+  minP -= pad
+  maxP += pad
+  const range = maxP - minP
+  
+  const yScale = p => PAD_T + ch * (1 - (p - minP) / range)
+  
+  let html = ''
+  
+  // 배경 영역 — LONG이면 진입~익절 녹색, 진입~손절 빨강
+  const yEntry = yScale(lv.entry)
+  const ySL = yScale(lv.stopLoss)
+  const yTP = yScale(lv.takeProfit)
+  
+  if (isLong) {
+    // 익절 영역 (위쪽) - 녹색
+    html += `<rect x="${PAD_L}" y="${yTP.toFixed(1)}" width="${cw}" height="${(yEntry - yTP).toFixed(1)}" fill="#2ecc71" fill-opacity="0.08"/>`
+    // 손절 영역 (아래쪽) - 빨강
+    html += `<rect x="${PAD_L}" y="${yEntry.toFixed(1)}" width="${cw}" height="${(ySL - yEntry).toFixed(1)}" fill="#e74c3c" fill-opacity="0.08"/>`
+  } else {
+    // SHORT — 반대
+    html += `<rect x="${PAD_L}" y="${yEntry.toFixed(1)}" width="${cw}" height="${(yTP - yEntry).toFixed(1)}" fill="#2ecc71" fill-opacity="0.08"/>`
+    html += `<rect x="${PAD_L}" y="${ySL.toFixed(1)}" width="${cw}" height="${(yEntry - ySL).toFixed(1)}" fill="#e74c3c" fill-opacity="0.08"/>`
+  }
+  
+  // 헬퍼: 수평선 + 라벨
+  const drawLevel = (price, color, label, dashed) => {
+    const y = yScale(price)
+    if (y < PAD_T || y > PAD_T + ch) return ''
+    const stroke = dashed ? 'stroke-dasharray="4,3"' : ''
+    return `
+      <line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${PAD_L + cw}" y2="${y.toFixed(1)}" 
+            stroke="${color}" stroke-width="1.5" ${stroke}/>
+      <text x="${PAD_L - 6}" y="${y.toFixed(1) + 3}" fill="${color}" font-size="9" text-anchor="end">${label}</text>
+      <text x="${PAD_L + cw + 6}" y="${y.toFixed(1) + 3}" fill="${color}" font-size="10" font-weight="600">$${price.toLocaleString()}</text>
+    `
+  }
+  
+  // 2차 익절 (있으면, 가장 먼저 그려서 다른 라인 아래로)
+  if (lv.takeProfit2) {
+    html += drawLevel(lv.takeProfit2, '#5fb35f', 'TP2', true)
+  }
+  
+  // 익절선
+  html += drawLevel(lv.takeProfit, '#2ecc71', `TP +${lv.takeProfitPct}%`, false)
+  
+  // 진입선 (가장 강조)
+  html += drawLevel(lv.entry, '#f0b90b', 'ENTRY', false)
+  
+  // 손절선
+  html += drawLevel(lv.stopLoss, '#e74c3c', `SL −${lv.stopLossPct}%`, false)
+  
+  // R:R 표시 (오른쪽 중앙)
+  const yMid = (yEntry + yTP) / 2
+  html += `<text x="${PAD_L + cw - 8}" y="${yMid.toFixed(1)}" fill="#f0b90b" font-size="10" font-weight="600" text-anchor="end" opacity="0.7">R:R ${lv.rr}</text>`
+  
+  return `<div class="rec-price-chart">
+    <svg class="rec-price-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${html}</svg>
   </div>`
 }
 
