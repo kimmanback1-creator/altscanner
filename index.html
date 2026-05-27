@@ -3410,6 +3410,9 @@ async function loadAutoSetup() {
   const body = document.getElementById('autosetup-body')
   const info = document.getElementById('autosetup-info')
   
+  // AI 결과 박스가 있으면 보존 (30초 갱신 시 사라지지 않도록)
+  const aiBox = document.getElementById('autosetup-ai-result')
+  
   try {
     // BTC 1D + 4H 각각 최신 행 조회
     const [d1Res, h4Res] = await Promise.all([
@@ -3457,6 +3460,9 @@ async function loadAutoSetup() {
         ${renderAutoSetupCard(h4, '4H')}
       </div>
     `
+    
+    // AI 결과 박스 복원 (있었으면 맨 위에 다시 끼워넣기)
+    if (aiBox) body.insertBefore(aiBox, body.firstChild)
   } catch (e) {
     body.innerHTML = `<div class="autosetup-empty">로딩 실패: ${e.message}</div>`
     info.textContent = '— 오류'
