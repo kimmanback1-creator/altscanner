@@ -914,6 +914,110 @@ tr.both-agree .ticker-name {
 .autosetup-sig-val .vf  { color: #555; }
 .autosetup-sig-val .high { color: #e84393; font-weight: 600; }
 
+/* ── 자동 셋업 추천 박스 ─────────── */
+.autosetup-rec-box {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  border: 1px solid #2a2a2a;
+  background: #141414;
+}
+.autosetup-rec-box.strong-long  { border-color: #2a6a3a; background: #0d2014; }
+.autosetup-rec-box.strong-short { border-color: #6a2a2a; background: #200d0d; }
+.autosetup-rec-box.weak-long    { border-color: #4a5a2a; background: #1a1c10; }
+.autosetup-rec-box.weak-short   { border-color: #5a3a2a; background: #1c130d; }
+.autosetup-rec-box.mixed        { border-color: #2a2a3a; background: #131320; }
+.autosetup-rec-box.no-data      { border-color: #2a2a2a; background: #141414; opacity: 0.7; }
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.rec-verdict {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rec-verdict.long  { color: #2ecc71; }
+.rec-verdict.short { color: #e74c3c; }
+.rec-verdict.weak-long  { color: #a8c860; }
+.rec-verdict.weak-short { color: #d5a55b; }
+.rec-verdict.mixed { color: #888; }
+.rec-verdict.no-data { color: #555; }
+.rec-confidence {
+  font-size: 11px;
+  color: #aaa;
+  font-family: 'Consolas', monospace;
+}
+
+.rec-levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  background: #0e0e0e;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+.rec-level {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rec-level-label {
+  font-size: 9px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rec-level-val {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Consolas', monospace;
+}
+.rec-level-val.entry { color: #e0e0e0; }
+.rec-level-val.sl    { color: #e74c3c; }
+.rec-level-val.tp    { color: #2ecc71; }
+.rec-level-pct {
+  font-size: 9px;
+  color: #888;
+}
+.rec-rr {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 6px;
+  text-align: right;
+}
+.rec-rr b { color: #f0b90b; }
+
+.rec-evidences {
+  margin-top: 8px;
+  border-top: 0.5px solid #1f1f1f;
+  padding-top: 6px;
+}
+.rec-evidence {
+  font-size: 10px;
+  color: #888;
+  padding: 2px 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.rec-evidence .ev-dir-long  { color: #2ecc71; font-weight: 600; }
+.rec-evidence .ev-dir-short { color: #e74c3c; font-weight: 600; }
+.rec-evidence .ev-bonus { color: #f0b90b; font-size: 9px; }
+
+.rec-reason {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 /* ── 셋업기록 ───────────────────── */
 #view-setup {
   flex-direction: column;
@@ -3453,11 +3557,15 @@ async function loadAutoSetup() {
     const now = new Date()
     info.textContent = `— 마지막 갱신: ${now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`
     
-    // 그리드 렌더
+    // 그리드 렌더 (카드가 async이므로 병렬 await)
+    const [d1Card, h4Card] = await Promise.all([
+      renderAutoSetupCard(d1, '1D'),
+      renderAutoSetupCard(h4, '4H'),
+    ])
     body.innerHTML = `
       <div class="autosetup-tf-grid">
-        ${renderAutoSetupCard(d1, '1D')}
-        ${renderAutoSetupCard(h4, '4H')}
+        ${d1Card}
+        ${h4Card}
       </div>
     `
     
@@ -3483,7 +3591,7 @@ async function loadAutoSetup() {
 }
 
 // TF 카드 렌더링
-function renderAutoSetupCard(row, tfLabel) {
+async function renderAutoSetupCard(row, tfLabel) {
   if (!row) {
     return `<div class="autosetup-tf-card">
       <div class="autosetup-tf-head">
@@ -3518,7 +3626,91 @@ function renderAutoSetupCard(row, tfLabel) {
     ${renderSignalRow('FVG', renderFvg(signals.fvg))}
     ${renderSignalRow('런던박스', renderLondonBox(signals.london_box))}
     ${renderSignalRow('임밸런스', renderImbalance(signals.imbalance))}
+    ${await renderRecommendationBox(row, tfLabel)}
   </div>`
+}
+
+// 추천 박스 렌더링
+async function renderRecommendationBox(row, tfLabel) {
+  const rec = await computeRecommendation(row, tfLabel)
+  return renderRecBox(rec)
+}
+
+function renderRecBox(rec) {
+  // NO_DATA
+  if (rec.verdict === 'NO_DATA') {
+    return `<div class="autosetup-rec-box no-data">
+      <div class="rec-header">
+        <span class="rec-verdict no-data">🔒 진입 추천 보류</span>
+        <span class="rec-confidence">표본 부족</span>
+      </div>
+      <div class="rec-reason">${rec.reason || '데이터 부족'}</div>
+    </div>`
+  }
+  
+  // MIXED
+  if (rec.verdict === 'MIXED') {
+    return `<div class="autosetup-rec-box mixed">
+      <div class="rec-header">
+        <span class="rec-verdict mixed">⚪ 방향 모호</span>
+        <span class="rec-confidence">L:${rec.longScore} / S:${rec.shortScore}</span>
+      </div>
+      ${renderEvidences(rec.evidences)}
+    </div>`
+  }
+  
+  // STRONG/WEAK LONG/SHORT
+  const isStrong = rec.verdict.startsWith('STRONG')
+  const isLong = rec.direction === 'LONG'
+  const boxCls = (isStrong ? 'strong-' : 'weak-') + (isLong ? 'long' : 'short')
+  const verdictCls = isStrong ? (isLong ? 'long' : 'short') : (isLong ? 'weak-long' : 'weak-short')
+  const verdictIcon = isStrong 
+    ? (isLong ? '🟢 강한 LONG' : '🔴 강한 SHORT')
+    : (isLong ? '🟡 약한 LONG' : '🟡 약한 SHORT')
+  
+  const lv = rec.levels
+  
+  return `<div class="autosetup-rec-box ${boxCls}">
+    <div class="rec-header">
+      <span class="rec-verdict ${verdictCls}">${verdictIcon}</span>
+      <span class="rec-confidence">신뢰도 <b style="color:#e0e0e0">${rec.confidencePct}%</b></span>
+    </div>
+    <div class="rec-levels">
+      <div class="rec-level">
+        <span class="rec-level-label">진입</span>
+        <span class="rec-level-val entry">$${lv.entry.toLocaleString()}</span>
+      </div>
+      <div class="rec-level">
+        <span class="rec-level-label">손절</span>
+        <span class="rec-level-val sl">$${lv.stopLoss.toLocaleString()}</span>
+        <span class="rec-level-pct">−${lv.stopLossPct}%</span>
+      </div>
+      <div class="rec-level">
+        <span class="rec-level-label">익절</span>
+        <span class="rec-level-val tp">$${lv.takeProfit.toLocaleString()}</span>
+        <span class="rec-level-pct">+${lv.takeProfitPct}%</span>
+      </div>
+    </div>
+    <div class="rec-rr">R:R <b>${lv.rr}</b>${lv.takeProfit2 ? ` · 2차 익절 $${lv.takeProfit2.toLocaleString()}` : ''}</div>
+    ${renderEvidences(rec.evidences)}
+  </div>`
+}
+
+function renderEvidences(evidences) {
+  if (!evidences || evidences.length === 0) return ''
+  const items = evidences.slice(0, 5).map(ev => {
+    const dirCls = ev.direction === 'LONG' ? 'ev-dir-long' : 'ev-dir-short'
+    const dirIcon = ev.direction === 'LONG' ? '▲' : '▼'
+    const bonusTag = ev.bonus ? ' <span class="ev-bonus">+환경보너스</span>' : ''
+    return `<div class="rec-evidence">
+      <span class="${dirCls}">${dirIcon}</span>
+      <span>${ev.sig}=${ev.val}</span>
+      <span style="color:#666">n=${ev.n}</span>
+      <span style="color:#aaa">${ev.hitPct.toFixed(0)}%</span>
+      ${bonusTag}
+    </div>`
+  }).join('')
+  return `<div class="rec-evidences">${items}</div>`
 }
 
 function renderSignalRow(name, valHtml) {
@@ -4553,6 +4745,258 @@ function buildAutoSetupSummary() {
   }
 
   return { text: txt, totalIncluded, sampleSize: totalAll }
+}
+
+// ══════════════════════════════════════
+//  자동 셋업 — 진입 추천 엔진
+// ══════════════════════════════════════
+
+// 환경 일치 보너스 조합 (1.5배 가중치)
+const COMBO_BONUS = {
+  // [시그널-값, 트렌드라인 상태들] → 방향
+  long: [
+    { sig: 'diamond', val: 'up', env: ['강세', '약세→강세 전환'] },
+    { sig: 'obv', val: 'bull_divergence', env: ['약세'] },
+    { sig: 'obv', val: 'oversold_release', env: ['약세→강세 전환'] },
+    { sig: 'fvg', val: 'new_up', env: ['강세', '약세→강세 전환'] },
+    { sig: 'imbalance', val: 'new_buy', env: ['강세', '약세→강세 전환'] },
+    { sig: 'va_weekly', val: 'val_support', env: ['강세', '약세→강세 전환'] },
+  ],
+  short: [
+    { sig: 'diamond', val: 'down', env: ['약세', '강세→약세 전환'] },
+    { sig: 'obv', val: 'bear_divergence', env: ['강세'] },
+    { sig: 'obv', val: 'overbought_release', env: ['강세→약세 전환'] },
+    { sig: 'fvg', val: 'new_down', env: ['약세', '강세→약세 전환'] },
+    { sig: 'imbalance', val: 'new_sell', env: ['약세', '강세→약세 전환'] },
+    { sig: 'va_weekly', val: 'vah_resistance', env: ['약세', '강세→약세 전환'] },
+  ],
+}
+
+// 상승군/하락군/횡보 분류
+const UP_RESULTS = ['상승', '하락 후 상승', '매수 임밸런스 흡수 후 상승']
+const DOWN_RESULTS = ['하락', '상승 후 하락', '매도 임밸런스 흡수 후 하락']
+
+// 현재 봉의 events에서 활성 시그널 추출
+// returns: [{ sig: 'trendline', val: '강세' }, { sig: 'imbalance', val: 'new_sell' }, ...]
+function extractActiveSignals(barRow) {
+  if (!barRow || !barRow.events) return []
+  const signals = []
+  for (const [sig, valStr] of Object.entries(barRow.events)) {
+    if (!valStr) continue
+    // imbalance, va_weekly, obv는 comma-separated 가능
+    const vals = String(valStr).split(',').map(s => s.trim()).filter(Boolean)
+    for (const val of vals) {
+      signals.push({ sig, val })
+    }
+  }
+  return signals
+}
+
+// 단일 시그널의 누적 통계 조회 → 적중률 계산
+// returns: { n, upPct, downPct, flatPct, direction, confidence } or null (n<5)
+async function getSignalStats(tf, sig, val) {
+  // setup_log_auto에서 같은 TF + 같은 시그널-값 + result 입력된 행 조회
+  // events JSONB에서 sig 키의 값에 val이 포함된 행
+  const { data, error } = await sb
+    .from('setup_log_auto')
+    .select('result')
+    .eq('timeframe', tf)
+    .not('result', 'is', null)
+    .filter('events->>' + sig, 'ilike', `%${val}%`)
+  
+  if (error) {
+    console.error('[stats]', sig, val, error)
+    return null
+  }
+  
+  const rows = data || []
+  if (rows.length < 5) return null  // 표본 부족
+  
+  const counts = { up: 0, down: 0, flat: 0 }
+  for (const r of rows) {
+    if (UP_RESULTS.includes(r.result)) counts.up++
+    else if (DOWN_RESULTS.includes(r.result)) counts.down++
+    else counts.flat++
+  }
+  
+  const n = rows.length
+  const upPct = counts.up / n
+  const downPct = counts.down / n
+  const flatPct = counts.flat / n
+  
+  // 방향 결정 (상승/하락 중 큰 쪽)
+  let direction = null
+  let confidence = 0
+  if (upPct > downPct && upPct >= 0.55) {
+    direction = 'LONG'
+    confidence = upPct
+  } else if (downPct > upPct && downPct >= 0.55) {
+    direction = 'SHORT'
+    confidence = downPct
+  }
+  
+  return { n, upPct, downPct, flatPct, direction, confidence, counts }
+}
+
+// 환경 일치 보너스 체크
+function hasComboBonus(direction, sig, val, trendlineState) {
+  const list = direction === 'LONG' ? COMBO_BONUS.long : COMBO_BONUS.short
+  for (const combo of list) {
+    if (combo.sig === sig && combo.val === val && combo.env.includes(trendlineState)) {
+      return true
+    }
+  }
+  return false
+}
+
+// 현재 봉 → 진입 추천 계산
+// returns: {
+//   verdict: 'STRONG_LONG' | 'STRONG_SHORT' | 'WEAK_LONG' | 'WEAK_SHORT' | 'MIXED' | 'NO_DATA',
+//   direction: 'LONG' | 'SHORT' | null,
+//   confidencePct: 0~100,
+//   evidences: [{sig, val, n, hitPct, weight, bonus}],
+//   levels: {entry, stopLoss, takeProfit, rr}
+// }
+async function computeRecommendation(barRow, tf) {
+  if (!barRow) return { verdict: 'NO_DATA', evidences: [] }
+  
+  const activeSignals = extractActiveSignals(barRow)
+  if (activeSignals.length === 0) {
+    return { verdict: 'NO_DATA', reason: '활성 시그널 없음', evidences: [] }
+  }
+  
+  // 현재 트렌드라인 상태 (환경 보너스 판정용)
+  const trendlineState = barRow.events?.trendline || null
+  
+  // 각 시그널의 통계 조회 (병렬)
+  const statsPromises = activeSignals.map(({ sig, val }) =>
+    getSignalStats(tf, sig, val).then(stats => ({ sig, val, stats }))
+  )
+  const statsResults = await Promise.all(statsPromises)
+  
+  // 통계 충분한 시그널만 (n≥5)
+  const validSignals = statsResults.filter(r => r.stats !== null)
+  
+  if (validSignals.length === 0) {
+    return {
+      verdict: 'NO_DATA',
+      reason: '활성 시그널 중 통계 충분(n≥5) 없음',
+      activeCount: activeSignals.length,
+      evidences: [],
+    }
+  }
+  
+  // 방향 점수 합산
+  let longScore = 0
+  let shortScore = 0
+  const evidences = []
+  
+  for (const { sig, val, stats } of validSignals) {
+    if (!stats.direction) continue  // 방향 모호 (둘 다 55% 미만)
+    
+    // 기본 가중치 = 적중률 (0.55 ~ 1.0)
+    let weight = stats.confidence
+    
+    // 환경 보너스 체크
+    const bonus = hasComboBonus(stats.direction, sig, val, trendlineState)
+    if (bonus) weight *= 1.5
+    
+    if (stats.direction === 'LONG') longScore += weight
+    else shortScore += weight
+    
+    evidences.push({
+      sig, val,
+      n: stats.n,
+      direction: stats.direction,
+      hitPct: stats.confidence * 100,
+      weight: weight,
+      bonus: bonus,
+      counts: stats.counts,
+    })
+  }
+  
+  // evidence 정렬 — 가중치 큰 순
+  evidences.sort((a, b) => b.weight - a.weight)
+  
+  // 신뢰도 계산
+  const totalScore = longScore + shortScore
+  if (totalScore === 0) {
+    return {
+      verdict: 'NO_DATA',
+      reason: '신뢰 가능한 방향성 시그널 없음',
+      evidences,
+    }
+  }
+  
+  const maxScore = Math.max(longScore, shortScore)
+  const direction = longScore > shortScore ? 'LONG' : 'SHORT'
+  const confidencePct = (maxScore / totalScore) * 100
+  
+  // 판정
+  let verdict
+  if (confidencePct >= 65) {
+    verdict = direction === 'LONG' ? 'STRONG_LONG' : 'STRONG_SHORT'
+  } else if (confidencePct >= 55) {
+    verdict = direction === 'LONG' ? 'WEAK_LONG' : 'WEAK_SHORT'
+  } else {
+    verdict = 'MIXED'
+  }
+  
+  // 진입가/손절/익절 계산 (Phase 3)
+  const levels = computeEntryLevels(direction, barRow)
+  
+  return {
+    verdict,
+    direction,
+    confidencePct: Math.round(confidencePct),
+    longScore: Math.round(longScore * 100) / 100,
+    shortScore: Math.round(shortScore * 100) / 100,
+    evidences,
+    levels,
+  }
+}
+
+// 진입가/손절/익절 자동 계산
+function computeEntryLevels(direction, barRow) {
+  const signals = barRow.signals || {}
+  const imb = signals.imbalance || {}
+  const va = signals.va_weekly || {}
+  
+  const currentPrice = Number(barRow.bar_close)
+  const support = imb.nearest_support ? Number(imb.nearest_support) : null
+  const resistance = imb.nearest_resistance ? Number(imb.nearest_resistance) : null
+  const val = va.val ? Number(va.val) : null
+  const vah = va.vah ? Number(va.vah) : null
+  
+  let entry, stopLoss, takeProfit, takeProfit2
+  
+  if (direction === 'LONG') {
+    entry = currentPrice
+    stopLoss = support || val || (currentPrice * 0.985)  // 1.5% fallback
+    takeProfit = resistance || vah || (currentPrice * 1.03)  // 3% fallback
+    // 2차 익절은 더 멀리 (저항이 있고 VAH가 더 멀면 VAH)
+    if (resistance && vah && vah > resistance) takeProfit2 = vah
+  } else {
+    entry = currentPrice
+    stopLoss = resistance || vah || (currentPrice * 1.015)
+    takeProfit = support || val || (currentPrice * 0.97)
+    if (support && val && val < support) takeProfit2 = val
+  }
+  
+  // R:R 계산
+  const risk = Math.abs(entry - stopLoss)
+  const reward = Math.abs(entry - takeProfit)
+  const rr = risk > 0 ? reward / risk : 0
+  
+  return {
+    entry: Math.round(entry * 100) / 100,
+    stopLoss: Math.round(stopLoss * 100) / 100,
+    takeProfit: Math.round(takeProfit * 100) / 100,
+    takeProfit2: takeProfit2 ? Math.round(takeProfit2 * 100) / 100 : null,
+    rr: Math.round(rr * 100) / 100,
+    stopLossPct: Math.abs((stopLoss - entry) / entry * 100).toFixed(2),
+    takeProfitPct: Math.abs((takeProfit - entry) / entry * 100).toFixed(2),
+  }
 }
 
 async function requestAutoSetupAnalysis() {
