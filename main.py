@@ -11,7 +11,8 @@ import uvicorn
 import exchanges.okx     as okx
 import exchanges.bybit   as bybit
 import exchanges.okx_private as okx_private
-from core.candle   import candle_loop
+from core.candle    import candle_loop
+from core.evaluator import evaluator_loop
 from webhook.server import app
 from db.supabase   import preload_history
 from config        import WEBHOOK_PORT
@@ -52,6 +53,7 @@ async def main():
         okx_private.run(),   # OKX private WS — 자동 매매 기록
         candle_loop(),       # 15분봉 신호 판정
         run_webhook(),       # TradingView 웹훅 수신
+        evaluator_loop(),    # setup_log_auto 자동 평가 (7일 후)
     )
 
 
