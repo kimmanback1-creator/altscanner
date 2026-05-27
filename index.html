@@ -818,6 +818,102 @@ tr.both-agree .ticker-name {
   font-size: 10px;
 }
 
+/* ── 셋업기록 ───────────────────── *//* ── 자동 셋업 (BTC) ───────────────── */
+#view-autosetup {
+  flex-direction: column;
+  overflow: hidden;
+}
+.autosetup-head {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.autosetup-head h2 {
+  font-size: 13px;
+  color: #e0e0e0;
+  font-weight: 500;
+}
+.autosetup-info {
+  font-size: 10px;
+  color: #666;
+}
+.autosetup-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px;
+}
+.autosetup-empty {
+  padding: 60px;
+  text-align: center;
+  color: #555;
+  font-size: 12px;
+}
+.autosetup-tf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.autosetup-tf-card {
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.autosetup-tf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 0.5px solid #1f1f1f;
+}
+.autosetup-tf-label {
+  font-size: 12px;
+  color: #f0b90b;
+  font-weight: 600;
+}
+.autosetup-bar-ts {
+  font-size: 10px;
+  color: #555;
+  font-family: 'Consolas', monospace;
+}
+.autosetup-price {
+  font-size: 14px;
+  color: #e0e0e0;
+  font-weight: 600;
+  font-family: 'Consolas', monospace;
+  margin-bottom: 12px;
+}
+.autosetup-sig-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 0.5px solid #1a1a1a;
+  font-size: 11px;
+}
+.autosetup-sig-row:last-child { border-bottom: none; }
+.autosetup-sig-name {
+  width: 80px;
+  flex-shrink: 0;
+  color: #888;
+  font-weight: 500;
+}
+.autosetup-sig-val {
+  flex: 1;
+  color: #ccc;
+  line-height: 1.5;
+}
+.autosetup-sig-val .key { color: #666; font-size: 10px; margin-right: 4px; }
+.autosetup-sig-val .v   { color: #ddd; margin-right: 8px; }
+.autosetup-sig-val .vt  { color: #2ecc71; font-weight: 600; }
+.autosetup-sig-val .vf  { color: #555; }
+.autosetup-sig-val .high { color: #e84393; font-weight: 600; }
+
 /* ── 셋업기록 ───────────────────── */
 #view-setup {
   flex-direction: column;
@@ -1738,6 +1834,10 @@ tr.both-agree .ticker-name {
       <div class="sidebar-item" data-view="setup" onclick="switchView('setup')">
         <span class="sidebar-icon">🎯</span>
         <span class="sidebar-label">셋업기록</span>
+      </div>
+      <div class="sidebar-item" data-view="autosetup" onclick="switchView('autosetup')">
+        <span class="sidebar-icon">⚡</span>
+        <span class="sidebar-label">자동 셋업 (BTC)</span>
       </div>
     </div>
   </div>
@@ -3053,7 +3153,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3081,6 +3181,11 @@ function switchView(view) {
   // 셋업기록 뷰 활성화 시 데이터 로드
   if (view === 'setup') {
     loadSetups()
+  }
+
+  // 자동 셋업 뷰 활성화 시 데이터 로드
+  if (view === 'autosetup') {
+    loadAutoSetup()
   }
 }
 function toggleSidebar() {
@@ -3280,6 +3385,242 @@ const SETUP_TOOLTIPS = {
 
 let setupData = []
 let setupFilter = { result: 'all', tf: 'all' }
+
+// ══════════════════════════════════════
+//  자동 셋업 (BTC) — 실시간 시그널 모니터
+// ══════════════════════════════════════
+let autoSetupTimer = null
+
+async function loadAutoSetup() {
+  const body = document.getElementById('autosetup-body')
+  const info = document.getElementById('autosetup-info')
+  
+  try {
+    // BTC 1D + 4H 각각 최신 행 조회
+    const [d1Res, h4Res] = await Promise.all([
+      sb.from('signal_state')
+        .select('*')
+        .eq('symbol', 'BTCUSDT')
+        .eq('timeframe', '1D')
+        .order('bar_ts', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      sb.from('signal_state')
+        .select('*')
+        .eq('symbol', 'BTCUSDT')
+        .eq('timeframe', '4H')
+        .order('bar_ts', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    
+    if (d1Res.error) throw d1Res.error
+    if (h4Res.error) throw h4Res.error
+    
+    const d1 = d1Res.data
+    const h4 = h4Res.data
+    
+    if (!d1 && !h4) {
+      body.innerHTML = `<div class="autosetup-empty">
+        signal_state에 데이터가 아직 없습니다.<br>
+        <span style="color:#444;font-size:10px;margin-top:8px;display:block">
+          다음 봉 마감 시점에 자동 수집 시작
+        </span>
+      </div>`
+      info.textContent = '— 데이터 없음'
+      return
+    }
+    
+    // 갱신 시각
+    const now = new Date()
+    info.textContent = `— 마지막 갱신: ${now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`
+    
+    // 그리드 렌더
+    body.innerHTML = `
+      <div class="autosetup-tf-grid">
+        ${renderAutoSetupCard(d1, '1D')}
+        ${renderAutoSetupCard(h4, '4H')}
+      </div>
+    `
+  } catch (e) {
+    body.innerHTML = `<div class="autosetup-empty">로딩 실패: ${e.message}</div>`
+    info.textContent = '— 오류'
+    console.error('[autosetup] load failed:', e)
+  }
+  
+  // 30초마다 자동 갱신
+  if (autoSetupTimer) clearInterval(autoSetupTimer)
+  autoSetupTimer = setInterval(() => {
+    const view = document.getElementById('view-autosetup')
+    if (view && view.style.display === 'flex') {
+      loadAutoSetup()
+    } else {
+      clearInterval(autoSetupTimer)
+      autoSetupTimer = null
+    }
+  }, 30000)
+}
+
+// TF 카드 렌더링
+function renderAutoSetupCard(row, tfLabel) {
+  if (!row) {
+    return `<div class="autosetup-tf-card">
+      <div class="autosetup-tf-head">
+        <span class="autosetup-tf-label">${tfLabel}</span>
+        <span class="autosetup-bar-ts">데이터 없음</span>
+      </div>
+      <div class="autosetup-empty" style="padding:30px">대기 중 — 다음 봉 마감 시 자동 수집</div>
+    </div>`
+  }
+  
+  const signals = row.signals || {}
+  
+  // bar_ts 포맷 (KST)
+  const d = new Date(row.bar_ts)
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+  const barTsStr = kst.toISOString().slice(5, 16).replace('T', ' ') + ' KST'
+  
+  // 가격 포맷
+  const priceStr = '$' + Number(row.bar_close).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  
+  return `<div class="autosetup-tf-card">
+    <div class="autosetup-tf-head">
+      <span class="autosetup-tf-label">${tfLabel}</span>
+      <span class="autosetup-bar-ts">${barTsStr}</span>
+    </div>
+    <div class="autosetup-price">${priceStr}</div>
+    ${renderSignalRow('트렌드라인', renderTrendline(signals.trendline))}
+    ${renderSignalRow('OBV', renderObv(signals.obv))}
+    ${renderSignalRow('다이아', renderDiamond(signals.diamond))}
+    ${renderSignalRow('추세전환', renderTrendChange(signals.trend_change))}
+    ${renderSignalRow('VA 주봉', renderVaWeekly(signals.va_weekly))}
+    ${renderSignalRow('FVG', renderFvg(signals.fvg))}
+    ${renderSignalRow('런던박스', renderLondonBox(signals.london_box))}
+    ${renderSignalRow('임밸런스', renderImbalance(signals.imbalance))}
+  </div>`
+}
+
+function renderSignalRow(name, valHtml) {
+  return `<div class="autosetup-sig-row">
+    <span class="autosetup-sig-name">${name}</span>
+    <div class="autosetup-sig-val">${valHtml || '<span class="vf">데이터 없음</span>'}</div>
+  </div>`
+}
+
+// 각 시그널별 렌더링
+function renderTrendline(t) {
+  if (!t) return null
+  const stateColor = t.state === '강세' ? '#2ecc71'
+                   : t.state === '약세' ? '#e74c3c'
+                   : t.state?.includes('전환') ? '#f0b90b'
+                   : '#888'
+  return `<span class="v" style="color:${stateColor};font-weight:600">${t.state}</span>` +
+    `<span class="key">score</span><span class="v">${t.score}</span>` +
+    `<span class="key">intensity</span><span class="v">${t.intensity}</span>`
+}
+
+function renderObv(o) {
+  if (!o) return null
+  let html = `<span class="key">scaled</span><span class="v">${o.scaled}</span>` +
+             `<span class="key">bundle</span><span class="v">${o.bundle_sum}</span>`
+  const flags = []
+  if (o.overbought) flags.push('<span class="high">과매수</span>')
+  if (o.oversold) flags.push('<span style="color:#5fb35f;font-weight:600">과매도</span>')
+  if (o.overbought_release) flags.push('<span style="color:#f0b90b">과매수 해제</span>')
+  if (o.oversold_release) flags.push('<span style="color:#f0b90b">과매도 해제</span>')
+  if (o.bear_divergence) flags.push('<span class="high">베어 다이버전스</span>')
+  if (o.bull_divergence) flags.push('<span style="color:#5fb35f;font-weight:600">불 다이버전스</span>')
+  if (flags.length) html += '<br>' + flags.join(' · ')
+  return html
+}
+
+function renderDiamond(d) {
+  if (!d) return null
+  if (d.green) return '<span style="color:#2ecc71;font-weight:600">🔷 상승 다이아</span>'
+  if (d.red) return '<span style="color:#e74c3c;font-weight:600">🔷 하락 다이아</span>'
+  return '<span class="vf">없음</span>'
+}
+
+function renderTrendChange(tc) {
+  if (!tc) return null
+  if (tc.active) {
+    return `<span style="color:#9b7fd5;font-weight:600">✓ 추세전환 활성</span>` +
+           ` <span class="key">r</span><span class="v">${tc.r}</span>`
+  }
+  return `<span class="vf">비활성</span> <span class="key">r</span><span class="v">${tc.r}</span>`
+}
+
+function renderVaWeekly(va) {
+  if (!va) return null
+  const zoneMap = {
+    'above_vah': 'VAH 위',
+    'between_poc_vah': 'POC~VAH 사이',
+    'between_val_poc': 'VAL~POC 사이',
+    'below_val': 'VAL 아래',
+  }
+  const migMap = {
+    'higher': '↑ 상승',
+    'lower': '↓ 하락',
+    'overlap': '겹침',
+  }
+  const pocMigMap = {
+    'up': '↑',
+    'down': '↓',
+    'flat': '→',
+  }
+  let html = `<span class="key">위치</span><span class="v">${zoneMap[va.price_zone] || va.price_zone}</span>` +
+             `<span class="key">migration</span><span class="v">${migMap[va.migration] || va.migration}</span>` +
+             `<span class="key">POC</span><span class="v">${pocMigMap[va.poc_migration] || va.poc_migration}</span>` +
+             `<br><span class="key">레벨</span>` +
+             `POC <span class="v">${va.poc}</span>` +
+             `VAH <span class="v">${va.vah}</span>` +
+             `VAL <span class="v">${va.val}</span>`
+  // 지지/저항 이벤트
+  const events = []
+  if (va.vah_support) events.push('<span style="color:#5fb35f">VAH 지지</span>')
+  if (va.vah_resistance) events.push('<span style="color:#e74c3c">VAH 저항</span>')
+  if (va.poc_support) events.push('<span style="color:#5fb35f">POC 지지</span>')
+  if (va.poc_resistance) events.push('<span style="color:#e74c3c">POC 저항</span>')
+  if (va.val_support) events.push('<span style="color:#5fb35f">VAL 지지</span>')
+  if (va.val_resistance) events.push('<span style="color:#e74c3c">VAL 저항</span>')
+  if (events.length) html += '<br>' + events.join(' · ')
+  return html
+}
+
+function renderFvg(fvg) {
+  if (!fvg) return null
+  let html = `<span class="key">상승</span><span class="v">${fvg.active_up_total}개</span>` +
+             `<span class="key">하락</span><span class="v">${fvg.active_down_total}개</span>`
+  if (fvg.new_up_this_bar) html += ' <span style="color:#5fb35f;font-weight:600">신규 상승</span>'
+  if (fvg.new_down_this_bar) html += ' <span style="color:#e74c3c;font-weight:600">신규 하락</span>'
+  return html
+}
+
+function renderLondonBox(lb) {
+  if (!lb) return null
+  let html = `<span class="key">상승</span><span class="v">${lb.active_up_total}개</span>` +
+             `<span class="key">하락</span><span class="v">${lb.active_down_total}개</span>`
+  if (lb.new_up_this_bar) html += ' <span style="color:#5fb35f;font-weight:600">신규 상승</span>'
+  if (lb.new_down_this_bar) html += ' <span style="color:#e74c3c;font-weight:600">신규 하락</span>'
+  return html
+}
+
+function renderImbalance(imb) {
+  if (!imb) return null
+  let html = `<span class="key">매수</span><span class="v">${imb.active_buy_count}개</span>` +
+             `<span class="key">매도</span><span class="v">${imb.active_sell_count}개</span>`
+  if (imb.new_buy_this_bar) html += ' <span style="color:#5fb35f;font-weight:600">신규 매수</span>'
+  if (imb.new_sell_this_bar) html += ' <span style="color:#e74c3c;font-weight:600">신규 매도</span>'
+  
+  const lines = []
+  if (imb.nearest_support != null) lines.push(`<span class="key">지지</span><span class="v" style="color:#5fb35f">$${Number(imb.nearest_support).toLocaleString()}</span>`)
+  if (imb.nearest_resistance != null) lines.push(`<span class="key">저항</span><span class="v" style="color:#e74c3c">$${Number(imb.nearest_resistance).toLocaleString()}</span>`)
+  if (imb.absorbed_buy_count || imb.absorbed_sell_count) {
+    lines.push(`<span class="key">흡수</span><span class="v">매수 ${imb.absorbed_buy_count} / 매도 ${imb.absorbed_sell_count}</span>`)
+  }
+  if (lines.length) html += '<br>' + lines.join(' ')
+  return html
+}
 
 async function loadSetups() {
   const box = document.getElementById('setup-content')
