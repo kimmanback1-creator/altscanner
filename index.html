@@ -2146,7 +2146,11 @@ tr.both-agree .ticker-name {
       <div class="autosetup-head">
         <h2>⚡ 자동 셋업 (BTC)</h2>
         <span class="autosetup-info" id="autosetup-info">— 마지막 갱신: 대기 중</span>
-        <button class="journal-btn" onclick="loadAutoSetup()" style="margin-left:auto">🔄 새로고침</button>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="openAutoSetupStats()">📊 통계</button>
+          <button class="journal-btn" onclick="requestAutoSetupAnalysis()">🤖 AI 분석</button>
+          <button class="journal-btn" onclick="loadAutoSetup()">🔄 새로고침</button>
+        </div>
       </div>
       <div class="autosetup-body" id="autosetup-body">
         <div class="autosetup-empty">데이터 로딩 중...</div>
@@ -4286,7 +4290,6 @@ async function requestSetupAnalysis() {
     alert('결과가 입력된 셋업이 없습니다. 셋업의 결과 라벨을 먼저 채워주세요.')
     return
   }
-
   const box = document.getElementById('setup-content')
   let aiBox = document.getElementById('setup-ai-result')
   if (!aiBox) {
@@ -4309,6 +4312,311 @@ async function requestSetupAnalysis() {
   } catch (e) {
     aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
     console.error('[setup-analysis]', e)
+  }
+}
+
+// ══════════════════════════════════════
+//  자동 셋업 통계 + AI 분석
+// ══════════════════════════════════════
+
+// 이벤트 정의 — DB의 events JSONB와 매칭
+const AUTO_SIGNAL_DEFS = [
+  { key: 'trendline',    label: '트렌드라인',
+    values: ['약세→강세 전환', '강세→약세 전환'] },
+  { key: 'obv',          label: 'OBV',
+    values: ['overbought', 'oversold', 'overbought_release', 'oversold_release', 'bear_divergence', 'bull_divergence'] },
+  { key: 'diamond',      label: '다이아',
+    values: ['up', 'down'] },
+  { key: 'trend_change', label: '추세전환',
+    values: ['active'] },
+  { key: 'va_weekly',    label: 'VA 주봉',
+    values: ['vah_support', 'vah_resistance', 'poc_support', 'poc_resistance', 'val_support', 'val_resistance'] },
+  { key: 'fvg',          label: 'FVG',
+    values: ['new_up', 'new_down', 'both'] },
+  { key: 'london_box',   label: '런던박스',
+    values: ['new_up', 'new_down', 'both'] },
+  { key: 'imbalance',    label: '임밸런스',
+    values: ['new_buy', 'new_sell', 'absorbed_buy', 'absorbed_sell'] },
+]
+
+let autoStatsState = { tf: 'all', minEvents: 0, rows: [] }
+
+// events JSONB에서 특정 시그널-값이 있는지 확인
+function hasEvent(row, sigKey, eventVal) {
+  const ev = (row.events || {})[sigKey]
+  if (!ev) return false
+  return ev.split(',').map(s => s.trim()).includes(eventVal)
+}
+
+async function openAutoSetupStats() {
+  // 기존 모달 제거
+  const old = document.getElementById('autoStatsOverlay')
+  if (old) old.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'autoStatsOverlay'
+  overlay.className = 'meta-check-overlay'
+  overlay.innerHTML = `
+    <div class="meta-check-modal" style="width:min(820px, 94vw)">
+      <div class="meta-check-header">
+        <h2>📊 자동 셋업 통계 — 데이터 기반 패턴</h2>
+        <button class="meta-check-close" onclick="document.getElementById('autoStatsOverlay').remove()">✕</button>
+      </div>
+      <div class="ss-controls-row">
+        <span class="ss-axis-label">TF</span>
+        <div class="setup-stats-modal-tf">
+          ${['all','4H','1D'].map(tf => `<button class="ss-tf-btn ${autoStatsState.tf===tf?'on':''}" data-tf="${tf}">${tf==='all'?'전체':tf}</button>`).join('')}
+        </div>
+      </div>
+      <div class="ss-controls-row" style="padding-top:8px">
+        <span class="ss-axis-label">강도 (이벤트 수)</span>
+        <div class="setup-stats-modal-tl">
+          ${[0,1,2,3].map(n => `<button class="ss-tl-btn ${autoStatsState.minEvents===n?'on':''}" data-min="${n}">≥${n}</button>`).join('')}
+        </div>
+      </div>
+      <div class="meta-check-body" id="autoStatsBody">
+        <div class="meta-check-loading">데이터 로딩 중...</div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove()
+  })
+  overlay.querySelectorAll('.ss-tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      autoStatsState.tf = btn.dataset.tf
+      overlay.querySelectorAll('.ss-tf-btn').forEach(b => b.classList.remove('on'))
+      btn.classList.add('on')
+      loadAndRenderAutoStats()
+    })
+  })
+  overlay.querySelectorAll('.ss-tl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      autoStatsState.minEvents = parseInt(btn.dataset.min)
+      overlay.querySelectorAll('.ss-tl-btn').forEach(b => b.classList.remove('on'))
+      btn.classList.add('on')
+      loadAndRenderAutoStats()
+    })
+  })
+
+  await loadAndRenderAutoStats()
+}
+
+async function loadAndRenderAutoStats() {
+  const body = document.getElementById('autoStatsBody')
+  if (!body) return
+  body.innerHTML = '<div class="meta-check-loading">불러오는 중...</div>'
+
+  try {
+    let q = sb.from('setup_log_auto').select('*').not('result', 'is', null)
+    if (autoStatsState.tf !== 'all') q = q.eq('timeframe', autoStatsState.tf)
+    if (autoStatsState.minEvents > 0) q = q.gte('event_count', autoStatsState.minEvents)
+
+    const { data, error } = await q
+    if (error) throw error
+    autoStatsState.rows = data || []
+  } catch (e) {
+    body.innerHTML = `<div class="meta-check-error">로딩 실패: ${e.message}</div>`
+    return
+  }
+
+  renderAutoStatsBody()
+}
+
+function renderAutoStatsBody() {
+  const body = document.getElementById('autoStatsBody')
+  if (!body) return
+
+  const rows = autoStatsState.rows
+  if (rows.length === 0) {
+    body.innerHTML = `
+      <div class="ss-empty">
+        결과 입력된 자동 셋업 데이터 없음.
+        <span class="ss-hint">
+          - 5/25부터 자동 수집 시작, 7일 후 자동 라벨링<br>
+          - 첫 결과 예상: 6/1 부근<br>
+          - 그 이후 매일 4H 6개 + 1D 1개씩 라벨링 누적
+        </span>
+      </div>
+    `
+    return
+  }
+
+  let html = `
+    <div style="font-size:11px;color:#888;margin-bottom:12px">
+      ${autoStatsState.tf === 'all' ? '전체 TF' : autoStatsState.tf} ·
+      이벤트 ≥${autoStatsState.minEvents} ·
+      결과 입력 <b style="color:#ddd">${rows.length}건</b>
+    </div>
+  `
+
+  // ① 전체 결과 분포
+  html += '<div class="ss-section"><div class="ss-section-head">전체 결과 분포</div>'
+  html += countRowAuto('전체', rows)
+  html += '</div>'
+
+  // ② event_count 분포 (히스토그램)
+  html += '<div class="ss-section"><div class="ss-section-head">강도(event_count)별 분포</div>'
+  for (let n = 0; n <= 6; n++) {
+    const eRows = rows.filter(r => r.event_count === n)
+    if (eRows.length === 0) continue
+    html += countRowAuto(`event_count = <b>${n}</b>`, eRows)
+  }
+  html += '</div>'
+
+  // ③ 시그널-이벤트별 분포
+  for (const sig of AUTO_SIGNAL_DEFS) {
+    let sigHtml = ''
+    for (const v of sig.values) {
+      const matched = rows.filter(r => hasEvent(r, sig.key, v))
+      if (matched.length === 0) continue
+      sigHtml += countRowAuto(`${v}`, matched)
+    }
+    if (!sigHtml) continue
+    html += `<div class="ss-section">
+      <div class="ss-section-head">${sig.label}</div>
+      ${sigHtml}
+    </div>`
+  }
+
+  body.innerHTML = html
+}
+
+// 자동 통계용 카운트 행 (매뉴얼의 countRow와 동일 형식)
+function countRowAuto(name, rows) {
+  const { counts, labeled } = countResults(rows)  // 매뉴얼 함수 재활용
+  const lowData = labeled > 0 && labeled < 5
+  const nClass = labeled === 0 ? 'setup-stat-n' : (lowData ? 'setup-stat-n setup-stat-lowdata' : 'setup-stat-n')
+  const nameStyle = labeled === 0 ? 'color:#555' : ''
+
+  const cells = SETUP_RESULTS.map(rs => {
+    const c = counts[rs] || 0
+    const color = c > 0 ? RESULT_COLORS[rs] : '#3a3a3a'
+    const weight = c > 0 ? '600' : '400'
+    return `<span style="color:${color};font-weight:${weight};font-size:10px;min-width:62px;display:inline-block">${rs} ${c}</span>`
+  }).join('')
+
+  return `
+    <div class="setup-stat-row" style="font-size:10px">
+      <span class="setup-stat-name" style="width:200px;${nameStyle}">${name}</span>
+      <div style="flex:1;display:flex;gap:4px;flex-wrap:wrap">${cells}</div>
+      <span class="${nClass}">n=${labeled}</span>
+    </div>
+  `
+}
+
+// 자동 셋업 요약 텍스트 — AI 분석용 (n>=5만 포함)
+function buildAutoSetupSummary() {
+  const MIN_N = 5
+  const labeled = autoStatsState.rows  // 이미 필터된 행
+  const totalAll = labeled.length
+
+  let txt = '=== 자동 셋업 통계 — 데이터 기반 시그널 패턴 ===\n'
+  txt += `필터: TF=${autoStatsState.tf}, 강도≥${autoStatsState.minEvents}\n`
+  txt += `결과 입력 봉: ${totalAll}건\n\n`
+
+  // 전체 분포
+  const overall = countResults(labeled)
+  txt += `[전체 분포] ${SETUP_RESULTS.filter(rs => overall.counts[rs]).map(rs => `${rs}=${overall.counts[rs]}`).join(', ')}\n\n`
+
+  // 시그널-이벤트별 (n>=5만)
+  let totalIncluded = 0
+  for (const sig of AUTO_SIGNAL_DEFS) {
+    const lines = []
+    for (const v of sig.values) {
+      const matched = labeled.filter(r => hasEvent(r, sig.key, v))
+      if (matched.length < MIN_N) continue
+      const { counts } = countResults(matched)
+      const dist = SETUP_RESULTS.filter(rs => counts[rs]).map(rs => `${rs}=${counts[rs]}`).join(', ')
+      lines.push(`  ${v}: n=${matched.length} (${dist})`)
+      totalIncluded++
+    }
+    if (lines.length === 0) continue
+    txt += `[${sig.label}]\n${lines.join('\n')}\n\n`
+  }
+
+  // event_count 그룹
+  for (let n = 1; n <= 6; n++) {
+    const eRows = labeled.filter(r => r.event_count >= n)
+    if (eRows.length < MIN_N) continue
+    const { counts } = countResults(eRows)
+    const dist = SETUP_RESULTS.filter(rs => counts[rs]).map(rs => `${rs}=${counts[rs]}`).join(', ')
+    txt += `[event_count >= ${n}] n=${eRows.length} (${dist})\n`
+  }
+
+  return { text: txt, totalIncluded, sampleSize: totalAll }
+}
+
+async function requestAutoSetupAnalysis() {
+  // 데이터 먼저 로드 (모달 안 열려 있어도 가능)
+  try {
+    let q = sb.from('setup_log_auto').select('*').not('result', 'is', null)
+    const { data, error } = await q
+    if (error) throw error
+    autoStatsState.rows = data || []
+  } catch (e) {
+    alert('데이터 로드 실패: ' + e.message)
+    return
+  }
+
+  const labeled = autoStatsState.rows
+  if (labeled.length === 0) {
+    alert('결과 입력된 자동 셋업이 없습니다. 첫 결과는 6/1 부근 자동 라벨링 예정.')
+    return
+  }
+
+  // AI 결과를 자동 셋업 뷰 body 위에 표시
+  const body = document.getElementById('autosetup-body')
+  let aiBox = document.getElementById('autosetup-ai-result')
+  if (!aiBox) {
+    aiBox = document.createElement('div')
+    aiBox.id = 'autosetup-ai-result'
+    aiBox.className = 'index-ai-box'
+    aiBox.style.marginBottom = '14px'
+    body.insertBefore(aiBox, body.firstChild)
+  }
+  aiBox.textContent = '🤖 AI 분석 중...'
+
+  const { text: summary, totalIncluded, sampleSize } = buildAutoSetupSummary()
+
+  if (totalIncluded === 0) {
+    aiBox.textContent = `⚠️ 표본 부족 — 전체 ${sampleSize}건이지만 시그널-값별로 n≥5인 조합이 없습니다. 데이터가 더 쌓여야 분석 가능.`
+    return
+  }
+
+  const prompt = `다음은 자동 수집된 BTC 봉별 셋업 통계입니다. 사람이 셋업을 골라낸 게 아니라 모든 4H/1D 봉을 시그널 이벤트와 함께 기록하고, 7일 후 가격으로 7개 라벨 자동 판정했습니다.
+
+7개 결과 라벨:
+- 상승군: 상승 / 하락 후 상승 / 매수 임밸런스 흡수 후 상승
+- 횡보: 횡보
+- 하락군: 매도 임밸런스 흡수 후 하락 / 상승 후 하락 / 하락
+
+분석 요청:
+1. 어떤 시그널-이벤트가 상승군 적중률 높은가
+2. 어떤 시그널-이벤트가 하락군 적중률 높은가
+3. 어떤 이벤트는 결과 분포가 랜덤(균등)이라 신호 가치가 낮은가
+4. event_count(강도)가 결과 예측력에 영향을 주는가
+5. 흥미로운 패턴이나 예상 밖 결과가 있다면
+
+규칙:
+- 표본 n이 5~10이면 "초기 경향"으로만, 단정 금지
+- 정확한 숫자 인용 (n=N, 분포)
+- 한국어 답변, 트레이더 관점
+
+${summary}`
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: prompt },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    aiBox.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[auto-setup-analysis]', e)
   }
 }
 
