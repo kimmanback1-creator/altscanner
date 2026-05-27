@@ -4776,19 +4776,59 @@ const COMBO_BONUS = {
 const UP_RESULTS = ['상승', '하락 후 상승', '매수 임밸런스 흡수 후 상승']
 const DOWN_RESULTS = ['하락', '상승 후 하락', '매도 임밸런스 흡수 후 하락']
 
-// 현재 봉의 events에서 활성 시그널 추출
+// 현재 봉의 signals JSONB에서 활성 이벤트 추출
+// (signal_state에는 events 컬럼이 없고 signals JSONB만 있어서 직접 파싱)
 // returns: [{ sig: 'trendline', val: '강세' }, { sig: 'imbalance', val: 'new_sell' }, ...]
 function extractActiveSignals(barRow) {
-  if (!barRow || !barRow.events) return []
+  if (!barRow || !barRow.signals) return []
+  const s = barRow.signals
   const signals = []
-  for (const [sig, valStr] of Object.entries(barRow.events)) {
-    if (!valStr) continue
-    // imbalance, va_weekly, obv는 comma-separated 가능
-    const vals = String(valStr).split(',').map(s => s.trim()).filter(Boolean)
-    for (const val of vals) {
-      signals.push({ sig, val })
-    }
+  
+  // 1. trendline — state 사용 (강세/약세/중립/약세→강세 전환/강세→약세 전환)
+  if (s.trendline?.state) {
+    signals.push({ sig: 'trendline', val: s.trendline.state })
   }
+  
+  // 2. obv — boolean 플래그들
+  const obv = s.obv || {}
+  if (obv.overbought)         signals.push({ sig: 'obv', val: 'overbought' })
+  if (obv.oversold)           signals.push({ sig: 'obv', val: 'oversold' })
+  if (obv.overbought_release) signals.push({ sig: 'obv', val: 'overbought_release' })
+  if (obv.oversold_release)   signals.push({ sig: 'obv', val: 'oversold_release' })
+  if (obv.bear_divergence)    signals.push({ sig: 'obv', val: 'bear_divergence' })
+  if (obv.bull_divergence)    signals.push({ sig: 'obv', val: 'bull_divergence' })
+  
+  // 3. diamond
+  if (s.diamond?.green) signals.push({ sig: 'diamond', val: 'up' })
+  if (s.diamond?.red)   signals.push({ sig: 'diamond', val: 'down' })
+  
+  // 4. trend_change
+  if (s.trend_change?.active) signals.push({ sig: 'trend_change', val: 'active' })
+  
+  // 5. va_weekly — 지지/저항 boolean 플래그들
+  const va = s.va_weekly || {}
+  if (va.vah_support)    signals.push({ sig: 'va_weekly', val: 'vah_support' })
+  if (va.vah_resistance) signals.push({ sig: 'va_weekly', val: 'vah_resistance' })
+  if (va.poc_support)    signals.push({ sig: 'va_weekly', val: 'poc_support' })
+  if (va.poc_resistance) signals.push({ sig: 'va_weekly', val: 'poc_resistance' })
+  if (va.val_support)    signals.push({ sig: 'va_weekly', val: 'val_support' })
+  if (va.val_resistance) signals.push({ sig: 'va_weekly', val: 'val_resistance' })
+  
+  // 6. fvg — 이번 봉 신규 발생만
+  if (s.fvg?.new_up_this_bar)   signals.push({ sig: 'fvg', val: 'new_up' })
+  if (s.fvg?.new_down_this_bar) signals.push({ sig: 'fvg', val: 'new_down' })
+  
+  // 7. london_box — 이번 봉 신규 발생만
+  if (s.london_box?.new_up_this_bar)   signals.push({ sig: 'london_box', val: 'new_up' })
+  if (s.london_box?.new_down_this_bar) signals.push({ sig: 'london_box', val: 'new_down' })
+  
+  // 8. imbalance — 신규 + 흡수
+  const imb = s.imbalance || {}
+  if (imb.new_buy_this_bar)  signals.push({ sig: 'imbalance', val: 'new_buy' })
+  if (imb.new_sell_this_bar) signals.push({ sig: 'imbalance', val: 'new_sell' })
+  if (imb.absorbed_buy_count > 0)  signals.push({ sig: 'imbalance', val: 'absorbed_buy' })
+  if (imb.absorbed_sell_count > 0) signals.push({ sig: 'imbalance', val: 'absorbed_sell' })
+  
   return signals
 }
 
@@ -4866,7 +4906,7 @@ async function computeRecommendation(barRow, tf) {
   }
   
   // 현재 트렌드라인 상태 (환경 보너스 판정용)
-  const trendlineState = barRow.events?.trendline || null
+  const trendlineState = barRow.signals?.trendline?.state || null
   
   // 각 시그널의 통계 조회 (병렬)
   const statsPromises = activeSignals.map(({ sig, val }) =>
