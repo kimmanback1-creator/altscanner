@@ -4328,7 +4328,7 @@ async function requestSetupAnalysis() {
 // 이벤트 정의 — DB의 events JSONB와 매칭
 const AUTO_SIGNAL_DEFS = [
   { key: 'trendline',    label: '트렌드라인',
-    values: ['약세→강세 전환', '강세→약세 전환'] },
+    values: ['강세', '약세', '중립', '약세→강세 전환', '강세→약세 전환'] },
   { key: 'obv',          label: 'OBV',
     values: ['overbought', 'oversold', 'overbought_release', 'oversold_release', 'bear_divergence', 'bull_divergence'] },
   { key: 'diamond',      label: '다이아',
