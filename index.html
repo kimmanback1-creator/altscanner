@@ -1106,6 +1106,55 @@ tr.both-agree .ticker-name {
   margin-top: 4px;
 }
 
+/* ── AI 의견 expand ─────────── */
+.rec-ai-section {
+  margin-top: 10px;
+  border-top: 0.5px solid #1f1f1f;
+  padding-top: 8px;
+}
+.rec-ai-btn {
+  background: #1a1a2e;
+  color: #7a9bd5;
+  border: 0.5px solid #2a3a5a;
+  padding: 5px 12px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Consolas', monospace;
+  width: 100%;
+  text-align: center;
+  transition: all .12s;
+}
+.rec-ai-btn:hover {
+  background: #1f1f3a;
+  color: #a8c0e0;
+  border-color: #3a4a6a;
+}
+.rec-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.rec-ai-result {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #0e0e0e;
+  border: 0.5px solid #1a1a1a;
+  border-left: 2px solid #5b9bd5;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #ccc;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.rec-ai-result.loading {
+  color: #888;
+  font-style: italic;
+}
+.rec-ai-result.error {
+  border-left-color: #e74c3c;
+  color: #d5a55b;
+}
+
 /* ── 셋업기록 ───────────────────── */
 #view-setup {
   flex-direction: column;
@@ -3845,6 +3894,7 @@ function renderRecBox(rec) {
     <div class="rec-rr">R:R <b>${lv.rr}</b>${lv.takeProfit2 ? ` · 2차 익절 $${lv.takeProfit2.toLocaleString()}` : ''}</div>
     ${renderPriceChart(rec, isLong)}
     ${renderEvidences(rec.evidences)}
+    ${renderAiSection(rec)}
   </div>`
 }
 
@@ -3923,6 +3973,126 @@ function renderPriceChart(rec, isLong) {
   return `<div class="rec-price-chart">
     <svg class="rec-price-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${html}</svg>
   </div>`
+}
+
+// AI 분석 캐시 — 같은 봉에서 재호출 방지
+// key: tf+barTs, value: 분석 결과 텍스트
+window._recAiCache = window._recAiCache || {}
+
+function renderAiSection(rec) {
+  // 캐시 키 — 활성 시그널과 verdict로 구성 (같은 추천이면 같은 분석)
+  const cacheKey = rec.verdict + '|' + (rec.evidences || []).map(e => `${e.sig}=${e.val}`).join(',')
+  const cached = window._recAiCache[cacheKey]
+  
+  // 캐시된 결과가 있으면 바로 표시
+  if (cached) {
+    return `<div class="rec-ai-section">
+      <div class="rec-ai-result">🤖 ${escapeHtml(cached)}</div>
+    </div>`
+  }
+  
+  // 안전하게 cacheKey 인코딩 (어트리뷰트 escape)
+  const safeKey = encodeURIComponent(cacheKey)
+  const safeRec = encodeURIComponent(JSON.stringify(rec))
+  
+  return `<div class="rec-ai-section">
+    <button class="rec-ai-btn" onclick="requestRecAiOpinion(this, '${safeKey}', '${safeRec}')">
+      🤖 AI 분석 (이 추천에 대한 해설)
+    </button>
+  </div>`
+}
+
+// AI 의견 호출
+async function requestRecAiOpinion(btn, safeKey, safeRec) {
+  const cacheKey = decodeURIComponent(safeKey)
+  const rec = JSON.parse(decodeURIComponent(safeRec))
+  
+  // 이미 호출 중이면 무시
+  if (btn.disabled) return
+  
+  // 결과 영역 생성 (버튼 아래)
+  let resultEl = btn.parentElement.querySelector('.rec-ai-result')
+  if (!resultEl) {
+    resultEl = document.createElement('div')
+    resultEl.className = 'rec-ai-result loading'
+    btn.parentElement.appendChild(resultEl)
+  }
+  
+  resultEl.classList.add('loading')
+  resultEl.classList.remove('error')
+  resultEl.textContent = '🤖 AI 분석 중...'
+  
+  const oldLabel = btn.textContent
+  btn.textContent = '분석 중...'
+  btn.disabled = true
+  
+  // 프롬프트 작성
+  const verdictText = {
+    STRONG_LONG: '강한 LONG 추천',
+    STRONG_SHORT: '강한 SHORT 추천',
+    WEAK_LONG: '약한 LONG 추천',
+    WEAK_SHORT: '약한 SHORT 추천',
+  }[rec.verdict] || rec.verdict
+  
+  const evidencesText = (rec.evidences || []).map(e => {
+    const dir = e.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'
+    const bonus = e.bonus ? ' [환경 보너스 적용]' : ''
+    return `  - ${e.sig}=${e.val}: 누적 표본 n=${e.n}, ${dir} 적중률 ${e.hitPct.toFixed(0)}%, 가중치 ${e.weight.toFixed(2)}${bonus}`
+  }).join('\n')
+  
+  const lv = rec.levels || {}
+  const levelsText = lv.entry
+    ? `  진입 $${lv.entry}, 손절 $${lv.stopLoss} (−${lv.stopLossPct}%), 익절 $${lv.takeProfit} (+${lv.takeProfitPct}%), R:R ${lv.rr}`
+    : ''
+  
+  const prompt = `다음은 BTC 자동 시그널 시스템이 누적 통계 기반으로 도출한 진입 추천입니다.
+
+판정: ${verdictText} (신뢰도 ${rec.confidencePct}%)
+LONG 점수: ${rec.longScore} / SHORT 점수: ${rec.shortScore}
+
+근거 시그널 (적중률 통계 기반):
+${evidencesText}
+
+진입 레벨:
+${levelsText}
+
+분석 요청:
+1. 이 추천의 핵심 논리를 2~3문장으로 요약 (어떤 시그널이 가장 강한가)
+2. 주의해야 할 리스크나 약점 (반대 방향 시그널, 표본 수 부족 등)
+3. 진입 시 체크해야 할 추가 확인 포인트 (예: 더 짧은 TF에서 확정 신호, 호가창, 거래량 등)
+4. 한 줄 결론 — 이 추천을 따를 만한가?
+
+규칙:
+- 한국어, 트레이더 관점, 간결하게 (전체 8~12줄)
+- 표본 n이 5~10이면 "초기 경향"으로만 언급, 단정 금지
+- 환경 보너스 적용된 시그널은 특별히 강조`
+  
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: prompt },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    
+    const analysis = result.analysis || '응답 없음'
+    
+    // 캐시 저장
+    window._recAiCache[cacheKey] = analysis
+    
+    // 결과 표시
+    resultEl.classList.remove('loading')
+    resultEl.textContent = '🤖 ' + analysis
+    
+    // 버튼 숨김 (캐시 표시로 대체됨)
+    btn.style.display = 'none'
+  } catch (e) {
+    resultEl.classList.remove('loading')
+    resultEl.classList.add('error')
+    resultEl.textContent = '⚠️ AI 분석 실패: ' + e.message
+    btn.textContent = oldLabel
+    btn.disabled = false
+    console.error('[rec-ai]', e)
+  }
 }
 
 function renderEvidences(evidences) {
