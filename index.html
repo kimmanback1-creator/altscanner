@@ -888,6 +888,46 @@ tr.both-agree .ticker-name {
   font-family: 'Consolas', monospace;
   margin-bottom: 12px;
 }
+
+/* ── raw 상태 (조기 감지) ─────────── */
+.autosetup-raw-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: #141414;
+  border: 0.5px solid #1f1f1f;
+}
+.autosetup-raw-state.diverged {
+  background: #1a1610;
+  border-color: #3a3015;
+}
+.autosetup-raw-state .raw-label {
+  font-size: 9px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.autosetup-raw-state .raw-val {
+  font-weight: 600;
+}
+.autosetup-raw-state .raw-val.bull    { color: #2ecc71; }
+.autosetup-raw-state .raw-val.bear    { color: #e74c3c; }
+.autosetup-raw-state .raw-val.neutral { color: #888; }
+.autosetup-raw-state .raw-val.turn    { color: #f0b90b; }
+.autosetup-raw-state .raw-diverge-tag {
+  font-size: 9px;
+  color: #d5a55b;
+  margin-left: auto;
+}
+.autosetup-raw-state .raw-same-tag {
+  font-size: 9px;
+  color: #555;
+  margin-left: auto;
+}
 .autosetup-sig-row {
   display: flex;
   align-items: flex-start;
@@ -3761,6 +3801,7 @@ async function renderAutoSetupCard(row, tfLabel, precomputedRec) {
       <span class="autosetup-bar-ts">${barTsStr}</span>
     </div>
     <div class="autosetup-price">${priceStr}</div>
+    ${renderRawState(signals.trendline)}
     ${renderSignalRow('트렌드라인', renderTrendline(signals.trendline))}
     ${renderSignalRow('OBV', renderObv(signals.obv))}
     ${renderSignalRow('다이아', renderDiamond(signals.diamond))}
@@ -4116,6 +4157,31 @@ function renderSignalRow(name, valHtml) {
   return `<div class="autosetup-sig-row">
     <span class="autosetup-sig-name">${name}</span>
     <div class="autosetup-sig-val">${valHtml || '<span class="vf">데이터 없음</span>'}</div>
+  </div>`
+}
+
+// raw 상태 (조기 감지) 렌더링 — state와 비교
+function renderRawState(t) {
+  if (!t || !t.raw_state) return ''
+  
+  const raw = t.raw_state
+  const state = t.state
+  const diverged = raw !== state  // raw가 안정화 state와 다른가
+  
+  // 색 클래스
+  const colorCls = raw === '강세' ? 'bull'
+                 : raw === '약세' ? 'bear'
+                 : raw.includes('전환') ? 'turn'
+                 : 'neutral'
+  
+  const tag = diverged
+    ? `<span class="raw-diverge-tag">⚡ 조기 신호 (확정: ${state})</span>`
+    : `<span class="raw-same-tag">확정 상태와 일치</span>`
+  
+  return `<div class="autosetup-raw-state ${diverged ? 'diverged' : ''}">
+    <span class="raw-label">raw</span>
+    <span class="raw-val ${colorCls}">${raw}</span>
+    ${tag}
   </div>`
 }
 
