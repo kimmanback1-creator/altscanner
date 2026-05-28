@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from db.supabase import get_client
 from notify.telegram import send_message
+from core.recommendation import build_autosetup_section
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -364,6 +365,8 @@ async def build_daily_report(start_kst, end_kst):
         "",
         "🪙 *메이저 24h 흐름*",
         fmt_major_block(majors),
+        "",
+        build_autosetup_section(),
         "",
         "🚀 *알트 TOP 5 상승*",
         fmt_alt_block(top_up, mode="up"),
