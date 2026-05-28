@@ -4160,13 +4160,15 @@ function renderSignalRow(name, valHtml) {
   </div>`
 }
 
-// raw 상태 (조기 감지) 렌더링 — state와 비교
+// raw 상태 (조기 감지) 렌더링 — state와 다를 때만 표시 (조기 신호)
 function renderRawState(t) {
   if (!t || !t.raw_state) return ''
   
   const raw = t.raw_state
   const state = t.state
-  const diverged = raw !== state  // raw가 안정화 state와 다른가
+  
+  // 일치하면 숨김 (조기 신호 아님)
+  if (raw === state) return ''
   
   // 색 클래스
   const colorCls = raw === '강세' ? 'bull'
@@ -4174,14 +4176,10 @@ function renderRawState(t) {
                  : raw.includes('전환') ? 'turn'
                  : 'neutral'
   
-  const tag = diverged
-    ? `<span class="raw-diverge-tag">⚡ 조기 신호 (확정: ${state})</span>`
-    : `<span class="raw-same-tag">확정 상태와 일치</span>`
-  
-  return `<div class="autosetup-raw-state ${diverged ? 'diverged' : ''}">
-    <span class="raw-label">raw</span>
+  return `<div class="autosetup-raw-state diverged">
+    <span class="raw-label">실시간</span>
     <span class="raw-val ${colorCls}">${raw}</span>
-    ${tag}
+    <span class="raw-diverge-tag">⚡ 조기 신호 (확정: ${state})</span>
   </div>`
 }
 
