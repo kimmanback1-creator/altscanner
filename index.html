@@ -2066,6 +2066,235 @@ tr.both-agree .ticker-name {
   background: #141414;
 }
 
+/* ══════════════════════════════════════════
+   검증 페이지
+   ══════════════════════════════════════════ */
+#view-verification {
+  padding: 20px 24px;
+  height: 100vh;
+  overflow-y: auto;
+}
+.verification-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 0.5px solid #1f1f1f;
+}
+.verification-head h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #e0e0e0;
+}
+.verification-info {
+  font-size: 11px;
+  color: #888;
+}
+
+/* A. 요약 통계 카드 그리드 */
+.verif-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.verif-stat-card {
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.verif-stat-label {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.verif-stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e0e0e0;
+  font-family: 'Consolas', monospace;
+}
+.verif-stat-value.pos { color: #2ecc71; }
+.verif-stat-value.neg { color: #e74c3c; }
+.verif-stat-value.warn { color: #f0b90b; }
+.verif-stat-sub {
+  font-size: 9px;
+  color: #555;
+  margin-top: 4px;
+}
+
+/* 섹션 타이틀 */
+.verif-section-title {
+  font-size: 13px;
+  color: #ccc;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px solid #1f1f1f;
+}
+
+/* B. 추적 중 그리드 */
+.verif-tracking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.verif-track-card {
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.verif-track-card.long  { border-left: 2px solid #2ecc71; }
+.verif-track-card.short { border-left: 2px solid #e74c3c; }
+.verif-track-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.verif-track-symbol {
+  font-weight: 600;
+  color: #e0e0e0;
+}
+.verif-track-direction {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.verif-track-direction.long  { background: #1a3020; color: #2ecc71; }
+.verif-track-direction.short { background: #301a1a; color: #e74c3c; }
+.verif-track-pnl {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: 'Consolas', monospace;
+}
+.verif-track-pnl.pos { color: #2ecc71; }
+.verif-track-pnl.neg { color: #e74c3c; }
+.verif-track-progress {
+  background: #0a0a0a;
+  border-radius: 2px;
+  height: 6px;
+  overflow: hidden;
+  margin: 4px 0;
+  position: relative;
+}
+.verif-track-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2a4a5a 0%, #5b9bd5 100%);
+  transition: width 0.3s;
+}
+.verif-track-meta {
+  font-size: 10px;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+}
+.verif-track-checkpoints {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  margin-top: 4px;
+}
+.verif-track-cp {
+  background: #0a0a0a;
+  border-radius: 2px;
+  padding: 3px 4px;
+  text-align: center;
+  font-size: 9px;
+  color: #444;
+}
+.verif-track-cp.filled { background: #1a1a1a; color: #aaa; }
+.verif-track-cp.filled.pos { color: #2ecc71; }
+.verif-track-cp.filled.neg { color: #e74c3c; }
+.verif-track-flags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 9px;
+}
+.verif-flag {
+  padding: 2px 5px;
+  border-radius: 2px;
+  background: #1a1a1a;
+  color: #666;
+}
+.verif-flag.hit { background: #1a3020; color: #2ecc71; }
+.verif-flag.sl { background: #301a1a; color: #e74c3c; }
+
+/* C. 완료된 분석 */
+.verif-analysis-wrap {
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 16px;
+}
+.verif-analysis-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.verif-analysis-section h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.verif-table {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+.verif-table th {
+  text-align: left;
+  color: #888;
+  font-weight: 500;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-bottom: 0.5px solid #1f1f1f;
+}
+.verif-table td {
+  padding: 4px 6px;
+  color: #ccc;
+  border-bottom: 0.5px solid #141414;
+}
+.verif-table td.num {
+  font-family: 'Consolas', monospace;
+  text-align: right;
+}
+.verif-table td.pos { color: #2ecc71; }
+.verif-table td.neg { color: #e74c3c; }
+
+.verif-empty {
+  padding: 30px;
+  text-align: center;
+  color: #555;
+  font-size: 11px;
+}
+
+/* 산점도 차트 (C) */
+.verif-scatter-wrap {
+  background: #0a0a0a;
+  border-radius: 4px;
+  padding: 8px;
+}
+.verif-scatter-svg {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
 </style>
 </head>
 <body>
@@ -2116,9 +2345,13 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">🎯</span>
         <span class="sidebar-label">셋업기록</span>
       </div>
-      <div class="sidebar-item" data-view="autosetup" onclick="switchView('autosetup')">
+      <<div class="sidebar-item" data-view="autosetup" onclick="switchView('autosetup')">
         <span class="sidebar-icon">⚡</span>
         <span class="sidebar-label">자동 셋업 (BTC)</span>
+      </div>
+      <div class="sidebar-item" data-view="verification" onclick="switchView('verification')">
+        <span class="sidebar-icon">🧪</span>
+        <span class="sidebar-label">검증</span>
       </div>
     </div>
   </div>
@@ -2437,8 +2670,68 @@ tr.both-agree .ticker-name {
         <div class="autosetup-empty">데이터 로딩 중...</div>
       </div>
     </div>
+
+    <!-- ── 검증 페이지 ─────────────────────── -->
+    <div id="view-verification" style="display:none">
+      <div class="verification-head">
+        <h2>🧪 알림 검증</h2>
+        <span class="verification-info" id="verification-info">데이터 로딩 중...</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="loadVerification()">🔄 새로고침</button>
+        </div>
+      </div>
+      <div class="verification-body" id="verification-body">
+        <!-- A. 요약 카드 -->
+        <div class="verif-summary-grid" id="verif-summary">
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">추적 중</div>
+            <div class="verif-stat-value" id="verif-tracking-count">—</div>
+            <div class="verif-stat-sub">알림 발생 후 7일 미만</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">완료된 표본</div>
+            <div class="verif-stat-value" id="verif-completed-count">—</div>
+            <div class="verif-stat-sub">7일 추적 완료</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">24h 평균 PnL</div>
+            <div class="verif-stat-value" id="verif-avg-24h">—</div>
+            <div class="verif-stat-sub">진입 24시간 후</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">트레일링 평균</div>
+            <div class="verif-stat-value" id="verif-avg-trailing">—</div>
+            <div class="verif-stat-sub">−10% callback 시뮬</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">24h 승률</div>
+            <div class="verif-stat-value" id="verif-win-rate">—</div>
+            <div class="verif-stat-sub">+PnL 비율</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">최대 잠재 평균</div>
+            <div class="verif-stat-value" id="verif-avg-max">—</div>
+            <div class="verif-stat-sub">7일 내 최고점</div>
+          </div>
+        </div>
+
+        <!-- B. 추적 중 알림 그리드 -->
+        <div class="verif-section-title">📍 추적 중인 알림</div>
+        <div class="verif-tracking-grid" id="verif-tracking-grid">
+          <div class="verif-empty">로딩 중...</div>
+        </div>
+
+        <!-- C. 완료된 결과 분석 -->
+        <div class="verif-section-title">📊 완료된 분석 (최근 100건)</div>
+        <div class="verif-analysis-wrap" id="verif-analysis">
+          <div class="verif-empty">로딩 중...</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+      
+<script>
       
 <script>
 const SUPABASE_URL = 'https://qjhqilkjckqpjlojppgq.supabase.co'
@@ -3449,7 +3742,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup', 'verification']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3482,6 +3775,11 @@ function switchView(view) {
   // 자동 셋업 뷰 활성화 시 데이터 로드
   if (view === 'autosetup') {
     loadAutoSetup()
+  }
+
+  // 검증 뷰 활성화 시 데이터 로드
+  if (view === 'verification') {
+    loadVerification()
   }
 }
 function toggleSidebar() {
@@ -7509,7 +7807,337 @@ function renderDiamondMatrix() {
   html += '</tbody></table>'
   wrap.innerHTML = html
 }
+
+// ══════════════════════════════════════
+//  검증 (Verification)
+// ══════════════════════════════════════
+let verifAutoTimer = null
+
+async function loadVerification() {
+  const info = document.getElementById('verification-info')
+  info.textContent = '데이터 로딩 중...'
   
+  try {
+    // 추적 중 + 완료 데이터 한 번에 fetch (최근 200건)
+    const { data: tracking } = await sb.from('signal_performance')
+      .select('*')
+      .eq('status', 'tracking')
+      .order('entry_at', { ascending: false })
+    
+    const { data: completed } = await sb.from('signal_performance')
+      .select('*')
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(200)
+    
+    const trackingRows = tracking || []
+    const completedRows = completed || []
+    
+    // A. 요약 카드
+    renderVerifSummary(trackingRows, completedRows)
+    
+    // B. 추적 중 그리드
+    renderVerifTracking(trackingRows)
+    
+    // C. 완료된 분석
+    renderVerifAnalysis(completedRows)
+    
+    const now = new Date()
+    const kst = new Date(now.getTime() + 9*60*60*1000)
+    info.textContent = `갱신 ${kst.toISOString().slice(11, 19)} KST · 추적 ${trackingRows.length} / 완료 ${completedRows.length}`
+    
+    // 자동 새로고침 (1분마다)
+    if (verifAutoTimer) clearInterval(verifAutoTimer)
+    verifAutoTimer = setInterval(() => {
+      if (document.getElementById('view-verification').style.display !== 'none') {
+        loadVerification()
+      } else {
+        clearInterval(verifAutoTimer)
+        verifAutoTimer = null
+      }
+    }, 60_000)
+    
+  } catch (e) {
+    console.error('[verification]', e)
+    info.textContent = '로딩 실패: ' + e.message
+  }
+}
+
+// A. 요약 통계 카드
+function renderVerifSummary(tracking, completed) {
+  document.getElementById('verif-tracking-count').textContent = tracking.length
+  document.getElementById('verif-completed-count').textContent = completed.length
+  
+  if (completed.length === 0) {
+    document.getElementById('verif-avg-24h').textContent = '—'
+    document.getElementById('verif-avg-trailing').textContent = '—'
+    document.getElementById('verif-win-rate').textContent = '—'
+    document.getElementById('verif-avg-max').textContent = '—'
+    return
+  }
+  
+  const valid24h = completed.filter(r => r.pnl_24h !== null)
+  const validTrail = completed.filter(r => r.trailing_pnl !== null)
+  const validMax = completed.filter(r => r.max_pnl !== null)
+  
+  const avg24h = valid24h.length ? valid24h.reduce((s, r) => s + r.pnl_24h, 0) / valid24h.length : 0
+  const avgTrail = validTrail.length ? validTrail.reduce((s, r) => s + r.trailing_pnl, 0) / validTrail.length : 0
+  const wins = valid24h.filter(r => r.pnl_24h > 0).length
+  const winRate = valid24h.length ? (wins / valid24h.length * 100) : 0
+  const avgMax = validMax.length ? validMax.reduce((s, r) => s + r.max_pnl, 0) / validMax.length : 0
+  
+  const setVal = (id, val, fmt) => {
+    const el = document.getElementById(id)
+    el.textContent = fmt(val)
+    el.className = 'verif-stat-value ' + (val > 0 ? 'pos' : val < 0 ? 'neg' : '')
+  }
+  
+  setVal('verif-avg-24h', avg24h, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  setVal('verif-avg-trailing', avgTrail, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  setVal('verif-avg-max', avgMax, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  
+  const wrEl = document.getElementById('verif-win-rate')
+  wrEl.textContent = winRate.toFixed(1) + '%'
+  wrEl.className = 'verif-stat-value ' + (winRate >= 40 ? 'pos' : winRate >= 30 ? 'warn' : 'neg')
+}
+
+// B. 추적 중 알림 그리드
+function renderVerifTracking(rows) {
+  const grid = document.getElementById('verif-tracking-grid')
+  if (rows.length === 0) {
+    grid.innerHTML = '<div class="verif-empty">현재 추적 중인 알림 없음 — 다음 알림 발생 시 자동 시작</div>'
+    return
+  }
+  
+  const now = Date.now()
+  
+  const cards = rows.map(r => {
+    const entryAt = new Date(r.entry_at).getTime()
+    const elapsedMin = (now - entryAt) / 1000 / 60
+    const progressPct = Math.min(100, elapsedMin / (60 * 24 * 7) * 100)
+    
+    // 최근 PnL (가장 최근 체크포인트)
+    const recentPnl = r.pnl_72h ?? r.pnl_24h ?? r.pnl_4h ?? r.pnl_1h ?? r.pnl_15m ?? 0
+    
+    const dirCls = r.direction === 'LONG' ? 'long' : 'short'
+    const dirIcon = r.direction === 'LONG' ? '▲' : '▼'
+    
+    const elapsed = elapsedMin < 60
+      ? `${elapsedMin.toFixed(0)}분 경과`
+      : elapsedMin < 60 * 24
+      ? `${(elapsedMin / 60).toFixed(1)}h 경과`
+      : `${(elapsedMin / 60 / 24).toFixed(1)}d 경과`
+    
+    // 체크포인트 미니 표시
+    const cps = [
+      { label: '15m', pnl: r.pnl_15m },
+      { label: '1h',  pnl: r.pnl_1h  },
+      { label: '4h',  pnl: r.pnl_4h  },
+      { label: '24h', pnl: r.pnl_24h },
+      { label: '72h', pnl: r.pnl_72h },
+      { label: '7d',  pnl: r.pnl_7d  },
+    ]
+    
+    const cpHtml = cps.map(cp => {
+      if (cp.pnl === null || cp.pnl === undefined) {
+        return `<div class="verif-track-cp">${cp.label}</div>`
+      }
+      const cls = cp.pnl >= 0 ? 'pos' : 'neg'
+      const sign = cp.pnl >= 0 ? '+' : ''
+      return `<div class="verif-track-cp filled ${cls}">${cp.label}<br>${sign}${cp.pnl.toFixed(1)}</div>`
+    }).join('')
+    
+    // 플래그
+    const flags = []
+    if (r.tp_100_hit) flags.push('<span class="verif-flag hit">+100%</span>')
+    else if (r.tp_50_hit) flags.push('<span class="verif-flag hit">+50%</span>')
+    else if (r.tp_20_hit) flags.push('<span class="verif-flag hit">+20%</span>')
+    else if (r.tp_10_hit) flags.push('<span class="verif-flag hit">+10%</span>')
+    if (r.sl_hit) flags.push('<span class="verif-flag sl">SL hit</span>')
+    if (r.trailing_exit_price) flags.push('<span class="verif-flag hit">트레일링 청산</span>')
+    
+    const pnlCls = recentPnl > 0 ? 'pos' : recentPnl < 0 ? 'neg' : ''
+    const pnlSign = recentPnl >= 0 ? '+' : ''
+    
+    return `
+      <div class="verif-track-card ${dirCls}">
+        <div class="verif-track-head">
+          <span class="verif-track-symbol">${r.symbol.replace('-USDT-SWAP', '')}</span>
+          <span class="verif-track-direction ${dirCls}">${dirIcon} ${r.direction}</span>
+        </div>
+        <div class="verif-track-pnl ${pnlCls}">${pnlSign}${recentPnl.toFixed(2)}%</div>
+        <div class="verif-track-progress">
+          <div class="verif-track-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
+        </div>
+        <div class="verif-track-meta">
+          <span>${elapsed}</span>
+          <span>진입 $${Number(r.entry_price).toLocaleString(undefined,{maximumFractionDigits:6})}</span>
+        </div>
+        <div class="verif-track-checkpoints">${cpHtml}</div>
+        ${flags.length ? `<div class="verif-track-flags">${flags.join('')}</div>` : ''}
+      </div>
+    `
+  }).join('')
+  
+  grid.innerHTML = cards
+}
+
+// C. 완료된 분석
+function renderVerifAnalysis(rows) {
+  const wrap = document.getElementById('verif-analysis')
+  if (rows.length < 5) {
+    wrap.innerHTML = `<div class="verif-empty">표본 부족 (현재 ${rows.length}건) — 5건 이상 누적 시 분석 시작</div>`
+    return
+  }
+  
+  // 방향별
+  const long  = rows.filter(r => r.direction === 'LONG')
+  const short = rows.filter(r => r.direction === 'SHORT')
+  
+  const calcStats = arr => {
+    const valid = arr.filter(r => r.pnl_24h !== null)
+    if (!valid.length) return null
+    const avg = valid.reduce((s, r) => s + r.pnl_24h, 0) / valid.length
+    const wins = valid.filter(r => r.pnl_24h > 0).length
+    const winRate = wins / valid.length * 100
+    const avgTrail = arr.filter(r => r.trailing_pnl !== null)
+      .reduce((s, r, _, a) => s + r.trailing_pnl / a.length, 0)
+    return { n: valid.length, avg, winRate, avgTrail }
+  }
+  
+  const lStats = calcStats(long)
+  const sStats = calcStats(short)
+  
+  // 종목 TOP 5 (max_pnl 기준)
+  const topMax = [...rows]
+    .filter(r => r.max_pnl !== null)
+    .sort((a, b) => b.max_pnl - a.max_pnl)
+    .slice(0, 5)
+  
+  // 종목 BOTTOM 5 (min_pnl)
+  const worstMin = [...rows]
+    .filter(r => r.min_pnl !== null)
+    .sort((a, b) => a.min_pnl - b.min_pnl)
+    .slice(0, 5)
+  
+  const fmtPct = v => v === null || v === undefined ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  const fmtCls = v => v === null || v === undefined ? '' : (v >= 0 ? 'pos' : 'neg')
+  
+  const dirRow = (label, s) => {
+    if (!s) return `<tr><td>${label}</td><td colspan="4">데이터 없음</td></tr>`
+    return `<tr>
+      <td>${label}</td>
+      <td class="num">${s.n}</td>
+      <td class="num ${s.avg >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avg)}</td>
+      <td class="num">${s.winRate.toFixed(0)}%</td>
+      <td class="num ${s.avgTrail >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avgTrail)}</td>
+    </tr>`
+  }
+  
+  wrap.innerHTML = `
+    <div class="verif-analysis-row">
+      <div class="verif-analysis-section">
+        <h4>방향별 성과</h4>
+        <table class="verif-table">
+          <thead><tr><th>방향</th><th>n</th><th>24h 평균</th><th>승률</th><th>트레일링</th></tr></thead>
+          <tbody>
+            ${dirRow('▲ LONG', lStats)}
+            ${dirRow('▼ SHORT', sStats)}
+          </tbody>
+        </table>
+      </div>
+      <div class="verif-analysis-section">
+        <h4>산점도 — 24h PnL 분포</h4>
+        ${renderScatter(rows)}
+      </div>
+    </div>
+    <div class="verif-analysis-row">
+      <div class="verif-analysis-section">
+        <h4>🚀 최대 잠재 수익 TOP 5</h4>
+        <table class="verif-table">
+          <thead><tr><th>티커</th><th>방향</th><th>최대</th><th>24h</th><th>트레일링</th></tr></thead>
+          <tbody>
+            ${topMax.map(r => `<tr>
+              <td>${r.symbol.replace('-USDT-SWAP','')}</td>
+              <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
+              <td class="num ${fmtCls(r.max_pnl)}">${fmtPct(r.max_pnl)}</td>
+              <td class="num ${fmtCls(r.pnl_24h)}">${fmtPct(r.pnl_24h)}</td>
+              <td class="num ${fmtCls(r.trailing_pnl)}">${fmtPct(r.trailing_pnl)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="verif-analysis-section">
+        <h4>📉 최대 낙폭 TOP 5</h4>
+        <table class="verif-table">
+          <thead><tr><th>티커</th><th>방향</th><th>최저</th><th>24h</th><th>SL</th></tr></thead>
+          <tbody>
+            ${worstMin.map(r => `<tr>
+              <td>${r.symbol.replace('-USDT-SWAP','')}</td>
+              <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
+              <td class="num ${fmtCls(r.min_pnl)}">${fmtPct(r.min_pnl)}</td>
+              <td class="num ${fmtCls(r.pnl_24h)}">${fmtPct(r.pnl_24h)}</td>
+              <td>${r.sl_hit ? '✓' : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `
+}
+
+// 산점도 SVG — x축: 진입 시간, y축: 24h PnL
+function renderScatter(rows) {
+  const valid = rows.filter(r => r.pnl_24h !== null)
+  if (valid.length < 3) return '<div class="verif-empty" style="padding:10px;">표본 부족</div>'
+  
+  const W = 400, H = 200
+  const PAD = 30
+  const cw = W - PAD * 2
+  const ch = H - PAD * 2
+  
+  // Y축: PnL 범위
+  let pnls = valid.map(r => r.pnl_24h)
+  let minP = Math.min(...pnls, -10)
+  let maxP = Math.max(...pnls, 10)
+  const pad = (maxP - minP) * 0.1
+  minP -= pad
+  maxP += pad
+  const range = maxP - minP
+  
+  // X축: 시간 (오래된 → 최근)
+  const times = valid.map(r => new Date(r.entry_at).getTime())
+  const minT = Math.min(...times)
+  const maxT = Math.max(...times)
+  const rangeT = maxT - minT || 1
+  
+  const xScale = t => PAD + cw * (t - minT) / rangeT
+  const yScale = p => PAD + ch * (1 - (p - minP) / range)
+  
+  // 0 라인
+  const yZero = yScale(0)
+  
+  // 점들
+  const dots = valid.map(r => {
+    const x = xScale(new Date(r.entry_at).getTime())
+    const y = yScale(r.pnl_24h)
+    const color = r.pnl_24h >= 0 ? '#2ecc71' : '#e74c3c'
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}" opacity="0.7">
+      <title>${r.symbol.replace('-USDT-SWAP','')} ${r.direction}: ${r.pnl_24h.toFixed(2)}%</title>
+    </circle>`
+  }).join('')
+  
+  return `<div class="verif-scatter-wrap">
+    <svg class="verif-scatter-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <line x1="${PAD}" y1="${yZero.toFixed(1)}" x2="${PAD+cw}" y2="${yZero.toFixed(1)}" stroke="#333" stroke-width="0.5" stroke-dasharray="3,3"/>
+      <text x="${PAD-4}" y="${(yZero+3).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">0%</text>
+      <text x="${PAD-4}" y="${(PAD+5).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">${maxP.toFixed(0)}%</text>
+      <text x="${PAD-4}" y="${(PAD+ch).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">${minP.toFixed(0)}%</text>
+      ${dots}
+    </svg>
+  </div>`
+}
+
 init()
 
 </script>
