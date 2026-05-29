@@ -135,7 +135,9 @@ def update_one(row: dict) -> bool:
         if not row.get("tp_50_hit")  and current_pnl >= 50:  updates["tp_50_hit"]  = True
         if not row.get("tp_100_hit") and current_pnl >= 100: updates["tp_100_hit"] = True
 
-        trailing_active = row.get("tp_10_hit") or updates.get("tp_10_hit")
+        # 트레일링 활성화 = 진입 후 한 번이라도 ACTIVATE_PCT 도달
+        # max_now가 활성화 임계 넘었으면 활성화 (tp 플래그 의존 안 함)
+        trailing_active = max_now >= TRAILING_ACTIVATE_PCT
 
         # ── 청산 판정 (먼저 발생한 이벤트 1개에서 종료) ──
         if not trailing_active:
