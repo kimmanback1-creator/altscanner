@@ -83,9 +83,10 @@ async def log_signal(result: dict, direction: str, sent: bool = True):
     신호 기록 저장
     sent=True: 텔레그램 전송됨
     sent=False: 쿨다운으로 차단됨 (관찰용 기록)
+    return: 생성된 signal_log의 id (실패 시 None)
     """
     try:
-        get_client().table("signal_log").insert({
+        res = get_client().table("signal_log").insert({
             "exchange":  result["exchange"],
             "symbol":    result["symbol"],
             "direction": direction,
@@ -97,8 +98,11 @@ async def log_signal(result: dict, direction: str, sent: bool = True):
             "date_kst":  str(today_kst()),
             "sent":      sent,
         }).execute()
+        rows = res.data or []
+        return rows[0]["id"] if rows else None
     except Exception as e:
         logger.error(f"[DB] signal_log insert 실패: {e}")
+        return None
 
 
 # ── diamond_signals ───────────────────────
