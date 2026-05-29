@@ -141,12 +141,12 @@ def update_one(row: dict) -> bool:
 
         # ── 청산 판정 (먼저 발생한 이벤트 1개에서 종료) ──
         if not trailing_active:
-            # 트레일링 비활성: 고정 SL -10% 만 작동
+            # 트레일링 비활성: 고정 SL만 작동
             if current_pnl <= -INITIAL_SL_PCT:
                 updates["sl_hit"]     = True
                 updates["sl_hit_at"]  = now.isoformat()
                 updates["exit_reason"] = "sl"
-                # SL은 트리거 후 시장가 → 트리거 지점(-10%)보다 위에서 못 잡음
+                # SL은 트리거 후 시장가 → 트리거 지점보다 위에서 못 잡음
                 exit_pnl = min(current_pnl, -INITIAL_SL_PCT)
                 updates["exit_pnl"]    = round(exit_pnl, 3)
                 updates["exit_price"]  = current
