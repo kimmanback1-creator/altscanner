@@ -263,7 +263,7 @@ def check_signal(result: dict, long_params: dict, short_params: dict) -> str | N
 
 
 def format_telegram(result: dict, direction: str) -> str:
-    """텔레그램 메시지 포맷"""
+    """텔레그램 메시지 포맷 — 진입 가이드 포함"""
     emoji   = "🚀" if direction == "LONG" else "🔻"
     ex_map  = {"binance": "🟡 Binance", "okx": "⚫ OKX", "bybit": "🟠 Bybit"}
     ex_str  = ex_map.get(result["exchange"], result["exchange"])
@@ -278,14 +278,39 @@ def format_telegram(result: dict, direction: str) -> str:
     c_arr = arrow.get(result.get("cvd_trend",   "flat"))
     o_arr = arrow.get(result.get("oi_trend",    "flat"))
 
+    # ── 진입 가이드 계산 ($100 × 3x 기준) ──
+    price = float(result["price"])
+    is_long = direction == "LONG"
+    
+    # 초기 SL = -10% 가격 변동 (3x 적용 시 -30% 손실 = $30)
+    if is_long:
+        sl_price   = price * 0.90
+        tp_act     = price * 1.10   # 트레일링 활성화 (+10%)
+    else:
+        sl_price   = price * 1.10
+        tp_act     = price * 0.90
+    
+    # 가격 포맷 (소수점 자릿수 자동 조절)
+    def fmt_p(p):
+        if p >= 100:   return f"${p:,.2f}"
+        if p >= 1:     return f"${p:.4f}"
+        if p >= 0.01:  return f"${p:.5f}"
+        return f"${p:.7f}"
+
     return "\n".join([
         f"{emoji} *{result['symbol']}* — {direction}",
         f"{ex_str}  |  15분봉",
         f"━━━━━━━━━━━━━━━━━━",
-        f"💰 가격:    ${result['price']:,.4f}  ({pc_sign}{result['price_chg']:.2f}%) {p_arr}",
+        f"💰 가격:    {fmt_p(price)}  ({pc_sign}{result['price_chg']:.2f}%) {p_arr}",
         f"⚡ CVD:    {cvd_sign}{result['cvd_pct']:.1f}% {c_arr}",
         f"📈 OI:     {oi_sign}{result['oi_pct']:.1f}% {o_arr}",
         f"📊 거래량: {result['vol_pct']:.1f}%",
         f"🔍 진단:   {result['diagnosis']}",
+        f"━━━━━━━━━━━━━━━━━━",
+        f"💵 *진입 가이드* ($100 × 3x)",
+        f"• 진입:  {fmt_p(price)}",
+        f"• SL:    {fmt_p(sl_price)}  (−10% / 손실 $30)",
+        f"• 활성:  {fmt_p(tp_act)}  (+10%, 트레일링 ON)",
+        f"• 폭:    callback −10%",
         f"━━━━━━━━━━━━━━━━━━",
     ])
