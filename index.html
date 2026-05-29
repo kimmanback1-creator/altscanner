@@ -2693,9 +2693,9 @@ tr.both-agree .ticker-name {
             <div class="verif-stat-sub">알림 발생 후 7일 미만</div>
           </div>
           <div class="verif-stat-card">
-            <div class="verif-stat-label">완료된 표본</div>
+            <div class="verif-stat-label">청산된 표본</div>
             <div class="verif-stat-value" id="verif-completed-count">—</div>
-            <div class="verif-stat-sub">7일 추적 완료</div>
+            <div class="verif-stat-sub">SL/트레일링/타임아웃</div>
           </div>
           <div class="verif-stat-card">
             <div class="verif-stat-label">24h 평균 PnL</div>
@@ -2703,9 +2703,9 @@ tr.both-agree .ticker-name {
             <div class="verif-stat-sub">진입 24시간 후</div>
           </div>
           <div class="verif-stat-card">
-            <div class="verif-stat-label">트레일링 평균</div>
+            <div class="verif-stat-label">확정 손익 평균</div>
             <div class="verif-stat-value" id="verif-avg-trailing">—</div>
-            <div class="verif-stat-sub">−5% callback 시뮬</div>
+            <div class="verif-stat-sub">5% SL/트레일링 청산</div>
           </div>
           <div class="verif-stat-card">
             <div class="verif-stat-label">24h 승률</div>
@@ -2726,7 +2726,7 @@ tr.both-agree .ticker-name {
         </div>
 
         <!-- C. 완료된 결과 분석 -->
-        <div class="verif-section-title">📊 완료된 분석 (최근 100건)</div>
+        <div class="verif-section-title">📊 청산 결과 분석 (최근 200건)</div>
         <div class="verif-analysis-wrap" id="verif-analysis">
           <div class="verif-empty">로딩 중...</div>
         </div>
@@ -7826,27 +7826,28 @@ async function loadVerification() {
       .eq('status', 'tracking')
       .order('entry_at', { ascending: false })
     
-    const { data: completed } = await sb.from('signal_performance')
+    // 청산 확정(exit_reason 있음) = 결과 분석 표본. status 무관 — 청산 즉시 편입.
+    const { data: exited } = await sb.from('signal_performance')
       .select('*')
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false })
+      .not('exit_reason', 'is', null)
+      .order('exit_at', { ascending: false })
       .limit(200)
     
     const trackingRows = tracking || []
-    const completedRows = completed || []
+    const exitedRows = exited || []
     
     // A. 요약 카드
-    renderVerifSummary(trackingRows, completedRows)
+    renderVerifSummary(trackingRows, exitedRows)
     
-    // B. 추적 중 그리드
+    // B. 추적 중 그리드 (아직 추적 중인 것 — 청산됐어도 status=tracking이면 여기 표시됨)
     renderVerifTracking(trackingRows)
     
-    // C. 완료된 분석
-    renderVerifAnalysis(completedRows)
+    // C. 청산 결과 분석
+    renderVerifAnalysis(exitedRows)
     
     const now = new Date()
     const kst = new Date(now.getTime() + 9*60*60*1000)
-    info.textContent = `갱신 ${kst.toISOString().slice(11, 19)} KST · 추적 ${trackingRows.length} / 완료 ${completedRows.length}`
+    info.textContent = `갱신 ${kst.toISOString().slice(11, 19)} KST · 추적 ${trackingRows.length} / 청산 ${exitedRows.length}`
     
     // 자동 새로고침 (1분마다)
     if (verifAutoTimer) clearInterval(verifAutoTimer)
@@ -7879,13 +7880,15 @@ function renderVerifSummary(tracking, completed) {
   }
   
   const valid24h = completed.filter(r => r.pnl_24h !== null)
-  const validTrail = completed.filter(r => r.trailing_pnl !== null)
+  const validExit = completed.filter(r => r.exit_pnl !== null)
   const validMax = completed.filter(r => r.max_pnl !== null)
   
   const avg24h = valid24h.length ? valid24h.reduce((s, r) => s + r.pnl_24h, 0) / valid24h.length : 0
-  const avgTrail = validTrail.length ? validTrail.reduce((s, r) => s + r.trailing_pnl, 0) / validTrail.length : 0
-  const wins = valid24h.filter(r => r.pnl_24h > 0).length
-  const winRate = valid24h.length ? (wins / valid24h.length * 100) : 0
+  // 확정 손익(exit_pnl) 평균 — 5% SL/트레일링 청산 기준
+  const avgExit = validExit.length ? validExit.reduce((s, r) => s + r.exit_pnl, 0) / validExit.length : 0
+  // 승률 = 확정 손익이 +인 비율
+  const wins = validExit.filter(r => r.exit_pnl > 0).length
+  const winRate = validExit.length ? (wins / validExit.length * 100) : 0
   const avgMax = validMax.length ? validMax.reduce((s, r) => s + r.max_pnl, 0) / validMax.length : 0
   
   const setVal = (id, val, fmt) => {
@@ -7895,7 +7898,7 @@ function renderVerifSummary(tracking, completed) {
   }
   
   setVal('verif-avg-24h', avg24h, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
-  setVal('verif-avg-trailing', avgTrail, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  setVal('verif-avg-trailing', avgExit, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
   setVal('verif-avg-max', avgMax, v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%')
   
   const wrEl = document.getElementById('verif-win-rate')
@@ -7996,19 +7999,27 @@ function renderVerifAnalysis(rows) {
   const long  = rows.filter(r => r.direction === 'LONG')
   const short = rows.filter(r => r.direction === 'SHORT')
   
+  // 확정 손익(exit_pnl) 기준 집계 — 5% SL/트레일링 청산 결과
   const calcStats = arr => {
-    const valid = arr.filter(r => r.pnl_24h !== null)
+    const valid = arr.filter(r => r.exit_pnl !== null)
     if (!valid.length) return null
-    const avg = valid.reduce((s, r) => s + r.pnl_24h, 0) / valid.length
-    const wins = valid.filter(r => r.pnl_24h > 0).length
+    const avgExit = valid.reduce((s, r) => s + r.exit_pnl, 0) / valid.length
+    const wins = valid.filter(r => r.exit_pnl > 0).length
     const winRate = wins / valid.length * 100
-    const avgTrail = arr.filter(r => r.trailing_pnl !== null)
-      .reduce((s, r, _, a) => s + r.trailing_pnl / a.length, 0)
-    return { n: valid.length, avg, winRate, avgTrail }
+    // "안 잘랐으면" 비교용 — 7일 내 최고점 평균
+    const avgMax = valid.filter(r => r.max_pnl !== null)
+      .reduce((s, r, _, a) => s + r.max_pnl / a.length, 0)
+    return { n: valid.length, avgExit, winRate, avgMax }
   }
   
   const lStats = calcStats(long)
   const sStats = calcStats(short)
+  
+  // 청산 사유 분포 (sl / trailing / timeout)
+  const exitReasons = { sl: 0, trailing: 0, timeout: 0 }
+  for (const r of rows) {
+    if (r.exit_reason && exitReasons[r.exit_reason] !== undefined) exitReasons[r.exit_reason]++
+  }
   
   // 종목 TOP 5 (max_pnl 기준)
   const topMax = [...rows]
@@ -8025,23 +8036,37 @@ function renderVerifAnalysis(rows) {
   const fmtPct = v => v === null || v === undefined ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
   const fmtCls = v => v === null || v === undefined ? '' : (v >= 0 ? 'pos' : 'neg')
   
+  // 확정 손익 vs 최고점 — "5%에서 잘랐는데 더 갔나" 비교 컬럼
   const dirRow = (label, s) => {
     if (!s) return `<tr><td>${label}</td><td colspan="4">데이터 없음</td></tr>`
     return `<tr>
       <td>${label}</td>
       <td class="num">${s.n}</td>
-      <td class="num ${s.avg >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avg)}</td>
+      <td class="num ${s.avgExit >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avgExit)}</td>
       <td class="num">${s.winRate.toFixed(0)}%</td>
-      <td class="num ${s.avgTrail >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avgTrail)}</td>
+      <td class="num ${s.avgMax >= 0 ? 'pos' : 'neg'}">${fmtPct(s.avgMax)}</td>
     </tr>`
   }
   
+  // 청산 사유 분포 막대
+  const totalExit = exitReasons.sl + exitReasons.trailing + exitReasons.timeout
+  const reasonBar = totalExit === 0 ? '' : `
+    <div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px">
+      <span style="color:#e74c3c">SL ${exitReasons.sl} (${(exitReasons.sl/totalExit*100).toFixed(0)}%)</span>
+      <span style="color:#2ecc71">트레일링 ${exitReasons.trailing} (${(exitReasons.trailing/totalExit*100).toFixed(0)}%)</span>
+      <span style="color:#888">타임아웃 ${exitReasons.timeout} (${(exitReasons.timeout/totalExit*100).toFixed(0)}%)</span>
+    </div>`
+  
+  // 청산 사유 한글 라벨
+  const reasonLabel = { sl: 'SL', trailing: '트레일링', timeout: '타임아웃' }
+  
   wrap.innerHTML = `
+    ${reasonBar}
     <div class="verif-analysis-row">
       <div class="verif-analysis-section">
-        <h4>방향별 성과</h4>
+        <h4>방향별 성과 (확정 손익)</h4>
         <table class="verif-table">
-          <thead><tr><th>방향</th><th>n</th><th>24h 평균</th><th>승률</th><th>트레일링</th></tr></thead>
+          <thead><tr><th>방향</th><th>n</th><th>확정 평균</th><th>승률</th><th>최고점 평균</th></tr></thead>
           <tbody>
             ${dirRow('▲ LONG', lStats)}
             ${dirRow('▼ SHORT', sStats)}
@@ -8049,22 +8074,22 @@ function renderVerifAnalysis(rows) {
         </table>
       </div>
       <div class="verif-analysis-section">
-        <h4>산점도 — 24h PnL 분포</h4>
+        <h4>산점도 — 확정 손익 분포</h4>
         ${renderScatter(rows)}
       </div>
     </div>
     <div class="verif-analysis-row">
       <div class="verif-analysis-section">
-        <h4>🚀 최대 잠재 수익 TOP 5</h4>
+        <h4>🚀 최대 잠재 수익 TOP 5 — "안 잘랐으면"</h4>
         <table class="verif-table">
-          <thead><tr><th>티커</th><th>방향</th><th>최대</th><th>24h</th><th>트레일링</th></tr></thead>
+          <thead><tr><th>티커</th><th>방향</th><th>최고점</th><th>확정</th><th>사유</th></tr></thead>
           <tbody>
             ${topMax.map(r => `<tr>
               <td>${r.symbol.replace('-USDT-SWAP','')}</td>
               <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
               <td class="num ${fmtCls(r.max_pnl)}">${fmtPct(r.max_pnl)}</td>
-              <td class="num ${fmtCls(r.pnl_24h)}">${fmtPct(r.pnl_24h)}</td>
-              <td class="num ${fmtCls(r.trailing_pnl)}">${fmtPct(r.trailing_pnl)}</td>
+              <td class="num ${fmtCls(r.exit_pnl)}">${fmtPct(r.exit_pnl)}</td>
+              <td style="font-size:10px;color:#888">${reasonLabel[r.exit_reason] || '—'}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -8072,14 +8097,14 @@ function renderVerifAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>📉 최대 낙폭 TOP 5</h4>
         <table class="verif-table">
-          <thead><tr><th>티커</th><th>방향</th><th>최저</th><th>24h</th><th>SL</th></tr></thead>
+          <thead><tr><th>티커</th><th>방향</th><th>최저</th><th>확정</th><th>사유</th></tr></thead>
           <tbody>
             ${worstMin.map(r => `<tr>
               <td>${r.symbol.replace('-USDT-SWAP','')}</td>
               <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
               <td class="num ${fmtCls(r.min_pnl)}">${fmtPct(r.min_pnl)}</td>
-              <td class="num ${fmtCls(r.pnl_24h)}">${fmtPct(r.pnl_24h)}</td>
-              <td>${r.sl_hit ? '✓' : '—'}</td>
+              <td class="num ${fmtCls(r.exit_pnl)}">${fmtPct(r.exit_pnl)}</td>
+              <td style="font-size:10px;color:#888">${reasonLabel[r.exit_reason] || '—'}</td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -8090,7 +8115,7 @@ function renderVerifAnalysis(rows) {
 
 // 산점도 SVG — x축: 진입 시간, y축: 24h PnL
 function renderScatter(rows) {
-  const valid = rows.filter(r => r.pnl_24h !== null)
+  const valid = rows.filter(r => r.exit_pnl !== null)
   if (valid.length < 3) return '<div class="verif-empty" style="padding:10px;">표본 부족</div>'
   
   const W = 400, H = 200
@@ -8099,7 +8124,7 @@ function renderScatter(rows) {
   const ch = H - PAD * 2
   
   // Y축: PnL 범위
-  let pnls = valid.map(r => r.pnl_24h)
+  let pnls = valid.map(r => r.exit_pnl)
   let minP = Math.min(...pnls, -10)
   let maxP = Math.max(...pnls, 10)
   const pad = (maxP - minP) * 0.1
@@ -8122,10 +8147,10 @@ function renderScatter(rows) {
   // 점들
   const dots = valid.map(r => {
     const x = xScale(new Date(r.entry_at).getTime())
-    const y = yScale(r.pnl_24h)
-    const color = r.pnl_24h >= 0 ? '#2ecc71' : '#e74c3c'
+    const y = yScale(r.exit_pnl)
+    const color = r.exit_pnl >= 0 ? '#2ecc71' : '#e74c3c'
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}" opacity="0.7">
-      <title>${r.symbol.replace('-USDT-SWAP','')} ${r.direction}: ${r.pnl_24h.toFixed(2)}%</title>
+      <title>${r.symbol.replace('-USDT-SWAP','')} ${r.direction}: ${r.exit_pnl.toFixed(2)}%</title>
     </circle>`
   }).join('')
   
