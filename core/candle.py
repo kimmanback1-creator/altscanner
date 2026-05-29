@@ -14,6 +14,7 @@ from core.scorer import calc_score, calc_score_4h, check_signal, format_telegram
 from db.supabase import insert_candle, sent_within_hours, log_signal, run_cleanup, refresh_ticker_counts, cleanup_liquidations, fetch_watchlist
 from notify.telegram import send_message
 from exchanges import okx as ex_okx, bybit as ex_bybit  # binance 제외
+from core.tracker import create_performance_row
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,10 @@ async def candle_loop():
             # 텔레그램 전송
             msg = format_telegram(result, direction)
             await send_message(msg)
-            await log_signal(result, direction, sent=True)
+            signal_id = await log_signal(result, direction, sent=True)
+            # 추적 시작 (Phase 0 검증 인프라)
+            if signal_id:
+                create_performance_row(signal_id, result, direction, datetime.now(timezone.utc))
             await asyncio.sleep(0.3)  # rate limit 방지
 
         # 1시간마다 롤링 딜리트
