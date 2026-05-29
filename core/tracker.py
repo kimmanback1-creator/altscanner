@@ -103,51 +103,81 @@ def update_one(row: dict) -> bool:
     # 변경 사항 누적
     updates = {}
 
+    # ── 이미 청산된 행: 추적 중단 (포지션 = 단일 청산 이벤트) ──
+    # exit_reason 확정 후엔 max_pnl/체크포인트/SL/trailing 갱신 안 함.
+    already_exited = row.get("exit_reason") is not None
+
     # ── 체크포인트 ──────────────────────────
     # 경과 시간이 체크포인트를 넘었고, 아직 안 채워진 항목만
+    # (청산 후에도 24h/7d 등 "참고용" 체크포인트는 계속 채움 — 통계 분석용)
     for mins, price_col, pnl_col in CHECKPOINTS:
         if elapsed_min >= mins and row.get(price_col) is None:
             updates[price_col] = current
             updates[pnl_col] = round(current_pnl, 3)
 
-    # ── max/min PnL 갱신 ──────────────────
-    old_max = row.get("max_pnl") or 0
-    old_min = row.get("min_pnl") or 0
-    if current_pnl > old_max:
-        updates["max_pnl"] = round(current_pnl, 3)
-        updates["max_pnl_at"] = now.isoformat()
-    if current_pnl < old_min:
-        updates["min_pnl"] = round(current_pnl, 3)
+    # ── 청산 후엔 max/SL/trailing 동결, 체크포인트만 기록 ──
+    if not already_exited:
+        # ── max/min PnL 갱신 ──────────────────
+        old_max = row.get("max_pnl") or 0
+        old_min = row.get("min_pnl") or 0
+        if current_pnl > old_max:
+            updates["max_pnl"] = round(current_pnl, 3)
+            updates["max_pnl_at"] = now.isoformat()
+        if current_pnl < old_min:
+            updates["min_pnl"] = round(current_pnl, 3)
 
-    # ── SL/TP 히트 ────────────────────────
-    if not row.get("sl_hit") and current_pnl <= -INITIAL_SL_PCT:
-        updates["sl_hit"] = True
-        updates["sl_hit_at"] = now.isoformat()
-    if not row.get("tp_10_hit")  and current_pnl >= 10:  updates["tp_10_hit"]  = True
-    if not row.get("tp_20_hit")  and current_pnl >= 20:  updates["tp_20_hit"]  = True
-    if not row.get("tp_50_hit")  and current_pnl >= 50:  updates["tp_50_hit"]  = True
-    if not row.get("tp_100_hit") and current_pnl >= 100: updates["tp_100_hit"] = True
-
-    # ── 트레일링 청산 체크 ────────────────
-    # 조건: tp_10_hit 했고 (활성화), 현재 PnL이 max_pnl - 10% 아래로 떨어졌으면 청산
-    if (row.get("tp_10_hit") or updates.get("tp_10_hit")) and not row.get("trailing_exit_price"):
+        # 이번 사이클 기준 max (방금 갱신분 반영)
         max_now = max(old_max, current_pnl)
-        # max에서 callback% 이상 하락
-        if (max_now - current_pnl) >= TRAILING_CALLBACK_PCT:
-            updates["trailing_exit_price"] = current
-            updates["trailing_exit_at"] = now.isoformat()
-            updates["trailing_pnl"] = round(current_pnl, 3)
+
+        # ── TP 히트 플래그 (활성화 판정용) ────
+        if not row.get("tp_10_hit")  and current_pnl >= 10:  updates["tp_10_hit"]  = True
+        if not row.get("tp_20_hit")  and current_pnl >= 20:  updates["tp_20_hit"]  = True
+        if not row.get("tp_50_hit")  and current_pnl >= 50:  updates["tp_50_hit"]  = True
+        if not row.get("tp_100_hit") and current_pnl >= 100: updates["tp_100_hit"] = True
+
+        trailing_active = row.get("tp_10_hit") or updates.get("tp_10_hit")
+
+        # ── 청산 판정 (먼저 발생한 이벤트 1개에서 종료) ──
+        if not trailing_active:
+            # 트레일링 비활성: 고정 SL -10% 만 작동
+            if current_pnl <= -INITIAL_SL_PCT:
+                updates["sl_hit"]     = True
+                updates["sl_hit_at"]  = now.isoformat()
+                updates["exit_reason"] = "sl"
+                # SL은 트리거 후 시장가 → 트리거 지점(-10%)보다 위에서 못 잡음
+                exit_pnl = min(current_pnl, -INITIAL_SL_PCT)
+                updates["exit_pnl"]    = round(exit_pnl, 3)
+                updates["exit_price"]  = current
+                updates["exit_at"]     = now.isoformat()
+        else:
+            # 트레일링 활성: 신고점 -callback% 트리거 → 시장가 청산
+            if (max_now - current_pnl) >= TRAILING_CALLBACK_PCT:
+                # 거래소 동작: 체결가는 트리거지점(max-10) 이하.
+                # 정상 유동성이면 max-10 근처, 갭다운이면 current가 더 아래 → 둘 중 낮은 값.
+                exit_pnl = min(current_pnl, max_now - TRAILING_CALLBACK_PCT)
+                updates["exit_reason"]        = "trailing"
+                updates["exit_pnl"]           = round(exit_pnl, 3)
+                updates["exit_price"]         = current
+                updates["exit_at"]            = now.isoformat()
+                # 레거시 컬럼 동시 기록 (프론트 호환)
+                updates["trailing_exit_price"] = current
+                updates["trailing_exit_at"]    = now.isoformat()
+                updates["trailing_pnl"]        = round(exit_pnl, 3)
 
     # ── 7일 경과 시 완료 처리 ─────────────
     if elapsed_min >= 60 * 24 * TRACK_DAYS:
         updates["status"] = "completed"
         updates["completed_at"] = now.isoformat()
-        # 트레일링 청산 안 됐으면 7d 가격으로 마감
-        if not row.get("trailing_exit_price") and not updates.get("trailing_exit_price"):
-            updates["trailing_pnl"] = round(current_pnl, 3)
+        # 청산 이벤트 없이 7일 도달 → timeout 마감 (7d 가격으로)
+        if row.get("exit_reason") is None and updates.get("exit_reason") is None:
+            updates["exit_reason"] = "timeout"
+            updates["exit_pnl"]    = round(current_pnl, 3)
+            updates["exit_price"]  = current
+            updates["exit_at"]     = now.isoformat()
+            # 레거시 컬럼 호환
+            updates["trailing_pnl"]        = round(current_pnl, 3)
             updates["trailing_exit_price"] = current
-            updates["trailing_exit_at"] = now.isoformat()
-
+            updates["trailing_exit_at"]    = now.isoformat()
     if not updates:
         return False
 
