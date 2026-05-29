@@ -21,8 +21,8 @@ KST = timezone(timedelta(hours=9))
 EXCHANGES = ["okx", "bybit"]  # Binance는 Render Singapore IP throttle로 제외
 
 # 기본 임계값 (페이지 슬라이더로 변경 가능 → 추후 Supabase config 테이블로 연동)
-LONG_PARAMS  = {"cvd": 60.0, "oi": 50.0, "vol": 70.0}
-SHORT_PARAMS = {"cvd": 60.0, "oi": 50.0, "vol": 70.0}
+LONG_PARAMS  = {"cvd": 30.0, "oi": 25.0, "vol": 35.0}
+SHORT_PARAMS = {"cvd": 30.0, "oi": 25.0, "vol": 35.0}
 
 def _next_candle_close(interval_min: int) -> float:
     """다음 N분봉 마감까지 남은 초"""
