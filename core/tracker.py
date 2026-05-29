@@ -16,9 +16,9 @@ from db.supabase import get_client
 logger = logging.getLogger(__name__)
 
 # ── 트레일링 시뮬 파라미터 ──────────────────
-TRAILING_ACTIVATE_PCT = 10.0   # +10% 도달 시 활성화
-TRAILING_CALLBACK_PCT = 10.0   # 신고점 -10% 시 청산
-INITIAL_SL_PCT        = 10.0   # 초기 SL: -10%
+TRAILING_ACTIVATE_PCT = 5.0    # +5% 도달 시 활성화
+TRAILING_CALLBACK_PCT = 5.0    # 신고점 -5% 시 청산
+INITIAL_SL_PCT        = 5.0    # 초기 SL: -5%
 
 # 체크포인트 (분 단위)
 CHECKPOINTS = [
