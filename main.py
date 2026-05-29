@@ -14,6 +14,7 @@ import exchanges.okx_private as okx_private
 from core.candle    import candle_loop
 from core.evaluator import evaluator_loop
 from core.recommendation import recommendation_loop
+from core.tracker   import tracker_loop
 from webhook.server import app
 from db.supabase   import preload_history
 from config        import WEBHOOK_PORT
@@ -56,6 +57,7 @@ async def main():
         run_webhook(),       # TradingView 웹훅 수신
         evaluator_loop(),    # setup_log_auto 자동 평가 (7일 후)
         recommendation_loop(),  # 자동 셋업 진입 추천 + Telegram 푸시
+        tracker_loop(),      # 알림 7일 추적 (Phase 0 검증)
     )
 
 
