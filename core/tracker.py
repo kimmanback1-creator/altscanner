@@ -191,10 +191,17 @@ def update_one(row: dict, candles: list = None) -> bool:
             if exit_done:
                 break
             # 1) 고점 먼저 — 신고점 갱신
+            new_high = fav > max_now
             if fav > max_now:
                 max_now = fav
             if adv < min_now:
                 min_now = adv
+
+            # 신고점을 세운 봉은 저점이 고점보다 시간상 앞설 수 있어
+            # (봉 OHLC만으론 순서 불명) 트레일/SL 트리거에서 제외 — 거짓 조기청산 방지.
+            # 청산은 다음 봉(고점 갱신 안 한 봉)의 저점에서 판정.
+            if new_high:
+                continue
 
             trailing_active = max_now >= TRAILING_ACTIVATE_PCT
 
