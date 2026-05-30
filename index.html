@@ -2317,6 +2317,80 @@ tr.both-agree .ticker-name {
   display: block;
 }
 
+/* ══════════════════════════════════════════
+   자동 셋업 검증 페이지 (대시보드 검증 클래스 재활용)
+   ══════════════════════════════════════════ */
+#view-autoverif {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  height: 100vh;
+  overflow-y: auto;
+}
+/* 전략 범례 */
+.av-strat-legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #aaa;
+  background: #181818;
+  border: 0.5px solid #1f1f1f;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.av-strat-legend b { color: #ddd; }
+.av-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.av-dot.trail { background: #5b9bd5; }
+.av-dot.fixed { background: #f0b90b; }
+
+/* 전략 비교 — 한 청산 사유 칩 */
+.av-reason-row {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.av-reason-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.av-reason-group .av-rg-label {
+  color: #888;
+  font-weight: 600;
+  font-size: 10px;
+}
+.av-reason-chip { color: #aaa; }
+.av-reason-chip.tp { color: #2ecc71; }
+.av-reason-chip.sl { color: #e74c3c; }
+.av-reason-chip.trailing { color: #5b9bd5; }
+.av-reason-chip.timeout { color: #888; }
+
+/* 트레일/고정 나란히 셀 */
+.av-dual-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  text-align: right;
+}
+.av-dual-cell .av-trail { color: #7ab8e0; }
+.av-dual-cell .av-fixed { color: #f0c850; }
+
 </style>
 </head>
 <body>
@@ -2369,6 +2443,10 @@ tr.both-agree .ticker-name {
       <div class="sidebar-item" data-view="autosetup" onclick="switchView('autosetup')">
         <span class="sidebar-icon">⚡</span>
         <span class="sidebar-label">자동 셋업 (BTC)</span>
+      </div>
+      <div class="sidebar-item" data-view="autoverif" onclick="switchView('autoverif')">
+        <span class="sidebar-icon">🔬</span>
+        <span class="sidebar-label">자동 셋업 검증</span>
       </div>
 
       <div class="sidebar-cat"><span class="cat-full">기록 / 매크로</span></div>
@@ -2751,6 +2829,71 @@ tr.both-agree .ticker-name {
         <!-- C. 완료된 결과 분석 -->
         <div class="verif-section-title">📊 청산 결과 분석 (최근 200건)</div>
         <div class="verif-analysis-wrap" id="verif-analysis">
+          <div class="verif-empty">로딩 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 자동 셋업 검증 페이지 ─────────────── -->
+    <div id="view-autoverif" style="display:none">
+      <div class="verification-head">
+        <h2>🔬 자동 셋업 검증 (BTC)</h2>
+        <span class="verification-info" id="autoverif-info">데이터 로딩 중...</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="loadAutoVerif()">🔄 새로고침</button>
+        </div>
+      </div>
+      <div class="verification-body" id="autoverif-body">
+        <!-- 전략 비교 설명 -->
+        <div class="av-strat-legend">
+          <span><span class="av-dot trail"></span><b>트레일링 3%</b> — 신고점 −3% / 초기 SL −3%</span>
+          <span><span class="av-dot fixed"></span><b>고정 TP/SL</b> — 추천이 준 레벨 도달</span>
+          <span style="color:#555">· 순수 가격 변화율 (레버리지 미적용)</span>
+        </div>
+
+        <!-- A. 요약 카드 -->
+        <div class="verif-summary-grid" id="av-summary">
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">추적 중</div>
+            <div class="verif-stat-value" id="av-tracking-count">—</div>
+            <div class="verif-stat-sub">STRONG 추천 후 7일 미만</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">청산된 표본</div>
+            <div class="verif-stat-value" id="av-completed-count">—</div>
+            <div class="verif-stat-sub">트레일링 기준</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">트레일링 평균</div>
+            <div class="verif-stat-value" id="av-avg-trail">—</div>
+            <div class="verif-stat-sub">3% 청산 확정 손익</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">고정 TP/SL 평균</div>
+            <div class="verif-stat-value" id="av-avg-fixed">—</div>
+            <div class="verif-stat-sub">추천 레벨 청산</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">승률 (트레일/고정)</div>
+            <div class="verif-stat-value" id="av-win-rate" style="font-size:16px">—</div>
+            <div class="verif-stat-sub">+ 청산 비율</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">최대 잠재 평균</div>
+            <div class="verif-stat-value" id="av-avg-max">—</div>
+            <div class="verif-stat-sub">7일 내 최고점</div>
+          </div>
+        </div>
+
+        <!-- B. 추적 중 그리드 -->
+        <div class="verif-section-title">📍 추적 중인 추천</div>
+        <div class="verif-tracking-grid" id="av-tracking-grid">
+          <div class="verif-empty">로딩 중...</div>
+        </div>
+
+        <!-- C. 청산 결과 분석 -->
+        <div class="verif-section-title">📊 전략 비교 분석 — 트레일링 vs 추천 레벨</div>
+        <div class="verif-analysis-wrap" id="av-analysis">
           <div class="verif-empty">로딩 중...</div>
         </div>
       </div>
@@ -3767,7 +3910,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup', 'verification']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup', 'autoverif', 'verification']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3805,6 +3948,11 @@ function switchView(view) {
   // 검증 뷰 활성화 시 데이터 로드
   if (view === 'verification') {
     loadVerification()
+  }
+
+  // 자동 셋업 검증 뷰 활성화 시 데이터 로드
+  if (view === 'autoverif') {
+    loadAutoVerif()
   }
 }
 function toggleSidebar() {
@@ -8186,6 +8334,338 @@ function renderScatter(rows) {
       ${dots}
     </svg>
   </div>`
+}
+
+// ══════════════════════════════════════
+//  자동 셋업 검증 (Auto Setup Verification)
+// ══════════════════════════════════════
+let autoVerifTimer = null
+
+async function loadAutoVerif() {
+  const info = document.getElementById('autoverif-info')
+  info.textContent = '데이터 로딩 중...'
+
+  try {
+    // 추적 중
+    const { data: tracking } = await sb.from('rec_performance')
+      .select('*')
+      .eq('status', 'tracking')
+      .order('entry_at', { ascending: false })
+
+    // 트레일링 청산 확정 = 결과 분석 표본 (청산 즉시 편입)
+    const { data: exited } = await sb.from('rec_performance')
+      .select('*')
+      .not('trail_exit_reason', 'is', null)
+      .order('trail_exit_at', { ascending: false })
+      .limit(200)
+
+    const trackingRows = tracking || []
+    const exitedRows = exited || []
+
+    renderAvSummary(trackingRows, exitedRows)
+    renderAvTracking(trackingRows)
+    renderAvAnalysis(exitedRows)
+
+    const now = new Date()
+    const kst = new Date(now.getTime() + 9*60*60*1000)
+    info.textContent = `갱신 ${kst.toISOString().slice(11, 19)} KST · 추적 ${trackingRows.length} / 청산 ${exitedRows.length}`
+
+    if (autoVerifTimer) clearInterval(autoVerifTimer)
+    autoVerifTimer = setInterval(() => {
+      if (document.getElementById('view-autoverif').style.display !== 'none') {
+        loadAutoVerif()
+      } else {
+        clearInterval(autoVerifTimer)
+        autoVerifTimer = null
+      }
+    }, 60_000)
+
+  } catch (e) {
+    console.error('[autoverif]', e)
+    info.textContent = '로딩 실패: ' + e.message
+  }
+}
+
+// A. 요약 카드
+function renderAvSummary(tracking, exited) {
+  document.getElementById('av-tracking-count').textContent = tracking.length
+  document.getElementById('av-completed-count').textContent = exited.length
+
+  const setVal = (id, val, fmt) => {
+    const el = document.getElementById(id)
+    el.textContent = fmt(val)
+    el.className = 'verif-stat-value ' + (val > 0 ? 'pos' : val < 0 ? 'neg' : '')
+  }
+
+  if (exited.length === 0) {
+    document.getElementById('av-avg-trail').textContent = '—'
+    document.getElementById('av-avg-fixed').textContent = '—'
+    document.getElementById('av-win-rate').textContent = '—'
+    document.getElementById('av-avg-max').textContent = '—'
+    return
+  }
+
+  const fmtP = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%'
+
+  // 트레일링 확정 손익 평균
+  const vTrail = exited.filter(r => r.trail_exit_pnl !== null)
+  const avgTrail = vTrail.length ? vTrail.reduce((s, r) => s + r.trail_exit_pnl, 0) / vTrail.length : 0
+  setVal('av-avg-trail', avgTrail, fmtP)
+
+  // 고정 TP/SL 확정 손익 평균 (청산된 것만)
+  const vFixed = exited.filter(r => r.fixed_exit_pnl !== null)
+  const avgFixed = vFixed.length ? vFixed.reduce((s, r) => s + r.fixed_exit_pnl, 0) / vFixed.length : 0
+  setVal('av-avg-fixed', avgFixed, fmtP)
+
+  // 최대 잠재
+  const vMax = exited.filter(r => r.max_pnl !== null)
+  const avgMax = vMax.length ? vMax.reduce((s, r) => s + r.max_pnl, 0) / vMax.length : 0
+  setVal('av-avg-max', avgMax, fmtP)
+
+  // 승률 — 트레일 / 고정 둘 다
+  const trailWin = vTrail.length ? (vTrail.filter(r => r.trail_exit_pnl > 0).length / vTrail.length * 100) : 0
+  const fixedWin = vFixed.length ? (vFixed.filter(r => r.fixed_exit_pnl > 0).length / vFixed.length * 100) : 0
+  const wrEl = document.getElementById('av-win-rate')
+  wrEl.innerHTML = `<span style="color:#7ab8e0">${trailWin.toFixed(0)}%</span> <span style="color:#555">/</span> <span style="color:#f0c850">${fixedWin.toFixed(0)}%</span>`
+  wrEl.className = 'verif-stat-value'
+}
+
+// B. 추적 중 그리드
+function renderAvTracking(rows) {
+  const grid = document.getElementById('av-tracking-grid')
+  if (rows.length === 0) {
+    grid.innerHTML = '<div class="verif-empty">현재 추적 중인 추천 없음 — STRONG 추천 발생 시 자동 시작</div>'
+    return
+  }
+
+  const now = Date.now()
+  const fmtP = v => (v === null || v === undefined) ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+
+  const cards = rows.map(r => {
+    const entryAt = new Date(r.entry_at).getTime()
+    const elapsedMin = (now - entryAt) / 1000 / 60
+    const progressPct = Math.min(100, elapsedMin / (60 * 24 * 7) * 100)
+
+    const recentPnl = r.pnl_72h ?? r.pnl_24h ?? r.pnl_4h ?? r.pnl_1h ?? r.pnl_15m ?? 0
+    const dirCls = r.direction === 'LONG' ? 'long' : 'short'
+    const dirIcon = r.direction === 'LONG' ? '▲' : '▼'
+
+    const elapsed = elapsedMin < 60
+      ? `${elapsedMin.toFixed(0)}분`
+      : elapsedMin < 60 * 24
+      ? `${(elapsedMin / 60).toFixed(1)}h`
+      : `${(elapsedMin / 60 / 24).toFixed(1)}d`
+
+    const cps = [
+      { label: '15m', pnl: r.pnl_15m }, { label: '1h', pnl: r.pnl_1h },
+      { label: '4h', pnl: r.pnl_4h }, { label: '24h', pnl: r.pnl_24h },
+      { label: '72h', pnl: r.pnl_72h }, { label: '7d', pnl: r.pnl_7d },
+    ]
+    const cpHtml = cps.map(cp => {
+      if (cp.pnl === null || cp.pnl === undefined) return `<div class="verif-track-cp">${cp.label}</div>`
+      const cls = cp.pnl >= 0 ? 'pos' : 'neg'
+      const sign = cp.pnl >= 0 ? '+' : ''
+      return `<div class="verif-track-cp filled ${cls}">${cp.label}<br>${sign}${cp.pnl.toFixed(1)}</div>`
+    }).join('')
+
+    // 두 전략 청산 상태 플래그
+    const flags = []
+    const reasonKr = { sl: 'SL', trailing: '트레일링', timeout: '타임아웃', tp: 'TP', tp2: 'TP2' }
+    if (r.trail_exit_reason) flags.push(`<span class="verif-flag" style="background:#1a2a3a;color:#7ab8e0">트레일 ${reasonKr[r.trail_exit_reason]} ${fmtP(r.trail_exit_pnl)}</span>`)
+    if (r.fixed_exit_reason) {
+      const fc = r.fixed_exit_reason === 'sl' ? '#e74c3c' : (r.fixed_exit_reason.startsWith('tp') ? '#2ecc71' : '#888')
+      flags.push(`<span class="verif-flag" style="background:#2a2410;color:${fc === '#888' ? '#aaa' : fc}">고정 ${reasonKr[r.fixed_exit_reason]} ${fmtP(r.fixed_exit_pnl)}</span>`)
+    }
+
+    const pnlCls = recentPnl > 0 ? 'pos' : recentPnl < 0 ? 'neg' : ''
+    const pnlSign = recentPnl >= 0 ? '+' : ''
+    const tfBadge = `<span style="font-size:9px;color:#7a9bd5;background:#1a1a2e;padding:1px 5px;border-radius:3px;margin-right:4px">${r.timeframe}</span>`
+
+    return `
+      <div class="verif-track-card ${dirCls}">
+        <div class="verif-track-head">
+          <span class="verif-track-symbol">${tfBadge}BTC ${r.verdict.replace('STRONG_', '')}</span>
+          <span class="verif-track-direction ${dirCls}">${dirIcon} ${r.confidence_pct ?? '—'}%</span>
+        </div>
+        <div class="verif-track-pnl ${pnlCls}">${pnlSign}${recentPnl.toFixed(2)}%</div>
+        <div class="verif-track-progress">
+          <div class="verif-track-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
+        </div>
+        <div class="verif-track-meta">
+          <span>${elapsed} 경과</span>
+          <span>진입 $${Number(r.entry_price).toLocaleString(undefined,{maximumFractionDigits:2})}</span>
+        </div>
+        <div class="verif-track-checkpoints">${cpHtml}</div>
+        ${flags.length ? `<div class="verif-track-flags">${flags.join('')}</div>` : ''}
+      </div>
+    `
+  }).join('')
+
+  grid.innerHTML = cards
+}
+
+// C. 전략 비교 분석
+function renderAvAnalysis(rows) {
+  const wrap = document.getElementById('av-analysis')
+  if (rows.length < 3) {
+    wrap.innerHTML = `<div class="verif-empty">표본 부족 (현재 ${rows.length}건) — 3건 이상 청산 시 분석 시작</div>`
+    return
+  }
+
+  const fmtPct = v => v === null || v === undefined ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  const fmtCls = v => v === null || v === undefined ? '' : (v >= 0 ? 'pos' : 'neg')
+
+  // 트레일링 / 고정 전체 통계
+  const vTrail = rows.filter(r => r.trail_exit_pnl !== null)
+  const vFixed = rows.filter(r => r.fixed_exit_pnl !== null)
+  const stat = arr => {
+    if (!arr.length) return null
+    const avg = arr.reduce((s, r, _, a) => s + (arr === vTrail ? r.trail_exit_pnl : r.fixed_exit_pnl) / a.length, 0)
+    return avg
+  }
+  const trailAvg = vTrail.length ? vTrail.reduce((s, r) => s + r.trail_exit_pnl, 0) / vTrail.length : 0
+  const fixedAvg = vFixed.length ? vFixed.reduce((s, r) => s + r.fixed_exit_pnl, 0) / vFixed.length : 0
+  const trailWin = vTrail.length ? vTrail.filter(r => r.trail_exit_pnl > 0).length / vTrail.length * 100 : 0
+  const fixedWin = vFixed.length ? vFixed.filter(r => r.fixed_exit_pnl > 0).length / vFixed.length * 100 : 0
+
+  // 방향별 (트레일 기준)
+  const dirStat = (dir) => {
+    const arr = rows.filter(r => r.direction === dir && r.trail_exit_pnl !== null)
+    if (!arr.length) return null
+    const t = arr.reduce((s, r) => s + r.trail_exit_pnl, 0) / arr.length
+    const fArr = arr.filter(r => r.fixed_exit_pnl !== null)
+    const f = fArr.length ? fArr.reduce((s, r) => s + r.fixed_exit_pnl, 0) / fArr.length : null
+    return { n: arr.length, trail: t, fixed: f }
+  }
+  const lStat = dirStat('LONG'), sStat = dirStat('SHORT')
+
+  // 청산 사유 분포 (각 전략별)
+  const trailReasons = { sl: 0, trailing: 0, timeout: 0 }
+  const fixedReasons = { tp: 0, tp2: 0, sl: 0, timeout: 0 }
+  for (const r of rows) {
+    if (r.trail_exit_reason && trailReasons[r.trail_exit_reason] !== undefined) trailReasons[r.trail_exit_reason]++
+    if (r.fixed_exit_reason && fixedReasons[r.fixed_exit_reason] !== undefined) fixedReasons[r.fixed_exit_reason]++
+  }
+
+  // TF별 (4H/1D)
+  const tfStat = (tf) => {
+    const arr = rows.filter(r => r.timeframe === tf && r.trail_exit_pnl !== null)
+    if (!arr.length) return null
+    const t = arr.reduce((s, r) => s + r.trail_exit_pnl, 0) / arr.length
+    const w = arr.filter(r => r.trail_exit_pnl > 0).length / arr.length * 100
+    return { n: arr.length, trail: t, win: w }
+  }
+  const tf4h = tfStat('4H'), tf1d = tfStat('1D')
+
+  // 개별 추천 TOP (트레일 기준 최고점)
+  const topMax = [...rows].filter(r => r.max_pnl !== null).sort((a, b) => b.max_pnl - a.max_pnl).slice(0, 6)
+
+  const dirRow = (label, s) => {
+    if (!s) return `<tr><td>${label}</td><td colspan="3">데이터 없음</td></tr>`
+    return `<tr>
+      <td>${label}</td>
+      <td class="num">${s.n}</td>
+      <td class="num ${fmtCls(s.trail)}" style="color:#7ab8e0">${fmtPct(s.trail)}</td>
+      <td class="num ${fmtCls(s.fixed)}" style="color:#f0c850">${fmtPct(s.fixed)}</td>
+    </tr>`
+  }
+
+  // 사유 칩
+  const rKr = { sl: 'SL', trailing: '트레일링', timeout: '타임아웃', tp: 'TP', tp2: 'TP2' }
+  const tTotal = trailReasons.sl + trailReasons.trailing + trailReasons.timeout
+  const fTotal = fixedReasons.tp + fixedReasons.tp2 + fixedReasons.sl + fixedReasons.timeout
+  const trailChips = tTotal === 0 ? '없음' : Object.entries(trailReasons).filter(([,c]) => c > 0)
+    .map(([k, c]) => `<span class="av-reason-chip ${k}">${rKr[k]} ${c}</span>`).join(' · ')
+  const fixedChips = fTotal === 0 ? '없음' : Object.entries(fixedReasons).filter(([,c]) => c > 0)
+    .map(([k, c]) => `<span class="av-reason-chip ${k}">${rKr[k]} ${c}</span>`).join(' · ')
+
+  wrap.innerHTML = `
+    <!-- 핵심 비교: 두 전략 평균 + 승률 -->
+    <div class="verif-analysis-row">
+      <div class="verif-analysis-section">
+        <h4>전략 직접 비교 (전체 ${rows.length}건)</h4>
+        <table class="verif-table">
+          <thead><tr><th>전략</th><th>n</th><th>평균 손익</th><th>승률</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="color:#7ab8e0">트레일링 3%</td>
+              <td class="num">${vTrail.length}</td>
+              <td class="num ${fmtCls(trailAvg)}">${fmtPct(trailAvg)}</td>
+              <td class="num">${trailWin.toFixed(0)}%</td>
+            </tr>
+            <tr>
+              <td style="color:#f0c850">고정 TP/SL</td>
+              <td class="num">${vFixed.length}</td>
+              <td class="num ${fmtCls(fixedAvg)}">${fmtPct(fixedAvg)}</td>
+              <td class="num">${fixedWin.toFixed(0)}%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:10px;color:#666;margin-top:8px">
+          ${trailAvg > fixedAvg ? '→ 트레일링이 평균 우위' : trailAvg < fixedAvg ? '→ 추천 레벨(고정)이 평균 우위' : '→ 동률'}
+          (차이 ${Math.abs(trailAvg - fixedAvg).toFixed(2)}%p)
+        </div>
+      </div>
+      <div class="verif-analysis-section">
+        <h4>청산 사유 분포</h4>
+        <div class="av-reason-row" style="flex-direction:column;gap:8px">
+          <div class="av-reason-group">
+            <span class="av-rg-label" style="color:#7ab8e0">트레일링</span>
+            <span>${trailChips}</span>
+          </div>
+          <div class="av-reason-group">
+            <span class="av-rg-label" style="color:#f0c850">고정</span>
+            <span>${fixedChips}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 방향별 + TF별 -->
+    <div class="verif-analysis-row">
+      <div class="verif-analysis-section">
+        <h4>방향별 (트레일 vs 고정)</h4>
+        <table class="verif-table">
+          <thead><tr><th>방향</th><th>n</th><th style="color:#7ab8e0">트레일</th><th style="color:#f0c850">고정</th></tr></thead>
+          <tbody>
+            ${dirRow('▲ LONG', lStat)}
+            ${dirRow('▼ SHORT', sStat)}
+          </tbody>
+        </table>
+      </div>
+      <div class="verif-analysis-section">
+        <h4>TF별 (트레일 기준)</h4>
+        <table class="verif-table">
+          <thead><tr><th>TF</th><th>n</th><th>평균</th><th>승률</th></tr></thead>
+          <tbody>
+            ${tf4h ? `<tr><td>4H</td><td class="num">${tf4h.n}</td><td class="num ${fmtCls(tf4h.trail)}">${fmtPct(tf4h.trail)}</td><td class="num">${tf4h.win.toFixed(0)}%</td></tr>` : `<tr><td>4H</td><td colspan="3">없음</td></tr>`}
+            ${tf1d ? `<tr><td>1D</td><td class="num">${tf1d.n}</td><td class="num ${fmtCls(tf1d.trail)}">${fmtPct(tf1d.trail)}</td><td class="num">${tf1d.win.toFixed(0)}%</td></tr>` : `<tr><td>1D</td><td colspan="3">없음</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 개별 추천 — 최고점 vs 두 전략 확정 -->
+    <div class="verif-analysis-row" style="grid-template-columns:1fr">
+      <div class="verif-analysis-section">
+        <h4>🚀 개별 추천 — 최고점 vs 트레일 vs 고정</h4>
+        <table class="verif-table">
+          <thead><tr><th>TF</th><th>방향</th><th>신뢰도</th><th>최고점</th><th style="color:#7ab8e0">트레일</th><th style="color:#f0c850">고정</th><th>진입가</th></tr></thead>
+          <tbody>
+            ${topMax.map(r => `<tr>
+              <td>${r.timeframe}</td>
+              <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
+              <td class="num">${r.confidence_pct ?? '—'}%</td>
+              <td class="num ${fmtCls(r.max_pnl)}">${fmtPct(r.max_pnl)}</td>
+              <td class="num" style="color:#7ab8e0">${fmtPct(r.trail_exit_pnl)}</td>
+              <td class="num" style="color:#f0c850">${fmtPct(r.fixed_exit_pnl)}</td>
+              <td class="num" style="color:#888">$${Number(r.entry_price).toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `
 }
 
 init()
