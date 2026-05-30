@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from db.supabase import get_client
 from notify.telegram import send_message
+from core.tracker import create_rec_performance_row
 
 logger = logging.getLogger(__name__)
 
@@ -457,6 +458,11 @@ async def check_and_push():
         msg = build_push_message(tf, rec)
         await send_message(msg)
         mark_pushed(tf, bar_ts, rec)
+        # 추적 행 생성 (rec_performance) — STRONG 푸시 1회당 1건
+        try:
+            create_rec_performance_row(tf, bar_ts, rec, datetime.now(timezone.utc))
+        except Exception as e:
+            logger.error(f"[rec] 추적 행 생성 실패: {e}")
         logger.info(f"[rec] {tf} 추천 푸시 완료 — {rec['verdict']} {rec['confidence_pct']}%")
 
 
