@@ -2295,6 +2295,9 @@ tr.both-agree .ticker-name {
   font-family: 'Consolas', monospace;
   text-align: right;
 }
+.verif-table th.num {
+  text-align: right;
+}
 .verif-table td.pos { color: #2ecc71; }
 .verif-table td.neg { color: #e74c3c; }
 
@@ -8585,7 +8588,7 @@ function renderAvAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>전략 직접 비교 (전체 ${rows.length}건)</h4>
         <table class="verif-table">
-          <thead><tr><th>전략</th><th>n</th><th>평균 손익</th><th>승률</th></tr></thead>
+          <thead><tr><th>전략</th><th class="num">n</th><th class="num">평균 손익</th><th class="num">승률</th></tr></thead>
           <tbody>
             <tr>
               <td style="color:#7ab8e0">트레일링 3%</td>
@@ -8626,7 +8629,7 @@ function renderAvAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>방향별 (트레일 vs 고정)</h4>
         <table class="verif-table">
-          <thead><tr><th>방향</th><th>n</th><th style="color:#7ab8e0">트레일</th><th style="color:#f0c850">고정</th></tr></thead>
+          <thead><tr><th>방향</th><th class="num">n</th><th class="num" style="color:#7ab8e0">트레일</th><th class="num" style="color:#f0c850">고정</th></tr></thead>
           <tbody>
             ${dirRow('▲ LONG', lStat)}
             ${dirRow('▼ SHORT', sStat)}
@@ -8636,7 +8639,7 @@ function renderAvAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>TF별 (트레일 기준)</h4>
         <table class="verif-table">
-          <thead><tr><th>TF</th><th>n</th><th>평균</th><th>승률</th></tr></thead>
+          <thead><tr><th>TF</th><th class="num">n</th><th class="num">평균</th><th class="num">승률</th></tr></thead>
           <tbody>
             ${tf4h ? `<tr><td>4H</td><td class="num">${tf4h.n}</td><td class="num ${fmtCls(tf4h.trail)}">${fmtPct(tf4h.trail)}</td><td class="num">${tf4h.win.toFixed(0)}%</td></tr>` : `<tr><td>4H</td><td colspan="3">없음</td></tr>`}
             ${tf1d ? `<tr><td>1D</td><td class="num">${tf1d.n}</td><td class="num ${fmtCls(tf1d.trail)}">${fmtPct(tf1d.trail)}</td><td class="num">${tf1d.win.toFixed(0)}%</td></tr>` : `<tr><td>1D</td><td colspan="3">없음</td></tr>`}
@@ -8650,7 +8653,7 @@ function renderAvAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>🚀 개별 추천 — 최고점 vs 트레일 vs 고정</h4>
         <table class="verif-table">
-          <thead><tr><th>TF</th><th>방향</th><th>신뢰도</th><th>최고점</th><th style="color:#7ab8e0">트레일</th><th style="color:#f0c850">고정</th><th>진입가</th></tr></thead>
+          <thead><tr><th>TF</th><th>방향</th><th style="text-align:right">신뢰도</th><th style="text-align:right">최고점</th><th style="text-align:right;color:#7ab8e0">트레일</th><th style="text-align:right;color:#f0c850">고정</th><th style="text-align:right">진입가</th></tr></thead>
           <tbody>
             ${topMax.map(r => `<tr>
               <td>${r.timeframe}</td>
