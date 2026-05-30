@@ -229,6 +229,191 @@ def update_all_tracking():
     logger.info(f"[tracker] 사이클 완료 — {len(rows)}건 검토, {updated}건 갱신")
 
 
+# ══════════════════════════════════════════
+#  자동 셋업(BTC) 추천 추적 — rec_performance
+#  STRONG 추천 발생 시 진입 가정.
+#  두 전략 동시 시뮬:
+#    trail_* : 3% 트레일링/SL (레벨 무시)
+#    fixed_* : 추천이 준 TP/SL 도달 여부
+#  PnL = 순수 가격 변화율 (레버리지 미적용)
+# ══════════════════════════════════════════
+import aiohttp
+
+OKX_TICKER_URL = "https://www.okx.com/api/v5/market/ticker"
+
+
+async def fetch_btc_price() -> float | None:
+    """OKX 무기한 BTC 현재가 (REST 단발 조회)."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{OKX_TICKER_URL}?instId={REC_BTC_INST}"
+            async with session.get(url, timeout=10) as resp:
+                data = await resp.json()
+        last = data.get("data", [{}])[0].get("last")
+        return float(last) if last else None
+    except Exception as e:
+        logger.error(f"[rec-tracker] BTC 가격 조회 실패: {e}")
+        return None
+
+
+def create_rec_performance_row(tf: str, bar_ts: str, rec: dict, entry_at: datetime):
+    """STRONG 추천 발생 시 추적 row 생성 (recommendation.check_and_push에서 호출)."""
+    sb = get_client()
+    levels = rec.get("levels") or {}
+    try:
+        sb.table("rec_performance").insert({
+            "timeframe":      tf,
+            "bar_ts":         bar_ts,
+            "verdict":        rec["verdict"],
+            "direction":      rec["direction"],
+            "confidence_pct": rec.get("confidence_pct"),
+            "entry_price":    float(levels.get("entry") or 0),
+            "rec_sl":         levels.get("stop_loss"),
+            "rec_tp":         levels.get("take_profit"),
+            "rec_tp2":        levels.get("take_profit2"),
+            "entry_at":       entry_at.isoformat(),
+            "status":         "tracking",
+        }).execute()
+        logger.info(f"[rec-tracker] 추적 시작 — {tf} {rec['verdict']} @ {levels.get('entry')}")
+    except Exception as e:
+        if "duplicate" not in str(e).lower():
+            logger.error(f"[rec-tracker] row 생성 실패: {e}")
+
+
+def _rec_price_at_pnl(entry: float, pnl_pct: float, direction: str) -> float:
+    """주어진 PnL%에 해당하는 가격 (exit_price 기록용)."""
+    if direction == "LONG":
+        return entry * (1 + pnl_pct / 100)
+    return entry * (1 - pnl_pct / 100)
+
+
+def update_rec_one(row: dict, current: float) -> bool:
+    """rec_performance 행 1개 갱신. trail/fixed 두 청산 독립 추적."""
+    direction = row["direction"]
+    entry     = float(row["entry_price"])
+    entry_at  = datetime.fromisoformat(row["entry_at"].replace("Z", "+00:00"))
+    now       = datetime.now(timezone.utc)
+    elapsed_min = (now - entry_at).total_seconds() / 60
+
+    if not entry or current is None:
+        return False
+
+    current_pnl = calc_pnl(entry, current, direction)
+    updates = {}
+
+    # ── 체크포인트 (청산 여부와 무관하게 계속 채움) ──
+    for mins, price_col, pnl_col in CHECKPOINTS:
+        if elapsed_min >= mins and row.get(price_col) is None:
+            updates[price_col] = round(current, 2)
+            updates[pnl_col]   = round(current_pnl, 3)
+
+    # ── max/min (둘 다 청산되기 전까지 갱신; trail 활성화 판정에 필요) ──
+    old_max = row.get("max_pnl") or 0
+    old_min = row.get("min_pnl") or 0
+    if current_pnl > old_max:
+        updates["max_pnl"] = round(current_pnl, 3)
+        updates["max_pnl_at"] = now.isoformat()
+    if current_pnl < old_min:
+        updates["min_pnl"] = round(current_pnl, 3)
+    max_now = max(old_max, current_pnl)
+
+    # ══ 전략 A: 3% 트레일링/SL ══
+    if row.get("trail_exit_reason") is None:
+        trailing_active = max_now >= REC_TRAIL_ACTIVATE_PCT
+        if not trailing_active:
+            if current_pnl <= -REC_INITIAL_SL_PCT:
+                exit_pnl = min(current_pnl, -REC_INITIAL_SL_PCT)
+                updates["trail_exit_reason"] = "sl"
+                updates["trail_exit_pnl"]    = round(exit_pnl, 3)
+                updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
+                updates["trail_exit_at"]     = now.isoformat()
+        else:
+            if (max_now - current_pnl) >= REC_TRAIL_CALLBACK_PCT:
+                exit_pnl = min(current_pnl, max_now - REC_TRAIL_CALLBACK_PCT)
+                updates["trail_exit_reason"] = "trailing"
+                updates["trail_exit_pnl"]    = round(exit_pnl, 3)
+                updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
+                updates["trail_exit_at"]     = now.isoformat()
+
+    # ══ 전략 B: 추천 고정 TP/SL ══
+    if row.get("fixed_exit_reason") is None:
+        rec_sl  = row.get("rec_sl")
+        rec_tp  = row.get("rec_tp")
+        rec_tp2 = row.get("rec_tp2")
+        hit = None
+        exit_price = None
+        if direction == "LONG":
+            # SL 우선 체크 (보수적: 같은 봉에 둘 다 닿으면 손실 가정)
+            if rec_sl and current <= float(rec_sl):
+                hit, exit_price = "sl", float(rec_sl)
+            elif rec_tp2 and current >= float(rec_tp2):
+                hit, exit_price = "tp2", float(rec_tp2)
+            elif rec_tp and current >= float(rec_tp):
+                hit, exit_price = "tp", float(rec_tp)
+        else:  # SHORT
+            if rec_sl and current >= float(rec_sl):
+                hit, exit_price = "sl", float(rec_sl)
+            elif rec_tp2 and current <= float(rec_tp2):
+                hit, exit_price = "tp2", float(rec_tp2)
+            elif rec_tp and current <= float(rec_tp):
+                hit, exit_price = "tp", float(rec_tp)
+        if hit:
+            updates["fixed_exit_reason"] = hit
+            updates["fixed_exit_pnl"]    = round(calc_pnl(entry, exit_price, direction), 3)
+            updates["fixed_exit_price"]  = round(exit_price, 2)
+            updates["fixed_exit_at"]     = now.isoformat()
+
+    # ── 7일 경과: 미청산 전략은 timeout 마감 + status 완료 ──
+    if elapsed_min >= 60 * 24 * TRACK_DAYS:
+        updates["status"] = "completed"
+        updates["completed_at"] = now.isoformat()
+        if row.get("trail_exit_reason") is None and "trail_exit_reason" not in updates:
+            updates["trail_exit_reason"] = "timeout"
+            updates["trail_exit_pnl"]    = round(current_pnl, 3)
+            updates["trail_exit_price"]  = round(current, 2)
+            updates["trail_exit_at"]     = now.isoformat()
+        if row.get("fixed_exit_reason") is None and "fixed_exit_reason" not in updates:
+            updates["fixed_exit_reason"] = "timeout"
+            updates["fixed_exit_pnl"]    = round(current_pnl, 3)
+            updates["fixed_exit_price"]  = round(current, 2)
+            updates["fixed_exit_at"]     = now.isoformat()
+
+    if not updates:
+        return False
+    try:
+        sb = get_client()
+        sb.table("rec_performance").update(updates).eq("id", row["id"]).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[rec-tracker] 갱신 실패 id={row.get('id')}: {e}")
+        return False
+
+
+async def update_all_rec_tracking():
+    """rec_performance status=tracking 전체 갱신 (BTC 단일가 1회 조회)."""
+    sb = get_client()
+    try:
+        res = sb.table("rec_performance").select("*").eq("status", "tracking").execute()
+        rows = res.data or []
+    except Exception as e:
+        logger.error(f"[rec-tracker] 추적 목록 조회 실패: {e}")
+        return
+
+    if not rows:
+        return
+
+    current = await fetch_btc_price()
+    if current is None:
+        logger.warning("[rec-tracker] BTC 가격 없음 — 이번 사이클 스킵")
+        return
+
+    updated = 0
+    for r in rows:
+        if update_rec_one(r, current):
+            updated += 1
+    logger.info(f"[rec-tracker] 사이클 — {len(rows)}건 검토, {updated}건 갱신 (BTC ${current:,.0f})")
+
+
 # ── 백그라운드 루프 ─────────────────────────
 async def tracker_loop():
     """15분마다 추적 갱신."""
@@ -241,6 +426,11 @@ async def tracker_loop():
             update_all_tracking()
         except Exception as e:
             logger.error(f"[tracker] 사이클 실패: {e}", exc_info=True)
+
+        try:
+            await update_all_rec_tracking()
+        except Exception as e:
+            logger.error(f"[rec-tracker] 사이클 실패: {e}", exc_info=True)
 
         # 다음 15분봉 마감 + 30초 후 (가격 안정화 대기)
         now = datetime.now(timezone.utc)
