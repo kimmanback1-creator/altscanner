@@ -745,6 +745,24 @@ tr.both-agree .ticker-name {
 }
 .sidebar.collapsed .sidebar-label { display: none; }
 .sidebar.collapsed .sidebar-item { justify-content: center; padding: 10px 0; }
+.sidebar-cat {
+  font-size: 9px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 10px 14px 4px;
+  user-select: none;
+}
+.sidebar-cat:first-child { padding-top: 4px; }
+.sidebar.collapsed .sidebar-cat {
+  text-align: center;
+  padding: 8px 0 4px;
+  font-size: 8px;
+  color: #444;
+  border-top: 0.5px solid #1e1e1e;
+}
+.sidebar.collapsed .sidebar-cat .cat-full { display: none; }
+.sidebar.collapsed .sidebar-cat::before { content: "···"; }
 .content-area {
   flex: 1;
   display: flex;
@@ -2329,6 +2347,7 @@ tr.both-agree .ticker-name {
   <div class="sidebar" id="sidebar">
     <div class="sidebar-toggle" onclick="toggleSidebar()">☰</div>
     <div class="sidebar-menu">
+      <div class="sidebar-cat"><span class="cat-full">대시보드</span></div>
       <div class="sidebar-item active" data-view="dashboard" onclick="switchView('dashboard')">
         <span class="sidebar-icon">⊞</span>
         <span class="sidebar-label">Dashboard</span>
@@ -2337,14 +2356,12 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📌</span>
         <span class="sidebar-label">Watchlist</span>
       </div>
-      <div class="sidebar-item" data-view="journal" onclick="switchView('journal')">
-        <span class="sidebar-icon">📋</span>
-        <span class="sidebar-label">매매일지</span>
+      <div class="sidebar-item" data-view="verification" onclick="switchView('verification')">
+        <span class="sidebar-icon">🧪</span>
+        <span class="sidebar-label">Dashboard 검증</span>
       </div>
-      <div class="sidebar-item" data-view="index" onclick="switchView('index')">
-        <span class="sidebar-icon">📊</span>
-        <span class="sidebar-label">인덱스</span>
-      </div>
+
+      <div class="sidebar-cat"><span class="cat-full">셋업</span></div>
       <div class="sidebar-item" data-view="setup" onclick="switchView('setup')">
         <span class="sidebar-icon">🎯</span>
         <span class="sidebar-label">셋업기록</span>
@@ -2353,9 +2370,15 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">⚡</span>
         <span class="sidebar-label">자동 셋업 (BTC)</span>
       </div>
-      <div class="sidebar-item" data-view="verification" onclick="switchView('verification')">
-        <span class="sidebar-icon">🧪</span>
-        <span class="sidebar-label">검증</span>
+
+      <div class="sidebar-cat"><span class="cat-full">기록 / 매크로</span></div>
+      <div class="sidebar-item" data-view="journal" onclick="switchView('journal')">
+        <span class="sidebar-icon">📋</span>
+        <span class="sidebar-label">매매일지</span>
+      </div>
+      <div class="sidebar-item" data-view="index" onclick="switchView('index')">
+        <span class="sidebar-icon">📊</span>
+        <span class="sidebar-label">인덱스</span>
       </div>
     </div>
   </div>
