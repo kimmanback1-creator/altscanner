@@ -20,6 +20,12 @@ TRAILING_ACTIVATE_PCT = 5.0    # +5% 도달 시 활성화
 TRAILING_CALLBACK_PCT = 5.0    # 신고점 -5% 시 청산
 INITIAL_SL_PCT        = 5.0    # 초기 SL: -5%
 
+# ── 자동 셋업(BTC) 추적 파라미터 (변동성 작아 타이트) ──
+REC_TRAIL_ACTIVATE_PCT = 3.0
+REC_TRAIL_CALLBACK_PCT = 3.0
+REC_INITIAL_SL_PCT     = 3.0
+REC_BTC_INST = "BTC-USDT-SWAP"   # OKX 무기한
+
 # 체크포인트 (분 단위)
 CHECKPOINTS = [
     (15,           "price_15m",  "pnl_15m"),
