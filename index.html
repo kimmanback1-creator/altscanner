@@ -8318,7 +8318,7 @@ function renderVerifAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>방향별 성과 (확정 손익)</h4>
         <table class="verif-table">
-          <thead><tr><th>방향</th><th>n</th><th>확정 평균</th><th>승률</th><th>최고점 평균</th></tr></thead>
+          <thead><tr><th>방향</th><th class="num">n</th><th class="num">확정 평균</th><th class="num">승률</th><th class="num">최고점 평균</th></tr></thead>
           <tbody>
             ${dirRow('▲ LONG', lStats)}
             ${dirRow('▼ SHORT', sStats)}
@@ -8334,7 +8334,7 @@ function renderVerifAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>🚀 최대 잠재 수익 TOP 5 — "안 잘랐으면"</h4>
         <table class="verif-table">
-          <thead><tr><th>티커</th><th>방향</th><th>최고점</th><th>확정</th><th>사유</th></tr></thead>
+          <thead><tr><th>티커</th><th>방향</th><th class="num">최고점</th><th class="num">확정</th><th>사유</th></tr></thead>
           <tbody>
             ${topMax.map(r => `<tr>
               <td>${r.symbol.replace('-USDT-SWAP','')}</td>
@@ -8349,7 +8349,7 @@ function renderVerifAnalysis(rows) {
       <div class="verif-analysis-section">
         <h4>📉 최대 낙폭 TOP 5</h4>
         <table class="verif-table">
-          <thead><tr><th>티커</th><th>방향</th><th>최저</th><th>확정</th><th>사유</th></tr></thead>
+          <thead><tr><th>티커</th><th>방향</th><th class="num">최저</th><th class="num">확정</th><th>사유</th></tr></thead>
           <tbody>
             ${worstMin.map(r => `<tr>
               <td>${r.symbol.replace('-USDT-SWAP','')}</td>
