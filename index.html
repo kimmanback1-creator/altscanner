@@ -2457,6 +2457,10 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📋</span>
         <span class="sidebar-label">매매일지</span>
       </div>
+      <div class="sidebar-item" data-view="autotrades" onclick="switchView('autotrades')">
+        <span class="sidebar-icon">🤖</span>
+        <span class="sidebar-label">자동매매 이력</span>
+      </div>
       <div class="sidebar-item" data-view="index" onclick="switchView('index')">
         <span class="sidebar-icon">📊</span>
         <span class="sidebar-label">인덱스</span>
@@ -2785,6 +2789,7 @@ tr.both-agree .ticker-name {
         <h2>🧪 알림 검증</h2>
         <span class="verification-info" id="verification-info">데이터 로딩 중...</span>
         <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="requestVerifAnalysis()">🤖 AI 분석</button>
           <button class="journal-btn" onclick="loadVerification()">🔄 새로고침</button>
         </div>
       </div>
@@ -2843,6 +2848,7 @@ tr.both-agree .ticker-name {
         <h2>🔬 자동 셋업 검증 (BTC)</h2>
         <span class="verification-info" id="autoverif-info">데이터 로딩 중...</span>
         <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="requestAvAnalysis()">🤖 AI 분석</button>
           <button class="journal-btn" onclick="loadAutoVerif()">🔄 새로고침</button>
         </div>
       </div>
@@ -2898,6 +2904,72 @@ tr.both-agree .ticker-name {
         <div class="verif-section-title">📊 전략 비교 분석 — 트레일링 vs 추천 레벨</div>
         <div class="verif-analysis-wrap" id="av-analysis">
           <div class="verif-empty">로딩 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 자동매매 이력 페이지 ─────────────── -->
+    <div id="view-autotrades" style="display:none">
+      <div class="verification-head">
+        <h2>🤖 자동매매 이력</h2>
+        <span class="verification-info" id="autotrades-info">데이터 로딩 중...</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="loadAutoTrades()">🔄 새로고침</button>
+        </div>
+      </div>
+      <div class="verification-body" id="autotrades-body">
+        <!-- 안내 배너 -->
+        <div class="av-strat-legend">
+          <span style="color:#aaa"><b style="color:#ddd">실매매 장부</b> — OKX 서브계정 실체결 기록 (계좌 $1000 · 건당 $100×3x · 일 손실한도 −$100 · 동시 최대 3건)</span>
+          <span style="color:#555">· 검증 완료 후 가동 예정</span>
+        </div>
+
+        <!-- A. 요약 카드 -->
+        <div class="verif-summary-grid" id="at-summary">
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">현재 잔고</div>
+            <div class="verif-stat-value" id="at-balance">—</div>
+            <div class="verif-stat-sub">시작 $1,000 기준</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">누적 손익</div>
+            <div class="verif-stat-value" id="at-total-pnl">—</div>
+            <div class="verif-stat-sub">청산 완료분 합산</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">총 거래</div>
+            <div class="verif-stat-value" id="at-total-count">—</div>
+            <div class="verif-stat-sub">오픈 + 청산</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">승률</div>
+            <div class="verif-stat-value" id="at-win-rate">—</div>
+            <div class="verif-stat-sub">청산 기준</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">오늘 손실</div>
+            <div class="verif-stat-value" id="at-daily-loss">—</div>
+            <div class="verif-stat-sub">한도 −$100</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">오픈 포지션</div>
+            <div class="verif-stat-value" id="at-open-count">—</div>
+            <div class="verif-stat-sub">동시 최대 3건</div>
+          </div>
+        </div>
+
+        <!-- B. 누적 잔고 곡선 -->
+        <div class="verif-section-title">📈 누적 잔고 곡선</div>
+        <div class="stats-chart-wrap" id="at-balance-wrap" style="display:none">
+          <svg class="stats-chart" id="at-balance-chart" viewBox="0 0 800 280" preserveAspectRatio="none"></svg>
+          <div class="stats-chart-hint">x: 거래 순번 · y: 잔고 ($) · 시작 $1,000</div>
+        </div>
+        <div class="verif-empty" id="at-balance-empty">청산된 자동매매가 없습니다 — 실거래 시작 후 채워집니다</div>
+
+        <!-- C. 거래 이력 테이블 -->
+        <div class="verif-section-title">📋 거래 이력</div>
+        <div class="verif-analysis-wrap" id="at-history">
+          <div class="verif-empty">자동매매 이력이 없습니다 — 검증 완료 후 OKX 서브계정 연동 시 기록 시작</div>
         </div>
       </div>
     </div>
@@ -3913,7 +3985,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup', 'autoverif', 'verification']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'setup', 'autosetup', 'autoverif', 'verification', 'autotrades']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3956,6 +4028,11 @@ function switchView(view) {
   // 자동 셋업 검증 뷰 활성화 시 데이터 로드
   if (view === 'autoverif') {
     loadAutoVerif()
+  }
+
+  // 자동매매 이력 뷰 활성화 시 데이터 로드
+  if (view === 'autotrades') {
+    loadAutoTrades()
   }
 }
 function toggleSidebar() {
@@ -8339,6 +8416,112 @@ function renderScatter(rows) {
   </div>`
 }
 
+// 청산된 표본 → AI용 통계 텍스트 (대시보드 알림검증)
+function buildVerifSummary(rows) {
+  const fmtP = v => v == null ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+
+  const valid = rows.filter(r => r.exit_pnl !== null)
+  const avgExit = valid.length ? valid.reduce((s, r) => s + r.exit_pnl, 0) / valid.length : 0
+  const winRate = valid.length ? valid.filter(r => r.exit_pnl > 0).length / valid.length * 100 : 0
+  const avgMax = rows.filter(r => r.max_pnl !== null).reduce((s, r, _, a) => s + r.max_pnl / a.length, 0)
+  const avg24h = rows.filter(r => r.pnl_24h !== null).reduce((s, r, _, a) => s + r.pnl_24h / a.length, 0)
+
+  // 청산 사유
+  const R = { sl: 0, trailing: 0, timeout: 0 }
+  for (const r of rows) if (R[r.exit_reason] !== undefined) R[r.exit_reason]++
+
+  // 방향별
+  const dirLine = dir => {
+    const a = rows.filter(r => r.direction === dir && r.exit_pnl !== null)
+    if (!a.length) return `${dir}: 없음`
+    const e = a.reduce((s, r) => s + r.exit_pnl, 0) / a.length
+    const w = a.filter(r => r.exit_pnl > 0).length / a.length * 100
+    const m = a.filter(r => r.max_pnl !== null).reduce((s, r, _, x) => s + r.max_pnl / x.length, 0)
+    return `${dir}: n=${a.length}, 확정 평균 ${fmtP(e)}, 승률 ${w.toFixed(0)}%, 최고점 평균 ${fmtP(m)}`
+  }
+
+  // "안 잘랐으면" 갭 — 5% 청산이 얼마나 양보했나 (최고점 vs 확정)
+  const gapDetail = [...rows].filter(r => r.max_pnl !== null)
+    .sort((a, b) => b.max_pnl - a.max_pnl)
+    .slice(0, 15)
+    .map(r => `  ${r.symbol.replace('-USDT-SWAP','')} ${r.direction}: 최고점 ${fmtP(r.max_pnl)} → 확정 ${fmtP(r.exit_pnl)} (사유 ${r.exit_reason})`)
+    .join('\n')
+
+  let txt = `=== 대시보드 알림 검증 — 5% SL/트레일링 청산 ===\n`
+  txt += `청산 표본: ${rows.length}건\n`
+  txt += `확정 손익 평균: ${fmtP(avgExit)}, 승률 ${winRate.toFixed(0)}%\n`
+  txt += `7일내 최고점 평균: ${fmtP(avgMax)}\n`
+  txt += `진입 24h 후 평균: ${fmtP(avg24h)}\n`
+  txt += `\n[청산 사유]\nSL ${R.sl} / 트레일링 ${R.trailing} / 타임아웃 ${R.timeout}\n`
+  txt += `\n[방향별]\n${dirLine('LONG')}\n${dirLine('SHORT')}\n`
+  txt += `\n[최고점 vs 확정 — 5% 청산이 양보한 양, 최고점순 TOP15]\n${gapDetail}\n`
+  return txt
+}
+
+async function requestVerifAnalysis() {
+  let exited = []
+  try {
+    const { data } = await sb.from('signal_performance')
+      .select('*')
+      .not('exit_reason', 'is', null)
+      .order('exit_at', { ascending: false })
+      .limit(200)
+    exited = data || []
+  } catch (e) {
+    alert('데이터 로드 실패: ' + e.message)
+    return
+  }
+
+  if (exited.length < 5) {
+    alert(`청산 표본 부족 (현재 ${exited.length}건) — 5건 이상 청산 후 분석 가능. 6/5경 첫 청산 데이터부터 채워집니다.`)
+    return
+  }
+
+  const body = document.getElementById('verification-body')
+  let aiBox = document.getElementById('verification-ai-result')
+  if (!aiBox) {
+    aiBox = document.createElement('div')
+    aiBox.id = 'verification-ai-result'
+    aiBox.className = 'index-ai-box'
+    aiBox.style.marginBottom = '14px'
+    body.insertBefore(aiBox, body.firstChild)
+  }
+  aiBox.textContent = '🤖 AI 분석 중...'
+
+  const summary = buildVerifSummary(exited)
+
+  const prompt = `다음은 알트코인 대시보드 알림(LONG/SHORT 신호)을 5% SL/트레일링으로 청산 시뮬레이션한 검증 데이터입니다.
+한 신호당 SL(-5%)·트레일링(신고점-5%)·타임아웃(7일) 중 먼저 터진 것으로 청산했고, 청산 후에도 7일 최고점은 계속 기록했습니다.
+PnL은 순수 가격 변화율(레버리지 미적용)입니다.
+
+분석 요청 (스스로 판단해서, 템플릿 채우기 말고):
+1. 5% 청산 파라미터가 알트에 적정한가 — 최고점 대비 확정 손익이 크게 양보하고 있다면(예: 최고점 +30%인데 5% 트레일에 +8%로 잘림) callback이 너무 타이트한 것
+2. 더 긴 callback(7%/10%)이 나았을 여지가 데이터에 보이는가
+3. LONG/SHORT 비대칭, 청산 사유 쏠림(SL 위주? 트레일링 위주?)에서 읽히는 것
+4. 신호 자체의 예측력 — 24h 후 평균이 +면 신호 방향이 맞는 것
+5. 한 줄 결론 — 지금 5%가 적정한지, 조정이 필요한지, 표본이 더 필요한지
+
+규칙:
+- 한국어, 트레이더 관점, 간결하게
+- 표본 n이 작으면(5~15) "초기 경향"으로만, 단정 금지
+- 정확한 숫자 인용
+- 이 통계가 자동매매 리스크한도($30/건) 근거가 된다는 점 염두
+
+${summary}`
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: prompt },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    aiBox.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[verif-analysis]', e)
+  }
+}
+
 // ══════════════════════════════════════
 //  자동 셋업 검증 (Auto Setup Verification)
 // ══════════════════════════════════════
@@ -8668,6 +8851,304 @@ function renderAvAnalysis(rows) {
         </table>
       </div>
     </div>
+  `
+}
+
+// 청산된 표본 → AI용 통계 텍스트
+function buildAvSummary(rows) {
+  const fmtP = v => v == null ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+
+  const vTrail = rows.filter(r => r.trail_exit_pnl !== null)
+  const vFixed = rows.filter(r => r.fixed_exit_pnl !== null)
+  const trailAvg = vTrail.length ? vTrail.reduce((s, r) => s + r.trail_exit_pnl, 0) / vTrail.length : 0
+  const fixedAvg = vFixed.length ? vFixed.reduce((s, r) => s + r.fixed_exit_pnl, 0) / vFixed.length : 0
+  const trailWin = vTrail.length ? vTrail.filter(r => r.trail_exit_pnl > 0).length / vTrail.length * 100 : 0
+  const fixedWin = vFixed.length ? vFixed.filter(r => r.fixed_exit_pnl > 0).length / vFixed.length * 100 : 0
+  const avgMax = rows.filter(r => r.max_pnl !== null).reduce((s, r, _, a) => s + r.max_pnl / a.length, 0)
+
+  // 청산 사유
+  const tR = { sl: 0, trailing: 0, timeout: 0 }
+  const fR = { tp: 0, tp2: 0, sl: 0, timeout: 0 }
+  for (const r of rows) {
+    if (tR[r.trail_exit_reason] !== undefined) tR[r.trail_exit_reason]++
+    if (fR[r.fixed_exit_reason] !== undefined) fR[r.fixed_exit_reason]++
+  }
+
+  // 방향별
+  const dirLine = dir => {
+    const a = rows.filter(r => r.direction === dir && r.trail_exit_pnl !== null)
+    if (!a.length) return `${dir}: 없음`
+    const t = a.reduce((s, r) => s + r.trail_exit_pnl, 0) / a.length
+    const f = a.filter(r => r.fixed_exit_pnl !== null).reduce((s, r, _, x) => s + r.fixed_exit_pnl / x.length, 0)
+    return `${dir}: n=${a.length}, 트레일 평균 ${fmtP(t)}, 고정 평균 ${fmtP(f)}`
+  }
+
+  // 개별 추천 (최고점 vs 트레일 vs 고정) — 트레일이 양보한 양
+  const detail = rows.filter(r => r.max_pnl !== null)
+    .sort((a, b) => b.max_pnl - a.max_pnl)
+    .map(r => `  ${r.timeframe} ${r.direction} 신뢰도${r.confidence_pct}%: 최고점 ${fmtP(r.max_pnl)} → 트레일 ${fmtP(r.trail_exit_pnl)}(사유 ${r.trail_exit_reason}) / 고정 ${fmtP(r.fixed_exit_pnl)}(사유 ${r.fixed_exit_reason})`)
+    .join('\n')
+
+  let txt = `=== 자동 셋업(BTC) 검증 — 두 청산전략 비교 ===\n`
+  txt += `청산 표본: ${rows.length}건\n`
+  txt += `전략 A (트레일링 3%, 신고점-3%/초기SL-3%, 레벨무시): 평균 ${fmtP(trailAvg)}, 승률 ${trailWin.toFixed(0)}%\n`
+  txt += `전략 B (고정 TP/SL, 추천이 준 레벨): 평균 ${fmtP(fixedAvg)}, 승률 ${fixedWin.toFixed(0)}%\n`
+  txt += `7일내 최고점 평균: ${fmtP(avgMax)}\n`
+  txt += `\n[청산 사유]\n트레일: SL ${tR.sl} / 트레일링 ${tR.trailing} / 타임아웃 ${tR.timeout}\n고정: TP ${fR.tp} / TP2 ${fR.tp2} / SL ${fR.sl} / 타임아웃 ${fR.timeout}\n`
+  txt += `\n[방향별]\n${dirLine('LONG')}\n${dirLine('SHORT')}\n`
+  txt += `\n[개별 추천 — 최고점→확정]\n${detail}\n`
+  return txt
+}
+
+async function requestAvAnalysis() {
+  // 현재 청산 표본 다시 조회
+  let exited = []
+  try {
+    const { data } = await sb.from('rec_performance')
+      .select('*')
+      .not('trail_exit_reason', 'is', null)
+      .order('trail_exit_at', { ascending: false })
+      .limit(200)
+    exited = data || []
+  } catch (e) {
+    alert('데이터 로드 실패: ' + e.message)
+    return
+  }
+
+  if (exited.length < 3) {
+    alert(`청산 표본 부족 (현재 ${exited.length}건) — 3건 이상 청산 후 분석 가능. 첫 STRONG 추천이 청산되면 채워집니다.`)
+    return
+  }
+
+  const body = document.getElementById('autoverif-body')
+  let aiBox = document.getElementById('autoverif-ai-result')
+  if (!aiBox) {
+    aiBox = document.createElement('div')
+    aiBox.id = 'autoverif-ai-result'
+    aiBox.className = 'index-ai-box'
+    aiBox.style.marginBottom = '14px'
+    body.insertBefore(aiBox, body.firstChild)
+  }
+  aiBox.textContent = '🤖 AI 분석 중...'
+
+  const summary = buildAvSummary(exited)
+
+  const prompt = `다음은 BTC 자동 셋업 추천을 두 청산 전략으로 동시 시뮬레이션한 검증 데이터입니다.
+같은 STRONG 추천에 대해 (A)트레일링 3%와 (B)추천이 준 고정 TP/SL을 각각 적용해 7일간 추적했습니다.
+PnL은 순수 가격 변화율(레버리지 미적용)입니다.
+
+분석 요청 (스스로 판단해서, 템플릿 채우기 말고):
+1. 트레일링 3%가 고정 레벨보다 나은가? 어느 상황에서 뒤집히는가
+2. 3% callback이 적정한가 — 최고점 대비 트레일이 얼마나 양보하는지 보고, 더 긴 callback(5%/7%)이 나았을 여지가 있는가
+3. LONG/SHORT 비대칭이 보이면 우연인지 구조적인지
+4. 청산 사유 분포에서 읽히는 것 (SL 쏠림? 타임아웃 많음?)
+5. 한 줄 결론 — 지금 데이터로 어느 전략을 신뢰할지, 아니면 표본 더 필요한지
+
+규칙:
+- 한국어, 트레이더 관점, 간결하게
+- 표본 n이 작으면(3~10) "초기 경향"으로만, 단정 금지
+- 정확한 숫자 인용
+
+${summary}`
+
+  try {
+    const { data: result, error } = await sb.functions.invoke('setup-analysis', {
+      body: { setup_summary: prompt },
+    })
+    if (error) throw error
+    if (result?.error) throw new Error(result.error)
+    aiBox.textContent = '🤖 ' + (result.analysis || '응답 없음')
+  } catch (e) {
+    aiBox.textContent = '⚠️ AI 분석 실패: ' + e.message
+    console.error('[av-analysis]', e)
+  }
+}
+
+// ══════════════════════════════════════
+//  자동매매 이력 (Auto Trades)
+// ══════════════════════════════════════
+const AT_START_BALANCE = 1000
+
+let autoTradesTimer = null
+
+async function loadAutoTrades() {
+  const info = document.getElementById('autotrades-info')
+  info.textContent = '데이터 로딩 중...'
+
+  try {
+    const { data } = await sb.from('auto_trades')
+      .select('*')
+      .order('entry_at', { ascending: false })
+      .limit(500)
+    const rows = data || []
+
+    renderAtSummary(rows)
+    renderAtBalanceChart(rows)
+    renderAtHistory(rows)
+
+    const now = new Date()
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    info.textContent = `갱신 ${kst.toISOString().slice(11, 19)} KST · 총 ${rows.length}건`
+
+    if (autoTradesTimer) clearInterval(autoTradesTimer)
+    autoTradesTimer = setInterval(() => {
+      if (document.getElementById('view-autotrades').style.display !== 'none') {
+        loadAutoTrades()
+      } else {
+        clearInterval(autoTradesTimer)
+        autoTradesTimer = null
+      }
+    }, 60_000)
+  } catch (e) {
+    console.error('[autotrades]', e)
+    info.textContent = '로딩 실패: ' + e.message
+  }
+}
+
+// A. 요약 카드
+function renderAtSummary(rows) {
+  const closed = rows.filter(r => r.status === 'closed')
+  const open = rows.filter(r => r.status === 'open')
+
+  const totalPnl = closed.reduce((s, r) => s + (r.exit_pnl_usd || 0), 0)
+  const balance = AT_START_BALANCE + totalPnl
+  const wins = closed.filter(r => (r.exit_pnl_usd || 0) > 0).length
+  const winRate = closed.length ? (wins / closed.length * 100) : 0
+
+  // 오늘 손실 (KST 자정 이후 청산분의 음수 합)
+  const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const todayLoss = closed
+    .filter(r => r.exit_at && new Date(new Date(r.exit_at).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === todayKst)
+    .reduce((s, r) => s + Math.min(0, r.exit_pnl_usd || 0), 0)
+
+  const fmtUsd = v => (v >= 0 ? '+$' : '−$') + Math.abs(v).toFixed(2)
+  const setVal = (id, txt, cls) => {
+    const el = document.getElementById(id)
+    el.textContent = txt
+    el.className = 'verif-stat-value' + (cls ? ' ' + cls : '')
+  }
+
+  document.getElementById('at-balance').textContent = '$' + balance.toFixed(2)
+  setVal('at-total-pnl', closed.length ? fmtUsd(totalPnl) : '—', totalPnl > 0 ? 'pos' : totalPnl < 0 ? 'neg' : '')
+  document.getElementById('at-total-count').textContent = rows.length
+  setVal('at-win-rate', closed.length ? winRate.toFixed(0) + '%' : '—', winRate >= 50 ? 'pos' : winRate >= 35 ? 'warn' : closed.length ? 'neg' : '')
+  setVal('at-daily-loss', closed.length ? fmtUsd(todayLoss) : '—', todayLoss < -50 ? 'neg' : todayLoss < 0 ? 'warn' : '')
+
+  const openEl = document.getElementById('at-open-count')
+  openEl.textContent = open.length + ' / 3'
+  openEl.className = 'verif-stat-value' + (open.length >= 3 ? ' warn' : '')
+}
+
+// B. 누적 잔고 곡선 (매매일지 통계 패턴 재활용)
+function renderAtBalanceChart(rows) {
+  const closed = rows.filter(r => r.status === 'closed' && r.exit_at)
+    .sort((a, b) => new Date(a.exit_at) - new Date(b.exit_at))
+
+  const wrap = document.getElementById('at-balance-wrap')
+  const empty = document.getElementById('at-balance-empty')
+
+  if (closed.length === 0) {
+    wrap.style.display = 'none'
+    empty.style.display = 'block'
+    return
+  }
+  wrap.style.display = 'block'
+  empty.style.display = 'none'
+
+  let bal = AT_START_BALANCE
+  const points = closed.map(r => {
+    bal += (r.exit_pnl_usd || 0)
+    return { bal, symbol: r.symbol }
+  })
+
+  const svg = document.getElementById('at-balance-chart')
+  const W = 800, H = 280
+  const PAD_L = 55, PAD_R = 16, PAD_T = 16, PAD_B = 28
+  const cw = W - PAD_L - PAD_R, ch = H - PAD_T - PAD_B
+
+  const vals = [AT_START_BALANCE, ...points.map(p => p.bal)]
+  let minY = Math.min(...vals), maxY = Math.max(...vals)
+  if (minY === maxY) { minY -= 10; maxY += 10 }
+  const padY = (maxY - minY) * 0.1
+  minY -= padY; maxY += padY
+  const rangeY = maxY - minY
+
+  const n = points.length
+  const xScale = i => PAD_L + (n === 1 ? cw / 2 : (i / (n - 1)) * cw)
+  const yScale = v => PAD_T + ch * (1 - (v - minY) / rangeY)
+
+  let html = ''
+  // Y 격자
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD_T + (ch / 4) * i
+    const val = maxY - (rangeY / 4) * i
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#1a1a1a" stroke-width="0.5" stroke-dasharray="2,4"/>`
+    html += `<text x="${PAD_L - 6}" y="${y + 3}" fill="#555" font-size="9" text-anchor="end">$${val.toFixed(0)}</text>`
+  }
+  // 시작 잔고 기준선
+  const yStart = yScale(AT_START_BALANCE)
+  html += `<line x1="${PAD_L}" y1="${yStart.toFixed(1)}" x2="${W - PAD_R}" y2="${yStart.toFixed(1)}" stroke="#3a3a3a" stroke-width="1" stroke-dasharray="3,3"/>`
+  html += `<text x="${W - PAD_R}" y="${(yStart - 4).toFixed(1)}" fill="#666" font-size="9" text-anchor="end">시작 $${AT_START_BALANCE}</text>`
+
+  const finalBal = points[n - 1].bal
+  const lineColor = finalBal >= AT_START_BALANCE ? '#2ecc71' : '#e74c3c'
+  const fillColor = finalBal >= AT_START_BALANCE ? '#2ecc7122' : '#e74c3c22'
+
+  const pathD = points.map((p, i) => (i === 0 ? 'M' : 'L') + xScale(i).toFixed(1) + ',' + yScale(p.bal).toFixed(1)).join(' ')
+  const fillD = pathD + ` L${xScale(n - 1).toFixed(1)},${yStart.toFixed(1)} L${PAD_L},${yStart.toFixed(1)} Z`
+  html += `<path d="${fillD}" fill="${fillColor}"/>`
+  html += `<path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round"/>`
+  html += `<circle cx="${xScale(n - 1).toFixed(1)}" cy="${yScale(finalBal).toFixed(1)}" r="4" fill="${lineColor}"/>`
+  html += `<text x="${(xScale(n - 1) - 8).toFixed(1)}" y="${(yScale(finalBal) - 10).toFixed(1)}" fill="${lineColor}" font-size="11" font-weight="600" text-anchor="end">$${finalBal.toFixed(2)}</text>`
+
+  svg.innerHTML = html
+}
+
+// C. 거래 이력 테이블
+function renderAtHistory(rows) {
+  const wrap = document.getElementById('at-history')
+  if (rows.length === 0) {
+    wrap.innerHTML = '<div class="verif-empty">자동매매 이력이 없습니다 — 검증 완료 후 OKX 서브계정 연동 시 기록 시작</div>'
+    return
+  }
+
+  const fmtUsd = v => v == null ? '—' : ((v >= 0 ? '+$' : '−$') + Math.abs(v).toFixed(2))
+  const fmtPct = v => v == null ? '—' : ((v >= 0 ? '+' : '') + v.toFixed(2) + '%')
+  const fmtCls = v => v == null ? '' : (v >= 0 ? 'pos' : 'neg')
+  const fmtTime = ts => {
+    if (!ts) return '—'
+    const kst = new Date(new Date(ts).getTime() + 9 * 60 * 60 * 1000)
+    return kst.toISOString().slice(5, 16).replace('T', ' ')
+  }
+  const srcBadge = s => s === 'rec'
+    ? '<span style="font-size:9px;color:#f0b90b;background:#2a2410;padding:1px 5px;border-radius:3px">BTC</span>'
+    : '<span style="font-size:9px;color:#7a9bd5;background:#1a1a2e;padding:1px 5px;border-radius:3px">알트</span>'
+  const reasonKr = { tp: 'TP', tp2: 'TP2', sl: 'SL', trailing: '트레일링', timeout: '타임아웃', manual: '수동' }
+
+  wrap.innerHTML = `
+    <table class="verif-table">
+      <thead><tr>
+        <th>소스</th><th>심볼</th><th>방향</th>
+        <th style="text-align:right">진입가</th><th style="text-align:right">사이즈</th>
+        <th style="text-align:right">청산가</th><th style="text-align:right">손익$</th><th style="text-align:right">손익%</th>
+        <th>사유</th><th style="text-align:right">진입시각</th><th>상태</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td>${srcBadge(r.source)}</td>
+          <td>${(r.symbol || '').replace('-USDT-SWAP', '')}</td>
+          <td>${r.direction === 'LONG' ? '▲' : '▼'}</td>
+          <td class="num">$${Number(r.entry_price).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+          <td class="num" style="color:#888">$${Number(r.size_usd).toFixed(0)}×${r.leverage}x</td>
+          <td class="num">${r.exit_price ? '$' + Number(r.exit_price).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}</td>
+          <td class="num ${fmtCls(r.exit_pnl_usd)}">${fmtUsd(r.exit_pnl_usd)}</td>
+          <td class="num ${fmtCls(r.exit_pnl_pct)}">${fmtPct(r.exit_pnl_pct)}</td>
+          <td style="font-size:10px;color:#888">${reasonKr[r.exit_reason] || '—'}</td>
+          <td class="num" style="color:#888;font-size:10px">${fmtTime(r.entry_at)}</td>
+          <td style="font-size:10px;color:${r.status === 'open' ? '#f0b90b' : '#888'}">${r.status === 'open' ? '● 오픈' : '청산'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
   `
 }
 
