@@ -369,8 +369,9 @@ def _rec_price_at_pnl(entry: float, pnl_pct: float, direction: str) -> float:
     return entry * (1 - pnl_pct / 100)
 
 
-def update_rec_one(row: dict, current: float) -> bool:
-    """rec_performance 행 1개 갱신. trail/fixed 두 청산 독립 추적."""
+def update_rec_one(row: dict, current: float, candles: list = None) -> bool:
+    """rec_performance 행 1개 갱신. trail/fixed 두 청산 독립 추적.
+    candles: BTC 1분봉 [(ts, high, low, close), ...] — 봉 단위 정밀 판정. None이면 current 1점."""
     direction = row["direction"]
     entry     = float(row["entry_price"])
     entry_at  = datetime.fromisoformat(row["entry_at"].replace("Z", "+00:00"))
@@ -389,61 +390,93 @@ def update_rec_one(row: dict, current: float) -> bool:
             updates[price_col] = round(current, 2)
             updates[pnl_col]   = round(current_pnl, 3)
 
-    # ── max/min (둘 다 청산되기 전까지 갱신; trail 활성화 판정에 필요) ──
+    # ── 봉 시퀀스 구성 (없으면 현재가 1점) ──
+    # 각 봉: (high, low, fav_pnl, adv_pnl)
+    bars = []
+    if candles:
+        for ts_ms, high, low, close in candles:
+            hp = calc_pnl(entry, high, direction)
+            lp = calc_pnl(entry, low, direction)
+            bars.append((high, low, max(hp, lp), min(hp, lp)))
+    else:
+        bars.append((current, current, current_pnl, current_pnl))
+
+    # ── max/min 갱신 (봉 고점/저점 반영) ──
     old_max = row.get("max_pnl") or 0
     old_min = row.get("min_pnl") or 0
-    if current_pnl > old_max:
-        updates["max_pnl"] = round(current_pnl, 3)
-        updates["max_pnl_at"] = now.isoformat()
-    if current_pnl < old_min:
-        updates["min_pnl"] = round(current_pnl, 3)
-    max_now = max(old_max, current_pnl)
+    max_now = old_max
+    min_now = old_min
 
-    # ══ 전략 A: 3% 트레일링/SL ══
-    if row.get("trail_exit_reason") is None:
+    # ══ 전략 A: 3% 트레일링/SL (봉 순회, 신고점 봉은 트리거 스킵) ══
+    trail_open = row.get("trail_exit_reason") is None
+    for high, low, fav, adv in bars:
+        if not trail_open:
+            break
+        new_high = fav > max_now
+        if fav > max_now: max_now = fav
+        if adv < min_now: min_now = adv
+        if new_high:
+            continue  # 신고점 봉은 저점이 고점보다 앞설 수 있어 트리거 제외
         trailing_active = max_now >= REC_TRAIL_ACTIVATE_PCT
         if not trailing_active:
-            if current_pnl <= -REC_INITIAL_SL_PCT:
-                exit_pnl = min(current_pnl, -REC_INITIAL_SL_PCT)
+            if adv <= -REC_INITIAL_SL_PCT:
+                exit_pnl = min(-REC_INITIAL_SL_PCT, adv)
                 updates["trail_exit_reason"] = "sl"
                 updates["trail_exit_pnl"]    = round(exit_pnl, 3)
                 updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
                 updates["trail_exit_at"]     = now.isoformat()
+                trail_open = False
         else:
-            if (max_now - current_pnl) >= REC_TRAIL_CALLBACK_PCT:
-                exit_pnl = min(current_pnl, max_now - REC_TRAIL_CALLBACK_PCT)
+            trail_line = max_now - REC_TRAIL_CALLBACK_PCT
+            if adv <= trail_line:
+                exit_pnl = min(trail_line, adv)
                 updates["trail_exit_reason"] = "trailing"
                 updates["trail_exit_pnl"]    = round(exit_pnl, 3)
                 updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
                 updates["trail_exit_at"]     = now.isoformat()
+                trail_open = False
 
-    # ══ 전략 B: 추천 고정 TP/SL ══
+    # max/min 갱신분 반영
+    if max_now > old_max:
+        updates["max_pnl"] = round(max_now, 3)
+        updates["max_pnl_at"] = now.isoformat()
+    if min_now < old_min:
+        updates["min_pnl"] = round(min_now, 3)
+
+    # ══ 전략 B: 추천 고정 TP/SL (봉 high/low 터치 판정) ══
     if row.get("fixed_exit_reason") is None:
-        rec_sl  = row.get("rec_sl")
-        rec_tp  = row.get("rec_tp")
-        rec_tp2 = row.get("rec_tp2")
-        hit = None
-        exit_price = None
-        if direction == "LONG":
-            # SL 우선 체크 (보수적: 같은 봉에 둘 다 닿으면 손실 가정)
-            if rec_sl and current <= float(rec_sl):
-                hit, exit_price = "sl", float(rec_sl)
-            elif rec_tp2 and current >= float(rec_tp2):
-                hit, exit_price = "tp2", float(rec_tp2)
-            elif rec_tp and current >= float(rec_tp):
-                hit, exit_price = "tp", float(rec_tp)
-        else:  # SHORT
-            if rec_sl and current >= float(rec_sl):
-                hit, exit_price = "sl", float(rec_sl)
-            elif rec_tp2 and current <= float(rec_tp2):
-                hit, exit_price = "tp2", float(rec_tp2)
-            elif rec_tp and current <= float(rec_tp):
-                hit, exit_price = "tp", float(rec_tp)
-        if hit:
-            updates["fixed_exit_reason"] = hit
-            updates["fixed_exit_pnl"]    = round(calc_pnl(entry, exit_price, direction), 3)
-            updates["fixed_exit_price"]  = round(exit_price, 2)
-            updates["fixed_exit_at"]     = now.isoformat()
+        rec_sl  = float(row["rec_sl"])  if row.get("rec_sl")  else None
+        rec_tp  = float(row["rec_tp"])  if row.get("rec_tp")  else None
+        rec_tp2 = float(row["rec_tp2"]) if row.get("rec_tp2") else None
+        for high, low, fav, adv in bars:
+            if direction == "LONG":
+                sl_hit  = rec_sl  is not None and low  <= rec_sl
+                tp2_hit = rec_tp2 is not None and high >= rec_tp2
+                tp_hit  = rec_tp  is not None and high >= rec_tp
+                worst   = low
+            else:
+                sl_hit  = rec_sl  is not None and high >= rec_sl
+                tp2_hit = rec_tp2 is not None and low  <= rec_tp2
+                tp_hit  = rec_tp  is not None and low  <= rec_tp
+                worst   = high
+            hit = None
+            exit_pnl = None
+            if sl_hit:
+                # SL은 시장가 — 갭으로 관통 시 봉 극값(worst)에서 체결
+                sl_pnl    = calc_pnl(entry, rec_sl, direction)
+                worst_pnl = calc_pnl(entry, worst, direction)
+                hit, exit_pnl = "sl", min(sl_pnl, worst_pnl)
+                exit_price = _rec_price_at_pnl(entry, exit_pnl, direction)
+            elif tp2_hit:
+                hit, exit_pnl, exit_price = "tp2", calc_pnl(entry, rec_tp2, direction), rec_tp2
+            elif tp_hit:
+                hit, exit_pnl, exit_price = "tp", calc_pnl(entry, rec_tp, direction), rec_tp
+            if hit:
+                updates["fixed_exit_reason"] = hit
+                updates["fixed_exit_pnl"]    = round(exit_pnl, 3)
+                updates["fixed_exit_price"]  = round(exit_price, 2)
+                updates["fixed_exit_at"]     = now.isoformat()
+                break
 
     # ── 7일 경과: 미청산 전략은 timeout 마감 + status 완료 ──
     if elapsed_min >= 60 * 24 * TRACK_DAYS:
@@ -472,7 +505,8 @@ def update_rec_one(row: dict, current: float) -> bool:
 
 
 async def update_all_rec_tracking():
-    """rec_performance status=tracking 전체 갱신 (BTC 단일가 1회 조회)."""
+    """rec_performance status=tracking 전체 갱신.
+    BTC 1분봉 candles 1회 조회 → 추적 행 전부 공유 (봉 단위 정밀 판정)."""
     sb = get_client()
     try:
         res = sb.table("rec_performance").select("*").eq("status", "tracking").execute()
@@ -484,16 +518,23 @@ async def update_all_rec_tracking():
     if not rows:
         return
 
-    current = await fetch_btc_price()
+    # BTC 1분봉 OHLC 1회 조회 (추적 행 전부 공유) — fetch_recent_candles 재활용
+    candles = fetch_recent_candles("okx", REC_BTC_INST)
+    # 현재가 = 마지막 봉 종가 (candles 실패 시 ticker 단발로 fallback)
+    if candles:
+        current = candles[-1][3]
+    else:
+        current = await fetch_btc_price()
     if current is None:
         logger.warning("[rec-tracker] BTC 가격 없음 — 이번 사이클 스킵")
         return
 
     updated = 0
     for r in rows:
-        if update_rec_one(r, current):
+        if update_rec_one(r, current, candles):
             updated += 1
-    logger.info(f"[rec-tracker] 사이클 — {len(rows)}건 검토, {updated}건 갱신 (BTC ${current:,.0f})")
+    src = "candles" if candles else "ticker"
+    logger.info(f"[rec-tracker] 사이클 — {len(rows)}건 검토, {updated}건 갱신 (BTC ${current:,.0f}, {src})")
 
 
 # ── 백그라운드 루프 ─────────────────────────
