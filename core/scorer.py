@@ -282,13 +282,13 @@ def format_telegram(result: dict, direction: str) -> str:
     price = float(result["price"])
     is_long = direction == "LONG"
     
-    # 초기 SL = -10% 가격 변동 (3x 적용 시 -30% 손실 = $30)
+    # 초기 SL = -5% 가격 변동 (3x 적용 시 -15% 손실 = $15)
     if is_long:
-        sl_price   = price * 0.90
-        tp_act     = price * 1.10   # 트레일링 활성화 (+10%)
+        sl_price   = price * 0.95
+        tp_act     = price * 1.05   # 트레일링 활성화 (+5%)
     else:
-        sl_price   = price * 1.10
-        tp_act     = price * 0.90
+        sl_price   = price * 1.05
+        tp_act     = price * 0.95
     
     # 가격 포맷 (소수점 자릿수 자동 조절)
     def fmt_p(p):
@@ -309,8 +309,8 @@ def format_telegram(result: dict, direction: str) -> str:
         f"━━━━━━━━━━━━━━━━━━",
         f"💵 *진입 가이드* ($100 × 3x)",
         f"• 진입:  {fmt_p(price)}",
-        f"• SL:    {fmt_p(sl_price)}  (−10% / 손실 $30)",
-        f"• 활성:  {fmt_p(tp_act)}  (+10%, 트레일링 ON)",
-        f"• 폭:    callback −10%",
+        f"• SL:    {fmt_p(sl_price)}  (−5% / 손실 $15)",
+        f"• 활성:  {fmt_p(tp_act)}  (+5%, 트레일링 ON)",
+        f"• 폭:    callback −5%",
         f"━━━━━━━━━━━━━━━━━━",
     ])
