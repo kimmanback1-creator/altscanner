@@ -7327,8 +7327,16 @@ function renderVerifTracking(rows) {
     else if (r.tp_50_hit) flags.push('<span class="verif-flag hit">+50%</span>')
     else if (r.tp_20_hit) flags.push('<span class="verif-flag hit">+20%</span>')
     else if (r.tp_10_hit) flags.push('<span class="verif-flag hit">+10%</span>')
-    if (r.sl_hit) flags.push('<span class="verif-flag sl">SL hit</span>')
-    if (r.trailing_exit_price) flags.push('<span class="verif-flag hit">트레일링 청산</span>')
+    // 청산 확정 칩 — exit_reason 기준, 확정 퍼센트 함께 표시
+    if (r.exit_reason) {
+      const exitPnl = r.exit_pnl != null
+        ? ((r.exit_pnl >= 0 ? '+' : '') + r.exit_pnl.toFixed(2) + '%')
+        : ''
+      const reasonKr = { sl: 'SL 청산', trailing: '트레일링 청산', timeout: '타임아웃' }
+      const label = reasonKr[r.exit_reason] || r.exit_reason
+      const chipCls = r.exit_reason === 'sl' ? 'verif-flag sl' : 'verif-flag hit'
+      flags.push(`<span class="${chipCls}">${label} ${exitPnl}</span>`)
+    }
     
     const pnlCls = recentPnl > 0 ? 'pos' : recentPnl < 0 ? 'neg' : ''
     const pnlSign = recentPnl >= 0 ? '+' : ''
