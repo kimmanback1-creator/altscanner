@@ -39,14 +39,18 @@ async def fetch_okx_ohlc(session, start_ts: datetime, end_ts: datetime, bar: str
     end_ms = int(end_ts.timestamp() * 1000)
 
     bars = []
-    cursor_before = end_ms
+    # OKX history-candles: `after`만 사용 (이 ts보다 과거 반환).
+    # before+after 동시 사용은 빈 결과를 줌 → after 커서 하나로 과거로 페이지네이션.
+    cursor_after = end_ms
+    seen = set()
 
-    while cursor_before > start_ms:
+    for _ in range(20):  # 안전장치: 최대 20페이지 (2000봉)
+        if cursor_after <= start_ms:
+            break
         params = {
             "instId": OKX_SYMBOL,
             "bar": bar,
-            "before": str(cursor_before),
-            "after": str(start_ms - 1),
+            "after": str(cursor_after),
             "limit": "100",
         }
         try:
@@ -66,25 +70,26 @@ async def fetch_okx_ohlc(session, start_ts: datetime, end_ts: datetime, bar: str
 
         for c in candles:
             ts_ms = int(c[0])
-            if ts_ms < start_ms:
+            if ts_ms in seen:
                 continue
-            bars.append({
-                "ts_ms": ts_ms,
-                "open":  float(c[1]),
-                "high":  float(c[2]),
-                "low":   float(c[3]),
-                "close": float(c[4]),
-            })
+            seen.add(ts_ms)
+            if start_ms <= ts_ms < end_ms:
+                bars.append({
+                    "ts_ms": ts_ms,
+                    "open":  float(c[1]),
+                    "high":  float(c[2]),
+                    "low":   float(c[3]),
+                    "close": float(c[4]),
+                })
 
         oldest_ms = int(candles[-1][0])
         if oldest_ms <= start_ms:
             break
-        cursor_before = oldest_ms
+        cursor_after = oldest_ms  # 다음 페이지: 더 과거로
         await asyncio.sleep(0.1)
 
     bars.sort(key=lambda x: x["ts_ms"])
     return bars
-
 
 # ── 라벨 판정 ──────────────────────────────
 def judge(bars: list, entry_price: float, threshold: float, signals: dict) -> str:
