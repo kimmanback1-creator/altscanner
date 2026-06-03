@@ -175,16 +175,23 @@ def update_one(row: dict, candles: list = None) -> bool:
         # 봉 시퀀스 구성: candles 있으면 1분봉 (high/low), 없으면 현재가 1점 fallback
         # 각 원소 = (favorable_pnl, adverse_pnl) — 방향별로 유리/불리 극값
         # LONG: high=유리(수익), low=불리(손실) / SHORT: 반대
+        # 진입 봉(진입 시각이 속한 1분봉) 및 그 이전 봉은 판정에서 제외.
+        # 받아온 1분봉 30개엔 진입 전 봉이 섞여 있어, 진입 전 저점으로 거짓 SL
+        # 청산되는 것 방지 (진입 직후 41초 -15% 청산 등). 신고점 봉 스킵과 같은 시간순서 문제.
+        entry_bar_ms = (int(entry_at.timestamp() * 1000) // 60000 + 1) * 60000
+
         seq = []
         if candles:
             for ts_ms, high, low, close in candles:
+                if ts_ms < entry_bar_ms:
+                    continue  # 진입 봉 및 이전 봉 스킵
                 hp = calc_pnl(entry, high, direction)
                 lp = calc_pnl(entry, low, direction)
                 fav = max(hp, lp)   # 유리 극값
                 adv = min(hp, lp)   # 불리 극값
                 seq.append((fav, adv))
-        else:
-            seq.append((current_pnl, current_pnl))
+        if not seq:
+            seq.append((current_pnl, current_pnl))  # 진입 후 봉 없으면 현재가 1점
 
         exit_done = False
         for fav, adv in seq:
@@ -392,14 +399,18 @@ def update_rec_one(row: dict, current: float, candles: list = None) -> bool:
 
     # ── 봉 시퀀스 구성 (없으면 현재가 1점) ──
     # 각 봉: (high, low, fav_pnl, adv_pnl)
+    # 진입 봉 및 이전 봉은 제외 (진입 전 가격으로 거짓 청산 방지 — signal과 동일).
+    entry_bar_ms = (int(entry_at.timestamp() * 1000) // 60000 + 1) * 60000
     bars = []
     if candles:
         for ts_ms, high, low, close in candles:
+            if ts_ms < entry_bar_ms:
+                continue  # 진입 봉 및 이전 봉 스킵
             hp = calc_pnl(entry, high, direction)
             lp = calc_pnl(entry, low, direction)
             bars.append((high, low, max(hp, lp), min(hp, lp)))
-    else:
-        bars.append((current, current, current_pnl, current_pnl))
+    if not bars:
+        bars.append((current, current, current_pnl, current_pnl))  # 진입 후 봉 없으면 현재가 1점
 
     # ── max/min 갱신 (봉 고점/저점 반영) ──
     old_max = row.get("max_pnl") or 0
