@@ -1992,6 +1992,23 @@ tr.both-agree .ticker-name {
 }
 
 /* B. 추적 중 그리드 */
+.verif-track-more-btn {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding: 10px;
+  background: #161616;
+  border: 1px dashed #333;
+  border-radius: 8px;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.verif-track-more-btn:hover {
+  background: #1c1c1c;
+  color: #aaa;
+  border-color: #444;
+}
 .verif-tracking-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -7276,6 +7293,8 @@ function renderVerifSummary(tracking, completed) {
 }
 
 // B. 추적 중 알림 그리드
+const VERIF_TRACK_VISIBLE = 15  // 기본 표시 카드 수 (나머지는 접기)
+
 function renderVerifTracking(rows) {
   const grid = document.getElementById('verif-tracking-grid')
   if (rows.length === 0) {
@@ -7284,6 +7303,9 @@ function renderVerifTracking(rows) {
   }
   
   const now = Date.now()
+
+  // 최신 진입 순 정렬 (entry_at 내림차순)
+  rows = [...rows].sort((a, b) => new Date(b.entry_at) - new Date(a.entry_at))
   
   const cards = rows.map(r => {
     const entryAt = new Date(r.entry_at).getTime()
@@ -7359,9 +7381,36 @@ function renderVerifTracking(rows) {
         ${flags.length ? `<div class="verif-track-flags">${flags.join('')}</div>` : ''}
       </div>
     `
-  }).join('')
-  
-  grid.innerHTML = cards
+ })  // ← 배열로 둠 (join 안 함)
+
+  const total = cards.length
+  const visible = cards.slice(0, VERIF_TRACK_VISIBLE).join('')
+  const hidden  = cards.slice(VERIF_TRACK_VISIBLE).join('')
+
+  if (total <= VERIF_TRACK_VISIBLE) {
+    grid.innerHTML = visible
+  } else {
+    grid.innerHTML = visible +
+      `<div id="verif-track-hidden" style="display:none;grid-column:1/-1;">
+         <div class="verif-tracking-grid">${hidden}</div>
+       </div>` +
+      `<button id="verif-track-toggle" class="verif-track-more-btn"
+         onclick="toggleVerifTrackMore()">
+         과거 추적 ${total - VERIF_TRACK_VISIBLE}건 더 보기 ▼
+       </button>`
+  }
+}
+
+function toggleVerifTrackMore() {
+  const box = document.getElementById('verif-track-hidden')
+  const btn = document.getElementById('verif-track-toggle')
+  if (!box || !btn) return
+  const open = box.style.display !== 'none'
+  box.style.display = open ? 'none' : 'block'
+  const cnt = box.querySelectorAll('.verif-track-card').length
+  btn.innerHTML = open
+    ? `과거 추적 ${cnt}건 더 보기 ▼`
+    : `과거 추적 접기 ▲`
 }
 
 // C. 완료된 분석
