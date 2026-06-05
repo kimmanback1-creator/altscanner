@@ -7530,15 +7530,36 @@ function renderScatter(rows) {
       <title>${r.symbol.replace('-USDT-SWAP','')} ${r.direction}: ${r.exit_pnl.toFixed(2)}%</title>
     </circle>`
   }).join('')
-  
-  return `<div class="verif-scatter-wrap">
-    <svg class="verif-scatter-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+
+  // 총 수익 / 총 손실 / 순손익 합산 (확정 손익 기준)
+  const totalWin  = valid.filter(r => r.exit_pnl > 0).reduce((s, r) => s + r.exit_pnl, 0)
+  const totalLoss = valid.filter(r => r.exit_pnl < 0).reduce((s, r) => s + r.exit_pnl, 0)
+  const winCnt    = valid.filter(r => r.exit_pnl > 0).length
+  const lossCnt   = valid.filter(r => r.exit_pnl < 0).length
+  const netPnl    = totalWin + totalLoss
+
+  return `<div class="verif-scatter-wrap" style="display:flex;align-items:stretch;gap:12px;">
+    <svg class="verif-scatter-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1;min-width:0;">
       <line x1="${PAD}" y1="${yZero.toFixed(1)}" x2="${PAD+cw}" y2="${yZero.toFixed(1)}" stroke="#333" stroke-width="0.5" stroke-dasharray="3,3"/>
       <text x="${PAD-4}" y="${(yZero+3).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">0%</text>
       <text x="${PAD-4}" y="${(PAD+5).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">${maxP.toFixed(0)}%</text>
       <text x="${PAD-4}" y="${(PAD+ch).toFixed(1)}" fill="#555" font-size="9" text-anchor="end">${minP.toFixed(0)}%</text>
       ${dots}
     </svg>
+    <div class="verif-scatter-totals" style="display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:96px;font-size:11px;">
+      <div>
+        <div style="color:#888;">총 수익 (${winCnt})</div>
+        <div style="color:#2ecc71;font-weight:600;font-size:14px;">+${totalWin.toFixed(1)}%</div>
+      </div>
+      <div>
+        <div style="color:#888;">총 손실 (${lossCnt})</div>
+        <div style="color:#e74c3c;font-weight:600;font-size:14px;">${totalLoss.toFixed(1)}%</div>
+      </div>
+      <div style="border-top:1px solid #333;padding-top:6px;">
+        <div style="color:#888;">순손익</div>
+        <div style="color:${netPnl >= 0 ? '#2ecc71' : '#e74c3c'};font-weight:700;font-size:16px;">${netPnl >= 0 ? '+' : ''}${netPnl.toFixed(1)}%</div>
+      </div>
+    </div>
   </div>`
 }
 
