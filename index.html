@@ -8119,6 +8119,77 @@ function renderAvTracking(rows) {
   grid.innerHTML = cards
 }
 
+// ── 추세 순/역방향 판정 ──────────────────────
+// trendline_state: 강세 / 약세 / 중립 / 약세→강세 전환 / 강세→약세 전환
+// 순방향 = 추세와 진입 방향 일치, 역방향 = 반대, 중립 = 추세 중립/불명
+function classifyTrendAlign(direction, trendState) {
+  if (!trendState) return null  // 데이터 없음 (구버전 행)
+  const bull = trendState === '강세' || trendState === '약세→강세 전환'
+  const bear = trendState === '약세' || trendState === '강세→약세 전환'
+  if (!bull && !bear) return 'neutral'  // 중립
+  if (direction === 'LONG')  return bull ? 'with' : 'against'
+  if (direction === 'SHORT') return bear ? 'with' : 'against'
+  return 'neutral'
+}
+
+// 추세 정렬별 승률/평균 (트레일 청산 기준)
+function renderTrendAlignAnalysis(rows) {
+  // trendline_state 있는 행만 (구버전 행은 null이라 제외)
+  const tagged = rows.filter(r =>
+    r.trendline_state != null && r.trail_exit_pnl != null
+  )
+  if (tagged.length < 3) {
+    return `<div class="verif-empty" style="padding:10px;">추세 태그 표본 부족 (현재 ${tagged.length}건) — trendline_state 기록된 추천이 3건 이상 청산돼야 분석 시작. (구버전 행은 추세 정보 없어 제외)</div>`
+  }
+
+  const groups = { with: [], against: [], neutral: [] }
+  for (const r of tagged) {
+    const cls = classifyTrendAlign(r.direction, r.trendline_state)
+    if (cls && groups[cls]) groups[cls].push(r)
+  }
+
+  const fmtP = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%'
+  const fmtCls = v => v >= 0 ? 'pos' : 'neg'
+  const statRow = (label, arr, hint) => {
+    if (!arr.length) return `<tr><td>${label}</td><td colspan="3" style="color:#555">없음</td></tr>`
+    const avg = arr.reduce((s, r) => s + r.trail_exit_pnl, 0) / arr.length
+    const win = arr.filter(r => r.trail_exit_pnl > 0).length / arr.length * 100
+    return `<tr>
+      <td>${label}<br><span style="font-size:9px;color:#666">${hint}</span></td>
+      <td class="num">${arr.length}</td>
+      <td class="num ${fmtCls(avg)}">${fmtP(avg)}</td>
+      <td class="num">${win.toFixed(0)}%</td>
+    </tr>`
+  }
+
+  const w = groups.with, a = groups.against
+  let verdict = ''
+  if (w.length >= 3 && a.length >= 3) {
+    const wAvg = w.reduce((s, r) => s + r.trail_exit_pnl, 0) / w.length
+    const aAvg = a.reduce((s, r) => s + r.trail_exit_pnl, 0) / a.length
+    const diff = wAvg - aAvg
+    verdict = `<div style="font-size:10px;color:#666;margin-top:8px">
+      ${diff > 0 ? '→ 순방향(추세 동행) 진입이 평균 우위' : diff < 0 ? '→ 역방향이 평균 우위 (의외 — 표본 확인 필요)' : '→ 차이 없음'}
+      (차이 ${Math.abs(diff).toFixed(2)}%p). 순방향이 유의미하게 나으면 "추세 순방향만 진입" 필터의 근거.
+    </div>`
+  } else {
+    verdict = `<div style="font-size:10px;color:#666;margin-top:8px">순/역 각 3건 이상 쌓이면 우열 판정 표시</div>`
+  }
+
+  return `
+    <table class="verif-table">
+      <thead><tr><th>추세 정렬</th><th class="num">n</th><th class="num">평균</th><th class="num">승률</th></tr></thead>
+      <tbody>
+        ${statRow('🟢 순방향', groups.with, '추세와 진입 방향 일치')}
+        ${statRow('🔴 역방향', groups.against, '추세와 반대로 진입')}
+        ${statRow('⚪ 중립', groups.neutral, '추세 중립/불명')}
+      </tbody>
+    </table>
+    ${verdict}
+    <div class="verif-sim-warn" style="margin-top:8px">진입 시점 trendline_state 기준. 백테스트 용도 — 필터 적용 전 효과 검증. 코인별·변동성 섞였으니 경향만.</div>
+  `
+}
+
 // C. 전략 비교 분석
 function renderAvAnalysis(rows) {
   const wrap = document.getElementById('av-analysis')
@@ -8257,6 +8328,14 @@ function renderAvAnalysis(rows) {
             ${tf1d ? `<tr><td>1D</td><td class="num">${tf1d.n}</td><td class="num ${fmtCls(tf1d.trail)}">${fmtPct(tf1d.trail)}</td><td class="num">${tf1d.win.toFixed(0)}%</td></tr>` : `<tr><td>1D</td><td colspan="3">없음</td></tr>`}
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- 추세 순/역방향 백테스트 -->
+    <div class="verif-analysis-row" style="grid-template-columns:1fr">
+      <div class="verif-analysis-section">
+        <h4>📐 추세 순/역방향 — 트렌드라인 정렬별 성과</h4>
+        ${renderTrendAlignAnalysis(rows)}
       </div>
     </div>
 
