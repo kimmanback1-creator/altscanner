@@ -311,6 +311,7 @@ def compute_recommendation(row: dict, tf: str) -> dict:
         "short_score": round(short_score, 2),
         "evidences": evidences,
         "levels": levels,
+        "trendline_state": trendline_state,
     }
 
 
