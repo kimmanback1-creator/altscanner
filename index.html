@@ -2103,6 +2103,47 @@ tr.both-agree .ticker-name {
 .verif-flag.sl { background: #301a1a; color: #e74c3c; }
 
 /* C. 완료된 분석 */
+.verif-sim-box {
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.verif-sim-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.verif-sim-title { font-size: 14px; font-weight: 600; color: #ddd; }
+.verif-sim-note { font-size: 11px; color: #666; }
+.verif-sim-inputs {
+  display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.verif-sim-inputs label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 11px; color: #888;
+}
+.verif-sim-inputs input {
+  width: 70px; padding: 6px 8px;
+  background: #1a1a1a; border: 1px solid #333; border-radius: 6px;
+  color: #eee; font-size: 14px;
+}
+.verif-sim-inputs input:focus { border-color: #4a9eff; outline: none; }
+.verif-sim-results {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  padding: 12px; background: #141414; border-radius: 8px;
+}
+.verif-sim-results div {
+  display: flex; flex-direction: column; gap: 3px;
+}
+.verif-sim-results span { font-size: 11px; color: #888; }
+.verif-sim-results b { font-size: 17px; font-weight: 700; color: #ddd; }
+.verif-sim-results b.pos { color: #2ecc71; }
+.verif-sim-results b.neg { color: #e74c3c; }
+.verif-sim-warn {
+  margin-top: 10px; font-size: 10px; color: #665;
+  line-height: 1.4;
+}
 .verif-analysis-wrap {
   background: #181818;
   border: 0.5px solid #1f1f1f;
@@ -7486,7 +7527,11 @@ function renderVerifAnalysis(rows) {
   // 청산 사유 한글 라벨
   const reasonLabel = { sl: 'SL', trailing: '트레일링', timeout: '타임아웃' }
   
+  // 시뮬용 데이터 전역 저장 (입력 바뀔 때 재계산)
+  window.__verifSimRows = rows
+
   wrap.innerHTML = `
+    <div id="verif-sim-box" class="verif-sim-box"></div>
     ${reasonBar}
     <div class="verif-analysis-row">
       <div class="verif-analysis-section">
@@ -7537,6 +7582,76 @@ function renderVerifAnalysis(rows) {
       </div>
     </div>
   `
+  renderVerifSim()  // 파라미터 시뮬레이터 렌더
+}
+
+// ── 파라미터 시뮬레이터 ──────────────────────
+// 활성화/콜백/SL을 입력받아 누적 데이터로 청산 결과 재계산.
+// 청산값 근사: 활성화 성공(max_pnl>=활성화) → GREATEST(max_pnl-콜백, min_pnl)
+//             활성화 실패 → min_pnl<=-SL이면 -SL(갭은 min_pnl), 아니면 실제 exit_pnl
+const VERIF_SIM = { activate: 5, callback: 5, sl: 5 }
+
+function verifSimExit(r, p) {
+  const maxP = r.max_pnl ?? 0
+  const minP = r.min_pnl ?? 0
+  if (maxP >= p.activate) {
+    // 트레일링: 신고점 - 콜백, 갭이면 min_pnl 하한
+    return Math.max(maxP - p.callback, minP)
+  } else {
+    // 활성화 못 함 → 고정 SL
+    if (minP <= -p.sl) return Math.min(-p.sl, minP)  // 갭 관통은 min_pnl
+    return r.exit_pnl ?? minP  // SL도 안 걸림 → 실제 청산값 유지
+  }
+}
+
+function renderVerifSim() {
+  const box = document.getElementById('verif-sim-box')
+  if (!box) return
+  const rows = window.__verifSimRows || []
+  const p = VERIF_SIM
+
+  const valid = rows.filter(r => r.max_pnl !== null && r.min_pnl !== null)
+  const sims = valid.map(r => verifSimExit(r, p))
+
+  const totalWin  = sims.filter(v => v > 0).reduce((s, v) => s + v, 0)
+  const totalLoss = sims.filter(v => v < 0).reduce((s, v) => s + v, 0)
+  const winCnt    = sims.filter(v => v > 0).length
+  const net       = totalWin + totalLoss
+  const winRate   = sims.length ? winCnt / sims.length * 100 : 0
+  const avg       = sims.length ? sims.reduce((s, v) => s + v, 0) / sims.length : 0
+  // 활성화(트레일) vs SL 비율
+  const trailCnt  = valid.filter(r => (r.max_pnl ?? 0) >= p.activate).length
+  const slCnt     = valid.length - trailCnt
+
+  box.innerHTML = `
+    <div class="verif-sim-head">
+      <span class="verif-sim-title">⚙️ 파라미터 시뮬레이터</span>
+      <span class="verif-sim-note">누적 ${valid.length}건 재계산 · 실시간</span>
+    </div>
+    <div class="verif-sim-inputs">
+      <label>활성화 %<input type="number" step="0.5" value="${p.activate}" id="sim-activate"></label>
+      <label>콜백 %<input type="number" step="0.5" value="${p.callback}" id="sim-callback"></label>
+      <label>SL %<input type="number" step="0.5" value="${p.sl}" id="sim-sl"></label>
+    </div>
+    <div class="verif-sim-results">
+      <div><span>순손익</span><b class="${net>=0?'pos':'neg'}">${net>=0?'+':''}${net.toFixed(1)}%</b></div>
+      <div><span>총 수익</span><b class="pos">+${totalWin.toFixed(1)}%</b></div>
+      <div><span>총 손실</span><b class="neg">${totalLoss.toFixed(1)}%</b></div>
+      <div><span>승률</span><b>${winRate.toFixed(0)}%</b></div>
+      <div><span>평균</span><b class="${avg>=0?'pos':'neg'}">${avg>=0?'+':''}${avg.toFixed(2)}%</b></div>
+      <div><span>트레일/SL</span><b>${trailCnt}/${slCnt}</b></div>
+    </div>
+    <div class="verif-sim-warn">근사 시뮬: 봉 순서·되돌림 미반영. 타이트한 콜백일수록 실제보다 낙관적. 경향 참고용.</div>
+  `
+
+  // 입력 핸들러 (값 바뀌면 즉시 재계산)
+  ['activate','callback','sl'].forEach(k => {
+    const el = document.getElementById('sim-' + k)
+    if (el) el.oninput = () => {
+      const v = parseFloat(el.value)
+      if (!isNaN(v) && v > 0) { VERIF_SIM[k] = v; renderVerifSim() }
+    }
+  })
 }
 
 // 산점도 SVG — x축: 진입 시간, y축: 24h PnL
