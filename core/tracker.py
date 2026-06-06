@@ -52,7 +52,7 @@ def create_performance_row(signal_id: int, result: dict, direction: str, entry_a
             "entry_price": float(result["price"]),
             "entry_at":    entry_at.isoformat(),
             "status":      "tracking",
-            "logic_ver":   2,
+            "logic_ver":   3,
         }).execute()
         logger.info(f"[tracker] 추적 시작 — {result['symbol']} {direction}")
     except Exception as e:
