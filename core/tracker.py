@@ -365,6 +365,7 @@ def create_rec_performance_row(tf: str, bar_ts: str, rec: dict, entry_at: dateti
             "entry_at":       entry_at.isoformat(),
             "status":         "tracking",
             "logic_ver":      2,
+            "trendline_state": rec.get("trendline_state"),
         }).execute()
         logger.info(f"[rec-tracker] 추적 시작 — {tf} {rec['verdict']} @ {levels.get('entry')}")
     except Exception as e:
