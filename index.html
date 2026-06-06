@@ -7642,10 +7642,10 @@ function renderVerifSim() {
       <div><span>트레일/SL</span><b>${trailCnt}/${slCnt}</b></div>
     </div>
     <div class="verif-sim-warn">근사 시뮬: 봉 순서·되돌림 미반영. 타이트한 콜백일수록 실제보다 낙관적. 경향 참고용.</div>
-  `
+  `;
 
   // 입력 핸들러 (값 바뀌면 즉시 재계산)
-  ['activate','callback','sl'].forEach(k => {
+  ;['activate','callback','sl'].forEach(k => {
     const el = document.getElementById('sim-' + k)
     if (el) el.oninput = () => {
       const v = parseFloat(el.value)
