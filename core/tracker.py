@@ -52,6 +52,7 @@ def create_performance_row(signal_id: int, result: dict, direction: str, entry_a
             "entry_price": float(result["price"]),
             "entry_at":    entry_at.isoformat(),
             "status":      "tracking",
+            "logic_ver":   2,
         }).execute()
         logger.info(f"[tracker] 추적 시작 — {result['symbol']} {direction}")
     except Exception as e:
@@ -194,30 +195,30 @@ def update_one(row: dict, candles: list = None) -> bool:
             seq.append((current_pnl, current_pnl))  # 진입 후 봉 없으면 현재가 1점
 
         exit_done = False
+        min_at = None  # 최저점 갱신 시각
         for fav, adv in seq:
             if exit_done:
                 break
-            # 1) 고점 먼저 — 신고점 갱신
-            new_high = fav > max_now
+            # 1) 봉 안에서 고가 먼저 발생 가정 — 신고점으로 청산선부터 갱신.
+            #    거래소 트레일링 스톱은 신고점 닿는 순간 청산선을 올리므로 같은 봉 저가로
+            #    바로 도달 판정해야 거래소 동작과 일치. (구버전은 신고점 봉을 스킵해
+            #    같은 봉 안 트레일 청산을 놓쳐 SL로 흘림 — 손익 과소 편향)
             if fav > max_now:
                 max_now = fav
             if adv < min_now:
                 min_now = adv
-
-            # 신고점을 세운 봉은 저점이 고점보다 시간상 앞설 수 있어
-            # (봉 OHLC만으론 순서 불명) 트레일/SL 트리거에서 제외 — 거짓 조기청산 방지.
-            # 청산은 다음 봉(고점 갱신 안 한 봉)의 저점에서 판정.
-            if new_high:
-                continue
+                min_at = now.isoformat()
 
             trailing_active = max_now >= TRAILING_ACTIVATE_PCT
 
-            # 2) 저점으로 트레일/SL 터치 판정 (같은 봉: 고점 먼저, 저점 나중)
+            # 2) 저가로 트레일/SL 도달 판정.
+            #    체결가는 트리거선이 기본. 고가조차 트리거선 아래인 '진짜 갭'일 때만 저가 체결.
+            #    (거래소: 고가→저가 경로상 트리거선을 지나므로 거기서 체결. 봉저가까지 안 끌려감)
             if not trailing_active:
                 # 트레일링 비활성: 고정 SL
                 if adv <= -INITIAL_SL_PCT:
                     exit_pnl = -INITIAL_SL_PCT
-                    if adv < exit_pnl:  # 갭다운 — 트리거선보다 더 아래에서 체결
+                    if fav < -INITIAL_SL_PCT:  # 고가조차 SL선 아래 = 갭다운
                         exit_pnl = adv
                     updates["sl_hit"]      = True
                     updates["sl_hit_at"]   = now.isoformat()
@@ -231,7 +232,7 @@ def update_one(row: dict, candles: list = None) -> bool:
                 trail_line = max_now - TRAILING_CALLBACK_PCT
                 if adv <= trail_line:
                     exit_pnl = trail_line
-                    if adv < exit_pnl:  # 갭다운 — 트리거선보다 더 아래에서 체결
+                    if fav < trail_line:  # 고가조차 트레일선 아래 = 갭다운
                         exit_pnl = adv
                     updates["exit_reason"]         = "trailing"
                     updates["exit_pnl"]            = round(exit_pnl, 3)
@@ -241,13 +242,14 @@ def update_one(row: dict, candles: list = None) -> bool:
                     updates["trailing_exit_at"]    = now.isoformat()
                     updates["trailing_pnl"]        = round(exit_pnl, 3)
                     exit_done = True
-
         # max/min 갱신분 반영
         if max_now > old_max:
             updates["max_pnl"] = round(max_now, 3)
             updates["max_pnl_at"] = now.isoformat()
         if min_now < old_min:
             updates["min_pnl"] = round(min_now, 3)
+            if min_at:
+                updates["min_pnl_at"] = min_at
 
         # TP 히트 플래그 (max_now 기준)
         if not row.get("tp_10_hit")  and max_now >= 10:  updates["tp_10_hit"]  = True
@@ -362,6 +364,7 @@ def create_rec_performance_row(tf: str, bar_ts: str, rec: dict, entry_at: dateti
             "rec_tp2":        levels.get("take_profit2"),
             "entry_at":       entry_at.isoformat(),
             "status":         "tracking",
+            "logic_ver":      2,
         }).execute()
         logger.info(f"[rec-tracker] 추적 시작 — {tf} {rec['verdict']} @ {levels.get('entry')}")
     except Exception as e:
@@ -418,20 +421,24 @@ def update_rec_one(row: dict, current: float, candles: list = None) -> bool:
     max_now = old_max
     min_now = old_min
 
-    # ══ 전략 A: 3% 트레일링/SL (봉 순회, 신고점 봉은 트리거 스킵) ══
+    # ══ 전략 A: 3% 트레일링/SL (봉 순회, 신고점 봉도 같은 봉 저가로 도달 판정) ══
     trail_open = row.get("trail_exit_reason") is None
+    rec_min_at = None
     for high, low, fav, adv in bars:
         if not trail_open:
             break
-        new_high = fav > max_now
+        # 봉 안 고가 먼저 가정 — 신고점으로 청산선 갱신 후 같은 봉 저가로 도달 판정
+        # (거래소 트레일링 스톱 동작과 일치. 구버전 신고점 봉 스킵은 트레일 놓침)
         if fav > max_now: max_now = fav
-        if adv < min_now: min_now = adv
-        if new_high:
-            continue  # 신고점 봉은 저점이 고점보다 앞설 수 있어 트리거 제외
+        if adv < min_now:
+            min_now = adv
+            rec_min_at = now.isoformat()
         trailing_active = max_now >= REC_TRAIL_ACTIVATE_PCT
         if not trailing_active:
             if adv <= -REC_INITIAL_SL_PCT:
-                exit_pnl = min(-REC_INITIAL_SL_PCT, adv)
+                exit_pnl = -REC_INITIAL_SL_PCT
+                if fav < -REC_INITIAL_SL_PCT:  # 고가조차 SL선 아래 = 갭다운
+                    exit_pnl = adv
                 updates["trail_exit_reason"] = "sl"
                 updates["trail_exit_pnl"]    = round(exit_pnl, 3)
                 updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
@@ -440,7 +447,9 @@ def update_rec_one(row: dict, current: float, candles: list = None) -> bool:
         else:
             trail_line = max_now - REC_TRAIL_CALLBACK_PCT
             if adv <= trail_line:
-                exit_pnl = min(trail_line, adv)
+                exit_pnl = trail_line
+                if fav < trail_line:  # 고가조차 트레일선 아래 = 갭다운
+                    exit_pnl = adv
                 updates["trail_exit_reason"] = "trailing"
                 updates["trail_exit_pnl"]    = round(exit_pnl, 3)
                 updates["trail_exit_price"]  = round(_rec_price_at_pnl(entry, exit_pnl, direction), 2)
@@ -453,6 +462,8 @@ def update_rec_one(row: dict, current: float, candles: list = None) -> bool:
         updates["max_pnl_at"] = now.isoformat()
     if min_now < old_min:
         updates["min_pnl"] = round(min_now, 3)
+        if rec_min_at:
+            updates["min_pnl_at"] = rec_min_at
 
     # ══ 전략 B: 추천 고정 TP/SL (봉 high/low 터치 판정) ══
     if row.get("fixed_exit_reason") is None:
