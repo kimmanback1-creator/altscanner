@@ -2652,6 +2652,7 @@ tr.both-agree .ticker-name {
         <h2>🧪 알림 검증</h2>
         <span class="verification-info" id="verification-info">데이터 로딩 중...</span>
         <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" id="verif-ver-toggle" onclick="toggleLogicVer('signal')">📊 전체 데이터</button>
           <button class="journal-btn" onclick="requestVerifAnalysis()">🤖 AI 분석</button>
           <button class="journal-btn" onclick="loadVerification()">🔄 새로고침</button>
         </div>
@@ -2711,6 +2712,7 @@ tr.both-agree .ticker-name {
         <h2>🔬 자동 셋업 검증 (BTC)</h2>
         <span class="verification-info" id="autoverif-info">데이터 로딩 중...</span>
         <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" id="autoverif-ver-toggle" onclick="toggleLogicVer('rec')">📊 전체 데이터</button>
           <button class="journal-btn" onclick="requestAvAnalysis()">🤖 AI 분석</button>
           <button class="journal-btn" onclick="loadAutoVerif()">🔄 새로고침</button>
         </div>
@@ -7248,15 +7250,15 @@ async function loadVerification() {
   
   try {
     // 추적 중 + 완료 데이터 한 번에 fetch (최근 200건)
-    const { data: tracking } = await sb.from('signal_performance')
+    const { data: tracking } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .eq('status', 'tracking')
+      .eq('status', 'tracking'))
       .order('entry_at', { ascending: false })
     
     // 청산 확정(exit_reason 있음) = 결과 분석 표본. status 무관 — 청산 즉시 편입.
-    const { data: exited } = await sb.from('signal_performance')
+    const { data: exited } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .not('exit_reason', 'is', null)
+      .not('exit_reason', 'is', null))
       .order('exit_at', { ascending: false })
       .limit(200)
     
@@ -7591,6 +7593,24 @@ function renderVerifAnalysis(rows) {
 //             활성화 실패 → min_pnl<=-SL이면 -SL(갭은 min_pnl), 아니면 실제 exit_pnl
 const VERIF_SIM = { activate: 5, callback: 5, sl: 5 }
 
+// logic_ver 필터: 'all' = 전체(구버전 거품 포함), 2 = 거래소정합 신버전만
+let LOGIC_VER_FILTER = 'all'
+function applyLogicVer(query) {
+  // logic_ver=2 선택 시에만 필터. 'all'이면 구버전(NULL/1)까지 전부.
+  return LOGIC_VER_FILTER === 2 ? query.eq('logic_ver', 2) : query
+}
+
+// 두 검증 페이지 공용 버전 토글. page: 'signal' | 'rec'
+function toggleLogicVer(page) {
+  LOGIC_VER_FILTER = LOGIC_VER_FILTER === 'all' ? 2 : 'all'
+  const label = LOGIC_VER_FILTER === 2 ? '✅ 신버전만' : '📊 전체 데이터'
+  const ids = ['verif-ver-toggle', 'autoverif-ver-toggle']
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = label })
+  // 현재 페이지 다시 로드
+  if (page === 'signal') loadVerification()
+  else loadAutoVerif()
+}
+
 function verifSimExit(r, p) {
   const maxP = r.max_pnl ?? 0
   const minP = r.min_pnl ?? 0
@@ -7772,9 +7792,9 @@ function buildVerifSummary(rows) {
 async function requestVerifAnalysis() {
   let exited = []
   try {
-    const { data } = await sb.from('signal_performance')
+    const { data } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .not('exit_reason', 'is', null)
+      .not('exit_reason', 'is', null))
       .order('exit_at', { ascending: false })
       .limit(200)
     exited = data || []
@@ -7844,18 +7864,17 @@ async function loadAutoVerif() {
 
   try {
     // 추적 중
-    const { data: tracking } = await sb.from('rec_performance')
+    const { data: tracking } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .eq('status', 'tracking')
+      .eq('status', 'tracking'))
       .order('entry_at', { ascending: false })
 
     // 트레일링 청산 확정 = 결과 분석 표본 (청산 즉시 편입)
-    const { data: exited } = await sb.from('rec_performance')
+    const { data: exited } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .not('trail_exit_reason', 'is', null)
+      .not('trail_exit_reason', 'is', null))
       .order('trail_exit_at', { ascending: false })
       .limit(200)
-
     const trackingRows = tracking || []
     const exitedRows = exited || []
 
@@ -8215,9 +8234,9 @@ async function requestAvAnalysis() {
   // 현재 청산 표본 다시 조회
   let exited = []
   try {
-    const { data } = await sb.from('rec_performance')
+    const { data } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .not('trail_exit_reason', 'is', null)
+      .not('trail_exit_reason', 'is', null))
       .order('trail_exit_at', { ascending: false })
       .limit(200)
     exited = data || []
