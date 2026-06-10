@@ -7252,13 +7252,13 @@ async function loadVerification() {
     // 추적 중 + 완료 데이터 한 번에 fetch (최근 200건)
     const { data: tracking } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .eq('status', 'tracking'))
+      .eq('status', 'tracking'), 'signal')
       .order('entry_at', { ascending: false })
     
     // 청산 확정(exit_reason 있음) = 결과 분석 표본. status 무관 — 청산 즉시 편입.
     const { data: exited } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .not('exit_reason', 'is', null))
+      .not('exit_reason', 'is', null), 'signal')
       .order('exit_at', { ascending: false })
       .limit(200)
     
