@@ -7896,7 +7896,7 @@ async function requestVerifAnalysis() {
   try {
     const { data } = await applyLogicVer(sb.from('signal_performance')
       .select('*')
-      .not('exit_reason', 'is', null))
+      .not('exit_reason', 'is', null), 'signal')
       .order('exit_at', { ascending: false })
       .limit(200)
     exited = data || []
@@ -7968,13 +7968,13 @@ async function loadAutoVerif() {
     // 추적 중
     const { data: tracking } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .eq('status', 'tracking'))
+      .eq('status', 'tracking'), 'rec')
       .order('entry_at', { ascending: false })
 
     // 트레일링 청산 확정 = 결과 분석 표본 (청산 즉시 편입)
     const { data: exited } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .not('trail_exit_reason', 'is', null))
+      .not('trail_exit_reason', 'is', null), 'rec')
       .order('trail_exit_at', { ascending: false })
       .limit(200)
     const trackingRows = tracking || []
@@ -8417,7 +8417,7 @@ async function requestAvAnalysis() {
   try {
     const { data } = await applyLogicVer(sb.from('rec_performance')
       .select('*')
-      .not('trail_exit_reason', 'is', null))
+      .not('trail_exit_reason', 'is', null), 'rec')
       .order('trail_exit_at', { ascending: false })
       .limit(200)
     exited = data || []
