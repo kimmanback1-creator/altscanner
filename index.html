@@ -7601,15 +7601,18 @@ const VERIF_SIM = { activate: 5, callback: 5, sl: 5 }
 
 // logic_ver 필터: 'all' = 전체(구버전 거품 포함), 2 = 거래소정합 신버전만
 let LOGIC_VER_FILTER = 'all'
-function applyLogicVer(query) {
-  // logic_ver=2 선택 시에만 필터. 'all'이면 구버전(NULL/1)까지 전부.
-  return LOGIC_VER_FILTER === 2 ? query.eq('logic_ver', 2) : query
+// page별 신버전 값: signal(대시보드 알트)=3, rec(자동셋업 BTC)=2
+const LOGIC_VER_BY_PAGE = { signal: 3, rec: 2 }
+function applyLogicVer(query, page) {
+  if (LOGIC_VER_FILTER !== 'new') return query
+  const ver = LOGIC_VER_BY_PAGE[page]
+  return ver ? query.eq('logic_ver', ver) : query
 }
 
 // 두 검증 페이지 공용 버전 토글. page: 'signal' | 'rec'
 function toggleLogicVer(page) {
-  LOGIC_VER_FILTER = LOGIC_VER_FILTER === 'all' ? 2 : 'all'
-  const label = LOGIC_VER_FILTER === 2 ? '✅ 신버전만' : '📊 전체 데이터'
+  LOGIC_VER_FILTER = LOGIC_VER_FILTER === 'all' ? 'new' : 'all'
+  const label = LOGIC_VER_FILTER === 'new' ? '✅ 신버전만' : '📊 전체 데이터'
   const ids = ['verif-ver-toggle', 'autoverif-ver-toggle']
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = label })
   // 현재 페이지 다시 로드
