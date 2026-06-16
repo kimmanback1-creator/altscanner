@@ -8609,21 +8609,31 @@ async function imbLoadCurrentPctB(){
   }catch(e){ /* 데이터 없으면 무시 */ }
 }
 
+let imbLevelSeries = []
 async function imbLoadLevels(){
   try{
     const { data, error } = await sb.from('imbalance_levels').select('*').eq('ticker', IMB_TICKER).single()
     if(error || !data) return
-    imbPriceLines.forEach(l=>imbCandleSeries.removePriceLine(l))
-    imbPriceLines = []
+    imbLevelSeries.forEach(s=>imbChart.removeSeries(s))
+    imbLevelSeries = []
+    const nowSec = Math.floor(Date.now()/1000)
     const draw = (arr, color)=>{
       (arr||[]).forEach(lv=>{
-        imbPriceLines.push(imbCandleSeries.createPriceLine({
-          price: lv.p,
+        if(lv.t == null) return
+        const startSec = Math.floor(Number(lv.t)/1000)
+        const s = imbChart.addLineSeries({
           color: lv.a ? '#3a3e45' : color,
           lineWidth: lv.a ? 1 : 2,
-          lineStyle: lv.a ? 1 : 0,
-          axisLabelVisible:false,
-        }))
+          lineStyle: lv.a ? 2 : 0,
+          priceLineVisible:false,
+          lastValueVisible:false,
+          crosshairMarkerVisible:false,
+        })
+        s.setData([
+          { time: startSec, value: lv.p },
+          { time: nowSec,   value: lv.p },
+        ])
+        imbLevelSeries.push(s)
       })
     }
     draw(data.buy_levels, '#b3b942')
