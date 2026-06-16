@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ALTSCANNER</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -2352,6 +2353,10 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">📊</span>
         <span class="sidebar-label">인덱스</span>
       </div>
+      <div class="sidebar-item" data-view="imbalance" onclick="switchView('imbalance')">
+        <span class="sidebar-icon">🟢</span>
+        <span class="sidebar-label">Imbalance</span>
+      </div>
     </div>
   </div>
 
@@ -2835,6 +2840,38 @@ tr.both-agree .ticker-name {
         <div class="verif-section-title">📋 거래 이력</div>
         <div class="verif-analysis-wrap" id="at-history">
           <div class="verif-empty">자동매매 이력이 없습니다 — 검증 완료 후 OKX 서브계정 연동 시 기록 시작</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-imbalance" style="display:none">
+      <div style="padding:20px 24px;height:100vh;overflow-y:auto;width:100%">
+        <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:14px">
+          <h2 style="font-size:18px;font-weight:700;color:#e6e8ea">Imbalance Map</h2>
+          <span style="color:#6b7178;font-size:13px;font-family:monospace">BTC · 4H · 통계</span>
+          <div style="margin-left:auto;text-align:right;font-family:monospace">
+            <div style="font-size:20px;font-weight:700;color:#e6e8ea" id="imb-price">—</div>
+            <div style="font-size:12px;color:#a8aeb6" id="imb-pctb">%B —</div>
+          </div>
+        </div>
+        <div id="imb-chart" style="width:100%;height:420px;border:1px solid #2a2e35;border-radius:10px;overflow:hidden"></div>
+        <div style="display:flex;gap:18px;margin:10px 2px 22px;font-size:12px;color:#a8aeb6;font-family:monospace">
+          <span><i style="width:16px;height:2px;display:inline-block;background:#b3b942;vertical-align:middle"></i> 매수 임밸런스</span>
+          <span><i style="width:16px;height:2px;display:inline-block;background:#e08bb6;vertical-align:middle"></i> 매도 임밸런스</span>
+          <span><i style="width:16px;border-top:2px dashed #6b7178;display:inline-block;vertical-align:middle"></i> 흡수됨</span>
+        </div>
+        <div style="background:#1c1f24;border:1px solid #2a2e35;border-radius:10px;padding:18px 20px">
+          <h2 style="font-size:15px;font-weight:700;color:#e6e8ea;margin-bottom:12px">구간별 승률 — %B × 임밸런스 방향 (1:2 RR)</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;font-family:monospace" id="imb-stats-table">
+            <thead><tr>
+              <th style="text-align:left;padding:9px 12px;border-bottom:1px solid #2a2e35;color:#6b7178;font-size:11px;text-transform:uppercase">%B 구간</th>
+              <th style="text-align:right;padding:9px 12px;border-bottom:1px solid #2a2e35;color:#6b7178;font-size:11px;text-transform:uppercase">매수(롱)</th>
+              <th style="text-align:right;padding:9px 12px;border-bottom:1px solid #2a2e35;color:#6b7178;font-size:11px;text-transform:uppercase">매도(숏)</th>
+            </tr></thead>
+            <tbody id="imb-stats-body">
+              <tr><td colspan="3" style="text-align:center;padding:30px;color:#6b7178">데이터를 불러오는 중…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -3850,7 +3887,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'autosetup', 'verification', 'autoverif', 'autotrades']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'autosetup', 'verification', 'autoverif', 'autotrades', 'imbalance']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3893,6 +3930,11 @@ function switchView(view) {
   // 자동매매 이력 뷰 활성화 시 데이터 로드
   if (view === 'autotrades') {
     loadAutoTrades()
+  }
+
+  // 임밸런스 뷰 활성화 시 데이터 로드
+  if (view === 'imbalance') {
+    loadImbalanceView()
   }
 }
 function toggleSidebar() {
@@ -8481,6 +8523,149 @@ ${summary}`
 const AT_START_BALANCE = 1000
 
 let autoTradesTimer = null
+
+// ══════════════════════════════════════
+//  Imbalance Map 통계 대시보드
+// ══════════════════════════════════════
+const IMB_TICKER = 'BTCUSDT.P'
+let imbChart = null, imbCandleSeries = null, imbPriceLines = [], imbCurPctB = null
+
+const IMB_ZONES = [
+  { label:'하단이탈 (<0)', min:-Infinity, max:0 },
+  { label:'0–20',   min:0,   max:20 },
+  { label:'20–40',  min:20,  max:40 },
+  { label:'40–60',  min:40,  max:60 },
+  { label:'60–80',  min:60,  max:80 },
+  { label:'80–100', min:80,  max:100 },
+  { label:'상단이탈 (>100)', min:100, max:Infinity },
+]
+function imbZoneOf(p){
+  if(p==null) return -1
+  for(let i=0;i<IMB_ZONES.length;i++){
+    const z=IMB_ZONES[i]
+    if(z.max===Infinity){ if(p>=z.min) return i }
+    else if(p>=z.min && p<z.max) return i
+  }
+  return -1
+}
+function imbTier(n){
+  if(n>=100) return ['#6fcf73','신뢰']
+  if(n>=30)  return ['#a8aeb6','수집중']
+  return ['#d9a441','초기']
+}
+
+let imbInited = false
+async function loadImbalanceView(){
+  // 차트는 한 번만 생성
+  if(!imbInited){
+    imbChart = LightweightCharts.createChart(document.getElementById('imb-chart'), {
+      layout:{ background:{color:'#16181c'}, textColor:'#a8aeb6' },
+      grid:{ vertLines:{color:'#22262d'}, horzLines:{color:'#22262d'} },
+      timeScale:{ timeVisible:true, borderColor:'#2a2e35' },
+      rightPriceScale:{ borderColor:'#2a2e35' },
+      crosshair:{ mode:0 },
+    })
+    imbCandleSeries = imbChart.addCandlestickSeries({
+      upColor:'#4caf50', downColor:'#e0556b',
+      wickUpColor:'#4caf50', wickDownColor:'#e0556b', borderVisible:false,
+    })
+    imbInited = true
+  }
+  imbChart.applyOptions({ width: document.getElementById('imb-chart').clientWidth })
+
+  await imbLoadCandles()
+  await imbLoadCurrentPctB()
+  await imbLoadLevels()
+  await imbLoadStats()
+}
+
+async function imbLoadCandles(){
+  try{
+    const r = await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=4H&limit=200')
+    const j = await r.json()
+    const rows = (j.data||[]).map(c=>({
+      time: Math.floor(Number(c[0])/1000),
+      open:+c[1], high:+c[2], low:+c[3], close:+c[4],
+    })).reverse()
+    imbCandleSeries.setData(rows)
+    if(rows.length) document.getElementById('imb-price').textContent = rows[rows.length-1].close.toLocaleString()
+  }catch(e){ console.error('[imb] 캔들 로드 실패', e) }
+}
+
+async function imbLoadCurrentPctB(){
+  try{
+    const { data } = await sb.from('imbalance_signals')
+      .select('pct_b, bar_time').eq('ticker', IMB_TICKER)
+      .order('bar_time',{ascending:false}).limit(1).single()
+    if(data && data.pct_b!=null){
+      imbCurPctB = data.pct_b
+      document.getElementById('imb-pctb').textContent = '%B '+Math.round(data.pct_b)
+    }
+  }catch(e){ /* 데이터 없으면 무시 */ }
+}
+
+async function imbLoadLevels(){
+  try{
+    const { data, error } = await sb.from('imbalance_levels').select('*').eq('ticker', IMB_TICKER).single()
+    if(error || !data) return
+    imbPriceLines.forEach(l=>imbCandleSeries.removePriceLine(l))
+    imbPriceLines = []
+    const draw = (arr, color)=>{
+      (arr||[]).forEach(lv=>{
+        imbPriceLines.push(imbCandleSeries.createPriceLine({
+          price: lv.p,
+          color: lv.a ? '#3a3e45' : color,
+          lineWidth: lv.a ? 1 : 2,
+          lineStyle: lv.a ? 1 : 0,
+          axisLabelVisible:false,
+        }))
+      })
+    }
+    draw(data.buy_levels, '#b3b942')
+    draw(data.sell_levels, '#e08bb6')
+  }catch(e){ console.error('[imb] 레벨 로드 실패', e) }
+}
+
+async function imbLoadStats(){
+  try{
+    const { data, error } = await sb.from('imbalance_signals')
+      .select('pct_b, imb_type, result')
+      .in('result',['SUCCESS','FAIL','UNRESOLVED'])
+      .in('imb_type',['BUY','SELL'])
+    if(error){ console.error(error); return }
+    const agg = {}
+    for(const row of (data||[])){
+      const zi = imbZoneOf(row.pct_b)
+      if(zi<0) continue
+      const key = zi+'_'+row.imb_type
+      agg[key] = agg[key] || {s:0,f:0,u:0}
+      if(row.result==='SUCCESS') agg[key].s++
+      else if(row.result==='FAIL') agg[key].f++
+      else if(row.result==='UNRESOLVED') agg[key].u++
+    }
+    const curZone = imbZoneOf(imbCurPctB)
+    let html = ''
+    IMB_ZONES.forEach((z,zi)=>{
+      const cell = (type)=>{
+        const a = agg[zi+'_'+type]
+        if(!a) return '<span style="color:#6b7178">—</span>'
+        const resolved = a.s + a.f
+        if(resolved===0) return '<span style="color:#6b7178">미해소 '+a.u+'</span>'
+        const wr = Math.round(a.s/resolved*100)
+        const [tcol,tlbl] = imbTier(resolved)
+        const c = type==='BUY' ? '#b3b942' : '#e08bb6'
+        const unres = a.u>0 ? ' <span style="color:#6b7178;font-size:12px">미해소 '+a.u+'</span>' : ''
+        return `<span style="font-weight:700;color:${c}">${wr}%</span> <span style="color:#6b7178;font-size:12px">n=${resolved}</span> <span style="font-size:10px;color:${tcol}">${tlbl}</span>${unres}`
+      }
+      const bg = (zi===curZone) ? 'background:rgba(179,185,66,.07)' : ''
+      html += `<tr style="${bg}"><td style="text-align:left;padding:9px 12px;border-bottom:1px solid #2a2e35;color:#a8aeb6">${z.label}</td><td style="text-align:right;padding:9px 12px;border-bottom:1px solid #2a2e35">${cell('BUY')}</td><td style="text-align:right;padding:9px 12px;border-bottom:1px solid #2a2e35">${cell('SELL')}</td></tr>`
+    })
+    if(Object.keys(agg).length===0){
+      html = '<tr><td colspan="3" style="text-align:center;padding:30px;color:#6b7178">아직 판정된 신호가 없습니다. 데이터가 쌓이면 표시됩니다.</td></tr>'
+    }
+    document.getElementById('imb-stats-body').innerHTML = html
+  }catch(e){ console.error('[imb] 통계 로드 실패', e) }
+}
 
 async function loadAutoTrades() {
   const info = document.getElementById('autotrades-info')
