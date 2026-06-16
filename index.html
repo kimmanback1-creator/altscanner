@@ -8558,13 +8558,18 @@ let imbInited = false
 async function loadImbalanceView(){
   // 차트는 한 번만 생성
   if(!imbInited){
-    imbChart = LightweightCharts.createChart(document.getElementById('imb-chart'), {
+    const imbEl = document.getElementById('imb-chart')
+    imbChart = LightweightCharts.createChart(imbEl, {
+      width: imbEl.clientWidth,
+      height: 420,
+      autoSize: true,
       layout:{ background:{color:'#16181c'}, textColor:'#a8aeb6' },
       grid:{ vertLines:{color:'#22262d'}, horzLines:{color:'#22262d'} },
       timeScale:{ timeVisible:true, borderColor:'#2a2e35' },
       rightPriceScale:{ borderColor:'#2a2e35' },
       crosshair:{ mode:0 },
     })
+    window.addEventListener('resize', ()=>{ if(imbChart) imbChart.applyOptions({ width: imbEl.clientWidth }) })
     imbCandleSeries = imbChart.addCandlestickSeries({
       upColor:'#4caf50', downColor:'#e0556b',
       wickUpColor:'#4caf50', wickDownColor:'#e0556b', borderVisible:false,
