@@ -8582,6 +8582,7 @@ async function loadImbalanceView(){
   await imbLoadCurrentPctB()
   await imbLoadLevels()
   await imbLoadStats()
+  await imbLoadReversals()
 }
 
 async function imbLoadCandles(){
@@ -8665,6 +8666,29 @@ async function imbLoadLevels(){
     draw(data.buy_levels, '#b3b942')
     draw(data.sell_levels, '#e08bb6')
   }catch(e){ console.error('[imb] 레벨 로드 실패', e) }
+}
+
+async function imbLoadReversals(){
+  try{
+    const { data, error } = await sb.from('imbalance_signals')
+      .select('bar_time, pct_b, imb_type')
+      .eq('ticker', IMB_TICKER)
+      .in('imb_type', ['BUY','SELL'])
+      .order('bar_time', { ascending: true })
+    if(error || !data) return
+    const markers = []
+    for(const row of data){
+      if(row.pct_b == null) continue
+      const t = Math.floor(new Date(row.bar_time).getTime()/1000)
+      if(row.imb_type === 'BUY' && row.pct_b < 0){
+        markers.push({ time:t, position:'belowBar', color:'#b3b942', shape:'arrowUp', text:'R' })
+      }
+      else if(row.imb_type === 'SELL' && row.pct_b > 100){
+        markers.push({ time:t, position:'aboveBar', color:'#e08bb6', shape:'arrowDown', text:'R' })
+      }
+    }
+    imbCandleSeries.setMarkers(markers)
+  }catch(e){ console.error('[imb] reversal 로드 실패', e) }
 }
 
 async function imbLoadStats(){
