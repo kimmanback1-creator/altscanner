@@ -8594,6 +8594,31 @@ async function imbLoadCandles(){
     })).reverse()
     imbCandleSeries.setData(rows)
     if(rows.length) document.getElementById('imb-price').textContent = rows[rows.length-1].close.toLocaleString()
+
+    // ── 볼린저밴드 (20, 2σ, SMA, 종가) — 트레이딩뷰 기본값 ──
+    const period = 20, mult = 2
+    const basis = [], upper = [], lower = []
+    for(let i=0;i<rows.length;i++){
+      if(i < period-1) continue
+      const slice = rows.slice(i-period+1, i+1)
+      const closes = slice.map(r=>r.close)
+      const mean = closes.reduce((a,b)=>a+b,0)/period
+      const variance = closes.reduce((a,b)=>a+(b-mean)**2,0)/period
+      const sd = Math.sqrt(variance)
+      basis.push({ time: rows[i].time, value: mean })
+      upper.push({ time: rows[i].time, value: mean + mult*sd })
+      lower.push({ time: rows[i].time, value: mean - mult*sd })
+    }
+    if(!imbBBSeries){
+      imbBBSeries = {
+        u: imbChart.addLineSeries({ color:'#555a62', lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false }),
+        m: imbChart.addLineSeries({ color:'#42464d', lineWidth:1, lineStyle:2, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false }),
+        l: imbChart.addLineSeries({ color:'#555a62', lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false }),
+      }
+    }
+    imbBBSeries.u.setData(upper)
+    imbBBSeries.m.setData(basis)
+    imbBBSeries.l.setData(lower)
   }catch(e){ console.error('[imb] 캔들 로드 실패', e) }
 }
 
@@ -8610,6 +8635,7 @@ async function imbLoadCurrentPctB(){
 }
 
 let imbLevelSeries = []
+let imbBBSeries = null
 async function imbLoadLevels(){
   try{
     const { data, error } = await sb.from('imbalance_levels').select('*').eq('ticker', IMB_TICKER).single()
