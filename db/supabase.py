@@ -440,3 +440,62 @@ def fetch_watchlist(exchange: str) -> list[str]:
         logger.error(f"[DB] fetch_watchlist({exchange}) 실패: {e}")
         return []
 
+# ══════════════════════════════════════════
+#  db/supabase.py 에 추가할 함수들
+#  (파일 맨 끝, fetch_watchlist 아래에 붙여넣기)
+# ══════════════════════════════════════════
+
+
+# ── options_macro ─────────────────────────
+async def insert_options_macro(result: dict):
+    """Deribit 옵션 거시 분석 결과 저장 (BTC/ETH, 30분 주기)"""
+    try:
+        get_client().table("options_macro").insert({
+            "ts_kst":           now_kst().isoformat(),
+            "asset":            result["asset"],
+            "spot":             result["spot"],
+            "main_expiry":      result.get("main_expiry"),
+            "days_to_exp":      result.get("days_to_exp"),
+            "main_expiry_oi":   result.get("main_expiry_oi"),
+            "pc_ratio":         result.get("pc_ratio"),
+            "call_oi":          result.get("call_oi"),
+            "put_oi":           result.get("put_oi"),
+            "atm_strike":       result.get("atm_strike"),
+            "atm_iv":           result.get("atm_iv"),
+            "otm_call_iv":      result.get("otm_call_iv"),
+            "otm_put_iv":       result.get("otm_put_iv"),
+            "skew_25d":         result.get("skew_25d"),
+            "skew_sentiment":   result.get("skew_sentiment"),
+            "net_gex":          result.get("net_gex"),
+            "gex_regime":       result.get("gex_regime"),
+            "max_gamma_strike": result.get("max_gamma_strike"),
+            "gex_profile":      result.get("gex_profile"),  # JSONB
+        }).execute()
+    except Exception as e:
+        logger.error(f"[DB] options_macro insert 실패 {result.get('asset')}: {e}")
+
+
+async def fetch_latest_options_macro(asset: str = "BTC") -> dict | None:
+    """특정 자산의 최신 옵션 거시 스냅샷 1건"""
+    try:
+        res = (
+            get_client().table("options_macro")
+            .select("*")
+            .eq("asset", asset)
+            .order("ts_kst", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logger.error(f"[DB] options_macro 조회 실패 {asset}: {e}")
+        return None
+
+
+async def cleanup_options_macro(keep_days: int = 30):
+    """30일 지난 옵션 매크로 행 삭제 (롤링)"""
+    try:
+        cutoff = (now_kst() - timedelta(days=keep_days)).isoformat()
+        get_client().table("options_macro").delete().lt("ts_kst", cutoff).execute()
+    except Exception as e:
+        logger.error(f"[DB] options_macro cleanup 실패: {e}")
