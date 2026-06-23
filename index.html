@@ -2892,7 +2892,7 @@ tr.both-agree .ticker-name {
                 <div id="opt-skew-lbl" style="font-size:11px;font-family:monospace;color:#6b7178;margin-top:2px">—</div>
               </div>
               <div style="background:#16181c;border:1px solid #2a2e35;border-radius:8px;padding:12px 14px">
-                <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:6px">GEX 레짐 (변동성)</div>
+                <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:6px;position:relative">GEX 레짐 (변동성) <span style="cursor:help;color:#5b9bd5;border:1px solid #3a3e45;border-radius:50%;padding:0 4px;font-size:9px" onmouseover="document.getElementById('gex-tip').style.display='block'" onmouseout="document.getElementById('gex-tip').style.display='none'">i</span><div id="gex-tip" style="display:none;position:absolute;top:18px;left:0;z-index:50;width:340px;background:#0e0f12;border:1px solid #3a3e45;border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.6;text-transform:none;color:#a8aeb6;box-shadow:0 4px 16px rgba(0,0,0,.5)"><div style="margin-bottom:6px"><b style="color:#5b9bd5">롱감마</b> (net GEX 음수): 딜러가 오르면 팔고 내리면 삼 → 변동성 <b>억제</b> → 횡보·핀·평균회귀</div><div><b style="color:#e0a356">숏감마</b> (net GEX 양수): 딜러가 오르면 더 사고 내리면 더 팖 → 변동성 <b>증폭</b> → 추세 가속·급등락</div></div></div>
                 <div id="opt-gex-val" style="font-size:19px;font-weight:700;font-family:monospace;color:#e6e8ea">—</div>
                 <div id="opt-gex-lbl" style="font-size:11px;font-family:monospace;color:#6b7178;margin-top:2px">—</div>
               </div>
@@ -8614,10 +8614,13 @@ async function imbLoadOptions(){
       return
     }
 
-    // 상단 배지: 한 줄 요약
+    // 상단 배지: 한 줄 요약 (색상 포함)
     const sentTxt = data.skew_sentiment==='fear' ? '공포' : data.skew_sentiment==='greed' ? '탐욕' : '—'
     const regTxt  = data.gex_regime==='long_gamma' ? '횡보' : data.gex_regime==='short_gamma' ? '증폭' : '—'
-    document.getElementById('opt-regime-badge').textContent = `${sentTxt} · ${regTxt}`
+    const sentCol = data.skew_sentiment==='fear' ? '#e0556b' : data.skew_sentiment==='greed' ? '#4caf50' : '#6b7178'
+    const regCol  = data.gex_regime==='long_gamma' ? '#5b9bd5' : data.gex_regime==='short_gamma' ? '#e0a356' : '#6b7178'
+    document.getElementById('opt-regime-badge').innerHTML =
+      `<span style="color:${sentCol}">${sentTxt}</span> <span style="color:#3a3e45">·</span> <span style="color:${regCol}">${regTxt}</span>`
 
     // 메타
     const ts = data.ts_kst ? new Date(data.ts_kst).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '—'
@@ -8650,6 +8653,9 @@ async function imbLoadOptions(){
     if(data.pc_ratio!=null)
       document.getElementById('opt-pcr-lbl').textContent = 'P/C '+data.pc_ratio.toFixed(2)
 
+    // ── 시계열 로드 → 자석 이동 라인 + 레짐 전환 띠 ──
+    imbLoadOptionsHistory()
+
     // GEX 분포 막대
     const barsEl = document.getElementById('opt-gex-bars')
     const profile = data.gex_profile || []
@@ -8675,6 +8681,75 @@ async function imbLoadOptions(){
     console.error('[imb] 옵션 매크로 로드 실패', e)
     document.getElementById('opt-regime-badge').textContent = '로드 실패'
   }
+}
+
+// 자석 이동 라인 + 레짐 전환 배경 띠 (시계열)
+let imbMagnetSeries = null
+let imbRegimeBands = []
+async function imbLoadOptionsHistory(){
+  try{
+    const { data, error } = await sb.from('options_macro')
+      .select('ts_kst, max_gamma_strike, gex_regime')
+      .eq('asset','BTC')
+      .order('ts_kst',{ascending:true})
+      .limit(2000)
+    if(error || !data || data.length < 2) return  // 점 2개 미만이면 선 안 그려짐
+
+    // ── 자석 이동: 노란 점선 라인 ──
+    const magnetData = []
+    for(const row of data){
+      if(row.max_gamma_strike == null || !row.ts_kst) continue
+      magnetData.push({
+        time: Math.floor(new Date(row.ts_kst).getTime()/1000),
+        value: Number(row.max_gamma_strike),
+      })
+    }
+    // 같은 time 중복 제거 (lightweight-charts는 오름차순 + 유니크 요구)
+    const seen = new Set()
+    const magnetClean = []
+    for(const d of magnetData){
+      if(seen.has(d.time)) continue
+      seen.add(d.time)
+      magnetClean.push(d)
+    }
+    if(magnetClean.length >= 2){
+      if(!imbMagnetSeries){
+        imbMagnetSeries = imbChart.addLineSeries({
+          color:'#e6c84a', lineWidth:2, lineStyle:2,
+          priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:true,
+          title:'감마 자석',
+        })
+      }
+      imbMagnetSeries.setData(magnetClean)
+    }
+
+    // ── 레짐 전환: 배경 띠 (마커로 표시) ──
+    // 롱→숏 또는 숏→롱 바뀌는 시점에 마커
+    const markers = []
+    let prevRegime = null
+    for(const row of data){
+      if(!row.gex_regime || !row.ts_kst) continue
+      if(prevRegime && row.gex_regime !== prevRegime){
+        const t = Math.floor(new Date(row.ts_kst).getTime()/1000)
+        const toShort = row.gex_regime === 'short_gamma'
+        markers.push({
+          time: t,
+          position: 'aboveBar',
+          color: toShort ? '#e0a356' : '#5b9bd5',
+          shape: toShort ? 'arrowUp' : 'arrowDown',
+          text: toShort ? '증폭전환' : '횡보전환',
+        })
+      }
+      prevRegime = row.gex_regime
+    }
+    // 기존 임밸런스 reversal 마커와 합쳐서 표시 (덮어쓰지 않게)
+    if(markers.length && imbCandleSeries){
+      const existing = imbCandleSeries.markers ? imbCandleSeries.markers() : []
+      const merged = [...(window.imbReversalMarkers||[]), ...markers]
+        .sort((a,b)=>a.time-b.time)
+      imbCandleSeries.setMarkers(merged)
+    }
+  }catch(e){ console.error('[imb] 옵션 시계열 로드 실패', e) }
 }
 async function loadImbalanceView(){
   // 차트는 한 번만 생성
@@ -8809,6 +8884,7 @@ async function imbLoadReversals(){
         markers.push({ time:t, position:'aboveBar', color:'#e08bb6', shape:'arrowDown', text:'R' })
       }
     }
+    window.imbReversalMarkers = markers
     imbCandleSeries.setMarkers(markers)
   }catch(e){ console.error('[imb] reversal 로드 실패', e) }
 }
