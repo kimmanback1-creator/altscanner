@@ -2873,6 +2873,46 @@ tr.both-agree .ticker-name {
             </tbody>
           </table>
         </div>
+
+        <!-- ══ 옵션 거시 패널 (Deribit GEX/스큐) ══ -->
+        <div style="background:#1c1f24;border:1px solid #2a2e35;border-radius:10px;margin-top:18px;overflow:hidden">
+          <div onclick="toggleOptPanel()" style="display:flex;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;user-select:none">
+            <span id="opt-caret" style="color:#6b7178;font-size:12px;transition:transform .15s">▶</span>
+            <h2 style="font-size:15px;font-weight:700;color:#e6e8ea;margin:0">옵션 시장 심리 — Deribit BTC</h2>
+            <span id="opt-regime-badge" style="margin-left:auto;font-size:12px;font-family:monospace;color:#6b7178">—</span>
+          </div>
+          <div id="opt-panel-body" style="display:none;padding:4px 20px 20px">
+            <div style="font-size:11px;color:#6b7178;font-family:monospace;margin-bottom:14px" id="opt-meta">만기 — · 잔존 — · 갱신 —</div>
+
+            <!-- 3개 핵심 지표 카드 -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+              <div style="background:#16181c;border:1px solid #2a2e35;border-radius:8px;padding:12px 14px">
+                <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:6px">IV 스큐 (방향 심리)</div>
+                <div id="opt-skew-val" style="font-size:19px;font-weight:700;font-family:monospace;color:#e6e8ea">—</div>
+                <div id="opt-skew-lbl" style="font-size:11px;font-family:monospace;color:#6b7178;margin-top:2px">—</div>
+              </div>
+              <div style="background:#16181c;border:1px solid #2a2e35;border-radius:8px;padding:12px 14px">
+                <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:6px">GEX 레짐 (변동성)</div>
+                <div id="opt-gex-val" style="font-size:19px;font-weight:700;font-family:monospace;color:#e6e8ea">—</div>
+                <div id="opt-gex-lbl" style="font-size:11px;font-family:monospace;color:#6b7178;margin-top:2px">—</div>
+              </div>
+              <div style="background:#16181c;border:1px solid #2a2e35;border-radius:8px;padding:12px 14px">
+                <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:6px">감마 자석 / P-C비</div>
+                <div id="opt-magnet-val" style="font-size:19px;font-weight:700;font-family:monospace;color:#e6e8ea">—</div>
+                <div id="opt-pcr-lbl" style="font-size:11px;font-family:monospace;color:#6b7178;margin-top:2px">—</div>
+              </div>
+            </div>
+
+            <!-- GEX 행사가 분포 막대 -->
+            <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:8px">행사가별 감마 익스포저 (자석 후보)</div>
+            <div id="opt-gex-bars" style="font-family:monospace;font-size:12px"></div>
+
+            <div style="font-size:11px;color:#6b7178;margin-top:14px;line-height:1.5">
+              ⚠️ 방향 예언이 아니라 <b style="color:#a8aeb6">시장 포지셔닝 구조</b>입니다. 스큐=방향 심리, GEX 레짐=변동성 성격(롱감마 횡보/숏감마 증폭), 자석=가격이 끌릴 행사가. 임밸런스·CVD 신호와 <b style="color:#a8aeb6">겹칠 때</b>만 참고하세요.
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -8555,6 +8595,87 @@ function imbTier(n){
 }
 
 let imbInited = false
+
+// ── 옵션 거시 패널 (Deribit GEX/스큐) ──
+let optPanelOpen = false
+function toggleOptPanel(){
+  optPanelOpen = !optPanelOpen
+  document.getElementById('opt-panel-body').style.display = optPanelOpen ? 'block' : 'none'
+  document.getElementById('opt-caret').style.transform = optPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+}
+
+async function imbLoadOptions(){
+  try{
+    const { data, error } = await sb.from('options_macro')
+      .select('*').eq('asset','BTC')
+      .order('ts_kst',{ascending:false}).limit(1).single()
+    if(error || !data){
+      document.getElementById('opt-regime-badge').textContent = '데이터 없음'
+      return
+    }
+
+    // 상단 배지: 한 줄 요약
+    const sentTxt = data.skew_sentiment==='fear' ? '공포' : data.skew_sentiment==='greed' ? '탐욕' : '—'
+    const regTxt  = data.gex_regime==='long_gamma' ? '횡보' : data.gex_regime==='short_gamma' ? '증폭' : '—'
+    document.getElementById('opt-regime-badge').textContent = `${sentTxt} · ${regTxt}`
+
+    // 메타
+    const ts = data.ts_kst ? new Date(data.ts_kst).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '—'
+    document.getElementById('opt-meta').textContent =
+      `만기 ${data.main_expiry||'—'} · 잔존 ${data.days_to_exp!=null?data.days_to_exp.toFixed(1)+'일':'—'} · 갱신 ${ts}`
+
+    // [1] 스큐
+    const skewEl = document.getElementById('opt-skew-val')
+    if(data.skew_25d!=null){
+      const s = data.skew_25d
+      skewEl.textContent = (s>0?'+':'')+s.toFixed(1)+'%p'
+      skewEl.style.color = s>0 ? '#4caf50' : '#e0556b'
+      document.getElementById('opt-skew-lbl').textContent =
+        s>0 ? '콜 비쌈 = 상방 베팅' : '풋 비쌈 = 하방 헷지'
+    }
+
+    // [2] GEX 레짐
+    const gexEl = document.getElementById('opt-gex-val')
+    if(data.gex_regime){
+      const isLong = data.gex_regime==='long_gamma'
+      gexEl.textContent = isLong ? '롱감마' : '숏감마'
+      gexEl.style.color = isLong ? '#5b9bd5' : '#e0a356'
+      document.getElementById('opt-gex-lbl').textContent =
+        isLong ? '움직임 억제 (핀/횡보)' : '움직임 증폭 (추세 가속)'
+    }
+
+    // [3] 자석 + PCR
+    if(data.max_gamma_strike!=null)
+      document.getElementById('opt-magnet-val').textContent = '$'+Number(data.max_gamma_strike).toLocaleString()
+    if(data.pc_ratio!=null)
+      document.getElementById('opt-pcr-lbl').textContent = 'P/C '+data.pc_ratio.toFixed(2)
+
+    // GEX 분포 막대
+    const barsEl = document.getElementById('opt-gex-bars')
+    const profile = data.gex_profile || []
+    if(profile.length){
+      const maxAbs = Math.max(...profile.map(p=>Math.abs(p.gex)))
+      const spot = data.spot
+      barsEl.innerHTML = profile.map(p=>{
+        const w = maxAbs>0 ? Math.round(Math.abs(p.gex)/maxAbs*100) : 0
+        const col = p.gex>=0 ? '#e0a356' : '#5b9bd5'
+        const near = (spot && Math.abs(p.strike-spot)<spot*0.015) ? ' ←현물' : ''
+        const isMagnet = p.strike===data.max_gamma_strike ? ' style="color:#e6e8ea;font-weight:700"' : ' style="color:#a8aeb6"'
+        return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+          <span${isMagnet}>$${Number(p.strike).toLocaleString()}${near}</span>
+          <div style="flex:1;height:8px;background:#16181c;border-radius:3px;overflow:hidden">
+            <div style="width:${w}%;height:100%;background:${col}"></div>
+          </div>
+        </div>`
+      }).join('')
+    } else {
+      barsEl.innerHTML = '<span style="color:#6b7178">분포 데이터 없음</span>'
+    }
+  }catch(e){
+    console.error('[imb] 옵션 매크로 로드 실패', e)
+    document.getElementById('opt-regime-badge').textContent = '로드 실패'
+  }
+}
 async function loadImbalanceView(){
   // 차트는 한 번만 생성
   if(!imbInited){
@@ -8583,6 +8704,7 @@ async function loadImbalanceView(){
   await imbLoadLevels()
   await imbLoadStats()
   await imbLoadReversals()
+  await imbLoadOptions()
 }
 
 async function imbLoadCandles(){
