@@ -19,6 +19,7 @@ from core.imbalance_resolver import imbalance_resolver_loop
 from webhook.server import app
 from db.supabase   import preload_history
 from config        import WEBHOOK_PORT
+from core.options_macro import options_macro_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +60,8 @@ async def main():
         evaluator_loop(),    # setup_log_auto 자동 평가 (7일 후)
         recommendation_loop(),  # 자동 셋업 진입 추천 + Telegram 푸시
         tracker_loop(),      # 알림 7일 추적 (Phase 0 검증)
-        imbalance_resolver_loop(),  # 임밸런스 신호 1:2 결과 판정
+        imbalance_resolver_loop(),    # 임밸런스 신호 1:2 결과 판정
+        options_macro_loop(),
     )
 
 
