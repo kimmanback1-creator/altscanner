@@ -2903,6 +2903,8 @@ tr.both-agree .ticker-name {
               </div>
             </div>
 
+            <!-- 현 상황 종합 요약 -->
+            <div id="opt-summary" style="background:#16181c;border:1px solid #2a2e35;border-left:3px solid #5b9bd5;border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;line-height:1.7;color:#a8aeb6"></div>
             <!-- GEX 행사가 분포 막대 -->
             <div style="font-size:10px;color:#6b7178;text-transform:uppercase;margin-bottom:8px">행사가별 감마 익스포저 (자석 후보)</div>
             <div id="opt-gex-bars" style="font-family:monospace;font-size:12px"></div>
@@ -8656,6 +8658,8 @@ async function imbLoadOptions(){
     // ── 시계열 로드 → 자석 이동 라인 + 레짐 전환 띠 ──
     imbLoadOptionsHistory()
 
+    // 종합 요약 (만기·스큐·GEX·자석·P/C 한 문단)
+    imbRenderOptSummary(data)
     // GEX 분포 막대
     const barsEl = document.getElementById('opt-gex-bars')
     const profile = data.gex_profile || []
@@ -8683,6 +8687,84 @@ async function imbLoadOptions(){
   }
 }
 
+// 만기 종류 판별: '26JUN26' → 주간/월간/분기 + 중복
+function imbClassifyExpiry(expStr){
+  if(!expStr) return ''
+  const m = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11}
+  const mt = expStr.match(/^(\d{1,2})([A-Z]{3})(\d{2})$/)
+  if(!mt) return ''
+  const day = parseInt(mt[1]), mon = m[mt[2]], yr = 2000+parseInt(mt[3])
+  const d = new Date(Date.UTC(yr, mon, day))
+  const isFriday = d.getUTCDay() === 5
+  const lastDay = new Date(Date.UTC(yr, mon+1, 0)).getUTCDate()
+  let lastFri = lastDay
+  while(new Date(Date.UTC(yr, mon, lastFri)).getUTCDay() !== 5) lastFri--
+  const isLastFriday = (day === lastFri)
+  const isQuarterMonth = [2,5,8,11].includes(mon)
+  const tags = []
+  if(isLastFriday && isQuarterMonth) tags.push('분기')
+  if(isLastFriday) tags.push('월간')
+  if(isFriday) tags.push('주간')
+  if(tags.length === 0) tags.push('단기')
+  return tags.join('+')
+}
+
+// 6개 요소 종합 → 쉬운 말 한 문단 (헷지 기준)
+function imbRenderOptSummary(data){
+  const el = document.getElementById('opt-summary')
+  if(!el) return
+  const skew = data.skew_25d, reg = data.gex_regime
+  const magnet = data.max_gamma_strike, spot = data.spot
+  const pcr = data.pc_ratio, exp = data.main_expiry, days = data.days_to_exp
+
+  const kind = imbClassifyExpiry(exp)
+  const big = (kind.includes('분기') || kind.includes('월간'))
+  let kindKo = ''
+  if(kind.includes('분기')) kindKo = '이번 주·이번 달·이번 분기 만기가 겹친 가장 큰 날'
+  else if(kind.includes('월간')) kindKo = '이번 주이자 이번 달 마지막 만기 — 큰 날'
+  else if(kind.includes('주간')) kindKo = '이번 주 만기'
+  else kindKo = '단기 만기'
+  const daysKo = days!=null ? (days < 0.5 ? '곧 마감' : `약 ${days.toFixed(1)}일 남음`) : ''
+  const expLine = `<b style="color:#e6e8ea">${big?'오늘이 만기일이에요':'만기'}</b>` +
+    ` <span style="color:${big?'#e6c84a':'#6b7178'}">(${kindKo})</span> · ${daysKo}`
+
+  let skewTxt = '오를지 내릴지 시장 심리는 한쪽으로 안 쏠린 편이에요'
+  if(skew != null){
+    if(skew <= -8) skewTxt = `지금 시장은 <b style="color:#e0556b">떨어질까 봐 더 걱정하는 분위기</b>예요 (하락 대비 헷지가 더 비쌈)`
+    else if(skew >= 8) skewTxt = `지금 시장은 <b style="color:#4caf50">오를 거란 기대가 더 큰 분위기</b>예요 (상승 쪽에 베팅이 몰림)`
+    else skewTxt = `오를지 내릴지 시장 심리는 거의 반반이에요`
+  }
+
+  let regTxt = ''
+  if(reg === 'long_gamma') regTxt = `그리고 큰손(딜러)들이 가격을 <b style="color:#5b9bd5">한 곳에 붙잡아두려는</b> 상태라, 위아래로 흔들려도 자꾸 제자리로 돌아오기 쉬워요`
+  else if(reg === 'short_gamma') regTxt = `그리고 큰손(딜러)들의 헷지가 <b style="color:#e0a356">움직임을 더 키우는</b> 상태라, 한번 방향이 나면 크게 갈 수 있어요`
+
+  let pinTxt = ''
+  if(magnet != null && spot){
+    const diff = magnet - spot, pct = Math.abs(diff/spot*100)
+    const mk = '$'+Number(magnet).toLocaleString()
+    if(pct < 0.4) pinTxt = ` 특히 지금 가격이 그 기준점(${mk}) 바로 근처라 그 값에 묶이기 쉬운 상태예요`
+    else if(diff > 0) pinTxt = ` 그 기준점(${mk})이 지금 가격보다 위에 있어 위로 끌릴 여지가 있어요`
+    else pinTxt = ` 그 기준점(${mk})이 지금 가격보다 아래라 아래로 끌릴 여지가 있어요`
+  }
+
+  let pcTxt = ''
+  if(pcr != null) pcTxt = pcr > 1
+    ? ` 참고로 하락 쪽 베팅(풋)이 조금 더 많이 쌓여 있어요.`
+    : ` 참고로 상승 쪽 베팅(콜)이 조금 더 많이 쌓여 있어요.`
+
+  let urgent = ''
+  if(days != null && days < 0.5)
+    urgent = reg==='long_gamma'
+      ? ` <b style="color:#e6c84a">만기가 코앞</b>이라 이 붙잡는 힘이 더 세지다가, 만기가 지나면 풀리면서 한쪽으로 방향이 날 수 있어요.`
+      : ` <b style="color:#e6c84a">만기가 코앞</b>이라 변동성이 크게 터질 수 있으니 주의하세요.`
+
+  el.innerHTML =
+    `<div style="margin-bottom:7px">📍 ${expLine}</div>` +
+    `<div>${skewTxt}. ${regTxt}.${pinTxt}${pcTxt}${urgent}</div>` +
+    `<div style="margin-top:7px;color:#6b7178;font-size:11.5px">→ 어디로 갈지는 차트(임밸런스·거래 흐름)랑 같이 봐야 해요.</div>`
+}
+  
 // 자석 이동 라인 + 레짐 전환 배경 띠 (시계열)
 let imbMagnetSeries = null
 let imbRegimeBands = []
