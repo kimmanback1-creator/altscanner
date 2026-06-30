@@ -17,6 +17,11 @@ OKX_API_KEY    = os.getenv("OKX_API_KEY", "")
 OKX_API_SECRET = os.getenv("OKX_API_SECRET", "")
 OKX_PASSPHRASE = os.getenv("OKX_PASSPHRASE", "")
 
+# ── OKX Sub-account API (read-only, 봇 헬스체크) ──────────
+OKX_SUB_API_KEY    = os.getenv("OKX_SUB_API_KEY", "")
+OKX_SUB_API_SECRET = os.getenv("OKX_SUB_API_SECRET", "")
+OKX_SUB_PASSPHRASE = os.getenv("OKX_SUB_PASSPHRASE", "")
+
 # ── Anthropic API (AI 의견 생성) ─────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 AI_MODEL          = os.getenv("AI_MODEL", "claude-haiku-4-5-20251001")
