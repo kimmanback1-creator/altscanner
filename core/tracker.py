@@ -574,7 +574,7 @@ async def tracker_loop():
         except Exception as e:
             logger.error(f"[tracker] 사이클 실패: {e}", exc_info=True)
 
-       try:
+        try:
             await update_all_rec_tracking()
         except Exception as e:
             logger.error(f"[rec-tracker] 사이클 실패: {e}", exc_info=True)
