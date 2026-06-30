@@ -12,6 +12,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 import requests
 from db.supabase import get_client
+from core.bot_health import run_health_check
 
 logger = logging.getLogger(__name__)
 
@@ -573,10 +574,15 @@ async def tracker_loop():
         except Exception as e:
             logger.error(f"[tracker] 사이클 실패: {e}", exc_info=True)
 
-        try:
+       try:
             await update_all_rec_tracking()
         except Exception as e:
             logger.error(f"[rec-tracker] 사이클 실패: {e}", exc_info=True)
+
+        try:
+            run_health_check()
+        except Exception as e:
+            logger.error(f"[bot_health] 사이클 실패: {e}", exc_info=True)
 
         # 다음 15분봉 마감 + 30초 후 (가격 안정화 대기)
         now = datetime.now(timezone.utc)
