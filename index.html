@@ -2357,6 +2357,12 @@ tr.both-agree .ticker-name {
         <span class="sidebar-icon">🟢</span>
         <span class="sidebar-label">Imbalance</span>
       </div>
+
+      <div class="sidebar-cat"><span class="cat-full">WEBHOOK</span></div>
+      <div class="sidebar-item" data-view="bothealth_eth_p" onclick="switchView('bothealth_eth_p')">
+        <span class="sidebar-icon">🩺</span>
+        <span class="sidebar-label">ETH.P</span>
+      </div>
     </div>
   </div>
 
@@ -2840,6 +2846,65 @@ tr.both-agree .ticker-name {
         <div class="verif-section-title">📋 거래 이력</div>
         <div class="verif-analysis-wrap" id="at-history">
           <div class="verif-empty">자동매매 이력이 없습니다 — 검증 완료 후 OKX 서브계정 연동 시 기록 시작</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-bothealth_eth_p" style="display:none">
+      <div class="verification-head">
+        <h2>🩺 ETH.P 봇 헬스체크</h2>
+        <span class="verification-info" id="bh-eth_p-info">데이터 로딩 중...</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="journal-btn" onclick="loadBotHealth('eth_p')">🔄 새로고침</button>
+        </div>
+      </div>
+      <div class="verification-body">
+        <div class="av-strat-legend">
+          <span style="color:#aaa"><b style="color:#ddd">웹훅 봇 모니터링</b> — OKX 서브계정 read-only 조회 (15분 주기). 봇 살아있음 · 주문 성공/실패 · 연결 상태</span>
+          <span style="color:#555">· 주문 무발화(신호 수신 실패)는 OKX Events History에서만 확인 가능</span>
+        </div>
+
+        <!-- A. 상태 요약 카드 -->
+        <div class="verif-summary-grid" id="bh-eth_p-summary">
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">봇 상태</div>
+            <div class="verif-stat-value" id="bh-eth_p-status">—</div>
+            <div class="verif-stat-sub" id="bh-eth_p-status-sub">—</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">연결</div>
+            <div class="verif-stat-value" id="bh-eth_p-conn">—</div>
+            <div class="verif-stat-sub" id="bh-eth_p-conn-sub">API 호출</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">최근 체결</div>
+            <div class="verif-stat-value" id="bh-eth_p-filled">—</div>
+            <div class="verif-stat-sub">최근 20건 중</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">최근 취소/거부</div>
+            <div class="verif-stat-value" id="bh-eth_p-canceled">—</div>
+            <div class="verif-stat-sub">최근 20건 중</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">마지막 주문</div>
+            <div class="verif-stat-value" id="bh-eth_p-lastorder" style="font-size:15px">—</div>
+            <div class="verif-stat-sub">활동 시각</div>
+          </div>
+          <div class="verif-stat-card">
+            <div class="verif-stat-label">마지막 점검</div>
+            <div class="verif-stat-value" id="bh-eth_p-lastcheck" style="font-size:15px">—</div>
+            <div class="verif-stat-sub">폴링 시각</div>
+          </div>
+        </div>
+
+        <!-- 에러 배너 (down일 때만) -->
+        <div id="bh-eth_p-error" class="verif-empty" style="display:none;border-color:#c0392b;color:#e74c3c"></div>
+
+        <!-- B. 최근 주문 이력 -->
+        <div class="verif-section-title">📋 최근 주문</div>
+        <div class="verif-analysis-wrap" id="bh-eth_p-orders">
+          <div class="verif-empty">주문 이력 로딩 중...</div>
         </div>
       </div>
     </div>
@@ -3929,7 +3994,7 @@ async function requestIndexOpinion() {
 }
 
 function switchView(view) {
-  const views = ['dashboard', 'journal', 'watchlist', 'index', 'autosetup', 'verification', 'autoverif', 'autotrades', 'imbalance']
+  const views = ['dashboard', 'journal', 'watchlist', 'index', 'autosetup', 'verification', 'autoverif', 'autotrades', 'imbalance', 'bothealth_eth_p']
   views.forEach(v => {
     const el = document.getElementById('view-' + v)
     if (el) el.style.display = (v === view) ? 'flex' : 'none'
@@ -3977,6 +4042,11 @@ function switchView(view) {
   // 임밸런스 뷰 활성화 시 데이터 로드
   if (view === 'imbalance') {
     loadImbalanceView()
+  }
+
+  // 봇 헬스체크 뷰 활성화 시 데이터 로드
+  if (view === 'bothealth_eth_p') {
+    loadBotHealth('eth_p')
   }
 }
 function toggleSidebar() {
@@ -9010,6 +9080,124 @@ async function imbLoadStats(){
     }
     document.getElementById('imb-stats-body').innerHTML = html
   }catch(e){ console.error('[imb] 통계 로드 실패', e) }
+}
+
+async function loadBotHealth(botId) {
+  const info = document.getElementById(`bh-${botId}-info`)
+  if (info) info.textContent = '데이터 로딩 중...'
+
+  const fmtTime = (ts) => {
+    if (!ts) return '—'
+    const d = new Date(ts)
+    return d.toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+  }
+
+  try {
+    // 상태 스냅샷
+    const { data: health } = await sb.from('bot_health')
+      .select('*')
+      .eq('bot_id', botId)
+      .maybeSingle()
+
+    const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt }
+    const setColor = (id, col) => { const el = document.getElementById(id); if (el) el.style.color = col }
+
+    if (!health) {
+      setText(`bh-${botId}-status`, '데이터 없음')
+      setText(`bh-${botId}-status-sub`, '아직 점검 기록 없음')
+      if (info) info.textContent = '아직 헬스체크 데이터가 없습니다 (봇 미가동 또는 첫 폴링 전)'
+    } else {
+      // 상태 배지
+      const statusMap = {
+        active:  ['🟢 정상',   '#2ecc71', '봇 활성'],
+        warning: ['⚠️ 주의',   '#f39c12', '주문 취소율 높음'],
+        down:    ['🔴 응답없음', '#e74c3c', '연결/키 문제'],
+        unknown: ['⚪ 미상',   '#888',    '점검 전'],
+      }
+      const [stTxt, stCol, stSub] = statusMap[health.status] || statusMap.unknown
+      setText(`bh-${botId}-status`, stTxt)
+      setColor(`bh-${botId}-status`, stCol)
+      setText(`bh-${botId}-status-sub`, stSub)
+
+      // 연결
+      setText(`bh-${botId}-conn`, health.api_ok ? '✓ OK' : '✗ 실패')
+      setColor(`bh-${botId}-conn`, health.api_ok ? '#2ecc71' : '#e74c3c')
+
+      // 카운트
+      setText(`bh-${botId}-filled`, health.recent_filled ?? 0)
+      setText(`bh-${botId}-canceled`, health.recent_canceled ?? 0)
+      setColor(`bh-${botId}-canceled`, (health.recent_canceled > 0) ? '#f39c12' : '#888')
+
+      // 시각
+      setText(`bh-${botId}-lastorder`, fmtTime(health.last_order_at))
+      setText(`bh-${botId}-lastcheck`, fmtTime(health.last_check_at))
+
+      // 에러 배너
+      const errEl = document.getElementById(`bh-${botId}-error`)
+      if (errEl) {
+        if (!health.api_ok && health.api_error) {
+          errEl.style.display = 'block'
+          errEl.textContent = `⚠️ API 오류: ${health.api_error}`
+        } else {
+          errEl.style.display = 'none'
+        }
+      }
+
+      if (info) info.textContent = `마지막 점검: ${fmtTime(health.last_check_at)}`
+    }
+
+    // 최근 주문 이력
+    const { data: orders } = await sb.from('bot_orders')
+      .select('*')
+      .eq('bot_id', botId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    const wrap = document.getElementById(`bh-${botId}-orders`)
+    if (wrap) {
+      if (!orders || orders.length === 0) {
+        wrap.innerHTML = '<div class="verif-empty">주문 이력이 없습니다 — 봇 가동 후 채워집니다</div>'
+      } else {
+        const stateBadge = (s) => {
+          const m = {
+            filled:           ['체결',   '#2ecc71'],
+            canceled:         ['취소/거부', '#e74c3c'],
+            live:             ['대기',   '#3498db'],
+            partially_filled: ['부분체결', '#f39c12'],
+          }
+          const [t, c] = m[s] || [s, '#888']
+          return `<span style="color:${c};font-weight:600">${t}</span>`
+        }
+        const sideBadge = (side, posSide) => {
+          const long = (posSide === 'long') || (side === 'buy')
+          const col = long ? '#2ecc71' : '#e74c3c'
+          const lbl = posSide && posSide !== 'net' ? posSide.toUpperCase() : side.toUpperCase()
+          return `<span style="color:${col}">${lbl}</span>`
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        html += '<thead><tr style="color:#888;text-align:left;border-bottom:1px solid #2a2a2a">'
+        html += '<th style="padding:8px 6px">시각</th><th>심볼</th><th>방향</th><th>타입</th><th>상태</th><th style="text-align:right">체결가</th><th style="text-align:right">수량</th><th>사유</th>'
+        html += '</tr></thead><tbody>'
+        for (const o of orders) {
+          html += '<tr style="border-bottom:1px solid #1a1a1a">'
+          html += `<td style="padding:8px 6px;color:#aaa">${fmtTime(o.created_at)}</td>`
+          html += `<td style="color:#ddd">${o.inst_id || '—'}</td>`
+          html += `<td>${sideBadge(o.side, o.pos_side)}</td>`
+          html += `<td style="color:#888">${o.ord_type || '—'}</td>`
+          html += `<td>${stateBadge(o.state)}</td>`
+          html += `<td style="text-align:right;color:#ccc">${o.avg_px ?? o.fill_px ?? '—'}</td>`
+          html += `<td style="text-align:right;color:#ccc">${o.fill_sz ?? '—'}</td>`
+          html += `<td style="color:#e74c3c;font-size:12px">${o.s_msg || ''}</td>`
+          html += '</tr>'
+        }
+        html += '</tbody></table>'
+        wrap.innerHTML = html
+      }
+    }
+  } catch (e) {
+    console.error('[bot_health] 로드 실패', e)
+    if (info) info.textContent = '로드 실패: ' + e.message
+  }
 }
 
 async function loadAutoTrades() {
